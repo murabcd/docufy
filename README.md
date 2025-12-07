@@ -1,143 +1,69 @@
-<img alt="AI-powered writing and document management platform." src="./public/landing/screenshots/secondary-feature.jpeg">
-<h1 align="center">Docufy</h1>
+<a href="https://docufy.vercel.app">
+  <img alt="AI Document Management Platform Built with TanStack Start, TanStack AI and Convex." src="./public/preview/docufy.png">
+  <h1 align="center">Docufy</h1>
+</a>
 
 <p align="center">
-  AI-powered writing and document management platform designed to supercharge your writing process.
+  AI Document Management Platform Built with TanStack Start, TanStack AI and Convex.
 </p>
+
+> **⚠️ WARNING: This project is currently in early development. There are a lot of performance issues so far i need to fix.**  
 
 <p align="center">
   <a href="#features"><strong>Features</strong></a> ·
-  <a href="#ai-capabilities"><strong>AI Capabilities</strong></a> ·
-  <a href="#tech-stack"><strong>Tech Stack</strong></a> ·
-  <a href="#getting-started"><strong>Getting Started</strong></a> ·
-  <a href="#project-structure"><strong>Project Structure</strong></a> ·
-  <a href="#deployment"><strong>Deployment</strong></a>
+  <a href="#model-providers"><strong>Model providers</strong></a> ·
+  <a href="#deploy-your-own"><strong>Deploy your own</strong></a> ·
+  <a href="#running-locally"><strong>Running locally</strong></a>
 </p>
+<br/>
 
 ## Features
 
-- **Effortless Document Creation:** Write essays, reports, and other documents with ease
-- **Efficient Collaboration:** Share your work, enhancing teamwork and productivity
-- **AI-powered Enhancements:** Elevate your writing with AI-powered analysis
-- **Progress Tracking:** Monitor your writing progress over time
-- **Document Management:** Organize and categorize your documents for easy access
-- **Version Control:** Track changes and revert to previous versions when needed
+- [TanStack Start](https://tanstack.com/start/latest)
+  - File-based routing, type-safe from server to client
+  - Built on Vite for a lightning-fast HMR development experience
+- [TanStack AI](https://tanstack.com/ai/latest)
+  - AI integration with OpenAI adapter
+  - Server-sent events for streaming responses
+- [Tiptap v3](https://tiptap.dev/)
+  - Modern rich text editor framework
+  - Extensible with custom extensions (code blocks, emojis, slash commands, etc.)
+  - Collaboration support with Yjs
+- [Convex](https://www.convex.dev/)
+  - Reactive queries for instant UI updates
+  - Optimized for real-time document synchronization
+- [Shadcn/UI](https://ui.shadcn.com)
+  - Styling with [Tailwind CSS](https://tailwindcss.com)
+  - Component primitives from [Radix UI](https://radix-ui.com) for accessibility and flexibility
+- [OpenAI](https://openai.com/)
+  - GPT-4o model for AI chat functionality
+  - Streaming responses for real-time AI interactions
 
-## AI Capabilities
+## Model provider
 
-**Smart Autocomplete:** Enhance your writing flow with intelligent sentence completion
-![AI Autocomplete Feature](./public/landing/screenshots/primary-feature-completion.jpeg)
+This app utilizes the [OpenAI API](https://openai.com/) for its AI capabilities. You will need to provide your own OpenAI API key in the environment variables.
 
-**Contextual Insights:** Discover related content across your documents for cohesive writing
-![AI Contextual Insights Feature](./public/landing/screenshots/primary-feature-context.jpeg)
+This app ships with [OpenAI API](https://openai.com/) provider as the default. However, with the [Tanstack AI](https://tanstack.com/ai/latest), you can switch LLM providers to [OpenAI](https://openai.com/), [Ollama](https://ollama.com), [Gemini](https://cohere.com/), and [many more](https://tanstack.com/ai/latest/docs/getting-started/overview) with just a few lines of code.
 
-**Grammar Perfection:** Automatically correct grammar errors for polished writing
-![AI Grammar Correction Feature](./public/landing/screenshots/primary-feature-grammar.jpeg)
+## Deploy your own
 
-## Tech Stack
+You can deploy your own version of Docufy to Vercel with one click:
 
-Docufy is built with modern technologies for optimal performance and developer experience:
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmurabcd%2Fdocs&env=CONVEX_DEPLOYMENT,VITE_CONVEX_URL,OPENAI_API_KEY&envDescription=Learn%20more%20about%20how%20to%20get%20the%20API%20Keys%20for%20the%20application&envLink=https%3A%2F%2Fgithub.com%2Fmurabcd%2Fdocs%2Fblob%2Fmain%2F.env.example&demo-title=Docufy&demo-description=AI-powered%20document%20management%20platform%20built%20with%20Tanstack%20Start%2C%20Tiptap%20v3%2C%20Convex%2C%20and%20OpenAI.&demo-url=https%3A%2F%2Fdocufy.vercel.app)
 
-- **Frontend**
+## Running locally
 
-  - [Next.js 14](https://nextjs.org/) - React framework with App Router
-  - [React](https://reactjs.org/) - UI library
-  - [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
-  - [Shadcn/ui](https://ui.shadcn.com/) - Accessible component library
-  - [Tiptap](https://tiptap.dev/) - Headless rich text editor for document editing
-  - [Tremor](https://www.tremor.so/) - React library for dashboards and data visualization
+You will need to use the environment variables [defined in `.env.example`](.env.example) to run Docufy. It's recommended you use [Vercel Environment Variables](https://vercel.com/docs/projects/environment-variables) for this, but a `.env` file is all that is necessary.
 
-- **State Management**
+> Note: You should not commit your `.env` file or it will expose secrets that will allow others to control access to your various OpenAI and authentication provider accounts.
 
-  - [Zustand](https://github.com/pmndrs/zustand) - Lightweight state management
+1. Install Vercel CLI: `npm i -g vercel`
+2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
+3. Download your environment variables: `vercel env pull`
 
-- **Backend & Database**
+```bash
+bun install
+bun dev
+```
 
-  - [Prisma ORM](https://www.prisma.io/) - Type-safe database client
-  - [Supabase](https://supabase.com/) - Open source Firebase alternative
-
-- **Authentication**
-
-  - [NextAuth.js](https://next-auth.js.org/) - Authentication for Next.js
-
-- **AI Integration**
-
-  - [OpenAI API](https://openai.com/api/) - AI capabilities
-
-- **Email**
-  - [Postmark](https://postmarkapp.com/) - Email delivery service
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18.x or later
-- npm, yarn, pnpm, or bun
-
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/yourusername/docufy.git
-   cd docufy
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   npm install
-   # or
-   yarn install
-   # or
-   pnpm install
-   # or
-   bun install
-   ```
-
-3. Set up environment variables:
-
-   ```bash
-   cp .env.example .env.local
-   ```
-
-   Edit `.env.local` with your API keys and configuration.
-
-4. Start the development server:
-
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   # or
-   pnpm dev
-   # or
-   bun dev
-   ```
-
-5. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-## Deployment
-
-### Deploy on Vercel
-
-The easiest way to deploy Docufy is to use the [Vercel Platform](https://vercel.com/new):
-
-1. Push your code to a GitHub repository
-2. Import the project to Vercel
-3. Vercel will detect Next.js and configure the build settings automatically
-4. Your application will be deployed and available at a Vercel URL
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+Your app should now be running on [localhost:3000](http://localhost:3000/).
