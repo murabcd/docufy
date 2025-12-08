@@ -25,7 +25,12 @@ export const Route = createRootRouteWithContext<{
 				content: "width=device-width, initial-scale=1",
 			},
 			{
-				title: "TanStack Start Starter",
+				title: "Docufy",
+			},
+			{
+				name: "description",
+				content:
+					"AI Document Management Platform Built with TanStack Start, TanStack AI and Convex.",
 			},
 		],
 		links: [
@@ -33,6 +38,7 @@ export const Route = createRootRouteWithContext<{
 				rel: "stylesheet",
 				href: appCss,
 			},
+			{ rel: "icon", href: "/logo.svg", type: "image/svg+xml" },
 		],
 	}),
 

@@ -1,9 +1,9 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useDebouncer } from "@tanstack/react-pacer";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { Editor } from "@tiptap/react";
-import { useMutation, useQuery } from "convex/react";
-import { Check, Loader2 } from "lucide-react";
+import { useMutation } from "convex/react";
 import {
 	useCallback,
 	useEffect,
@@ -14,21 +14,11 @@ import {
 } from "react";
 import { AISidebar } from "@/components/ai-sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { NavActions } from "@/components/nav-actions";
+import { Header } from "@/components/header";
 import TiptapEditor, {
 	type TiptapEditorHandle,
 } from "@/components/tiptap/tiptap-editor";
-import {
-	Breadcrumb,
-	BreadcrumbItem,
-	BreadcrumbLink,
-	BreadcrumbList,
-	BreadcrumbPage,
-	BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset } from "@/components/ui/sidebar";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -69,61 +59,26 @@ function DocumentEditor() {
 	);
 	const isUserEditingRef = useRef(false);
 	const lastUserEditTimeRef = useRef<number>(0);
-	const titleInputRef = useRef<HTMLInputElement>(null);
-	const [isEditingTitle, setIsEditingTitle] = useState(false);
-	const [title, setTitle] = useState("Untitled");
-
-	const document = useQuery(api.documents.get, {
-		id: documentId as Id<"documents">,
-	});
-	const ancestors =
-		useQuery(api.documents.getAncestors, {
+	const { data: document } = useSuspenseQuery(
+		convexQuery(api.documents.get, {
 			id: documentId as Id<"documents">,
-		}) ?? [];
+		}),
+	);
+	const { data: ancestors = [] } = useSuspenseQuery(
+		convexQuery(api.documents.getAncestors, {
+			id: documentId as Id<"documents">,
+		}),
+	);
 
-	// Sync title with document when it changes externally
-	useEffect(() => {
-		if (!isEditingTitle) {
-			setTitle(document?.title || "Untitled");
-		}
-	}, [document?.title, isEditingTitle]);
-
-	// Handle title editing
-	const enableTitleEdit = useCallback(() => {
-		setTitle(document?.title || "Untitled");
-		setIsEditingTitle(true);
-		setTimeout(() => {
-			titleInputRef.current?.focus();
-			titleInputRef.current?.setSelectionRange(
-				0,
-				titleInputRef.current.value.length,
-			);
-		}, 0);
-	}, [document?.title]);
-
-	const disableTitleEdit = useCallback(() => {
-		setIsEditingTitle(false);
-	}, []);
-
+	// Handle title change
 	const onTitleChange = useCallback(
-		(event: React.ChangeEvent<HTMLInputElement>) => {
-			const newTitle = event.target.value;
-			setTitle(newTitle);
+		(newTitle: string) => {
 			updateDocumentTitle({
 				id: documentId as Id<"documents">,
 				title: newTitle || "Untitled",
 			});
 		},
 		[documentId, updateDocumentTitle],
-	);
-
-	const onTitleKeyDown = useCallback(
-		(event: React.KeyboardEvent<HTMLInputElement>) => {
-			if (event.key === "Enter") {
-				disableTitleEdit();
-			}
-		},
-		[disableTitleEdit],
 	);
 
 	// Helper to check if editor is ready
@@ -538,101 +493,14 @@ function DocumentEditor() {
 		<>
 			<AppSidebar />
 			<SidebarInset>
-				<header className="flex h-14 shrink-0 items-center gap-2">
-					<div className="flex flex-1 items-center gap-2 px-3">
-						<SidebarTrigger />
-						<Separator
-							orientation="vertical"
-							className="mr-2 data-[orientation=vertical]:h-4"
-						/>
-						<Breadcrumb>
-							<BreadcrumbList>
-								{ancestors.length > 0 ? (
-									<>
-										{ancestors.map((ancestor) => (
-											<>
-												<BreadcrumbItem key={ancestor._id}>
-													<BreadcrumbLink asChild>
-														<Link
-															to="/documents/$documentId"
-															params={{ documentId: ancestor._id }}
-														>
-															{ancestor.title}
-														</Link>
-													</BreadcrumbLink>
-												</BreadcrumbItem>
-												<BreadcrumbSeparator />
-											</>
-										))}
-										<BreadcrumbItem>
-											{isEditingTitle ? (
-												<Input
-													ref={titleInputRef}
-													onClick={enableTitleEdit}
-													onBlur={disableTitleEdit}
-													onChange={onTitleChange}
-													onKeyDown={onTitleKeyDown}
-													value={title}
-													className="h-auto px-1 py-0 text-sm focus-visible:ring-transparent border-transparent bg-transparent shadow-none hover:bg-accent/50 rounded"
-													style={{ minWidth: "100px", maxWidth: "300px" }}
-												/>
-											) : (
-												<BreadcrumbPage
-													className="line-clamp-1 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors"
-													onClick={enableTitleEdit}
-												>
-													{document?.title || "Untitled"}
-												</BreadcrumbPage>
-											)}
-										</BreadcrumbItem>
-									</>
-								) : (
-									<BreadcrumbItem>
-										{isEditingTitle ? (
-											<Input
-												ref={titleInputRef}
-												onClick={enableTitleEdit}
-												onBlur={disableTitleEdit}
-												onChange={onTitleChange}
-												onKeyDown={onTitleKeyDown}
-												value={title}
-												className="h-auto px-1 py-0 text-sm focus-visible:ring-transparent border-transparent bg-transparent shadow-none hover:bg-accent/50 rounded"
-												style={{ minWidth: "100px", maxWidth: "300px" }}
-											/>
-										) : (
-											<BreadcrumbPage
-												className="line-clamp-1 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors"
-												onClick={enableTitleEdit}
-											>
-												{document?.title || "Untitled"}
-											</BreadcrumbPage>
-										)}
-									</BreadcrumbItem>
-								)}
-							</BreadcrumbList>
-						</Breadcrumb>
-					</div>
-					<div className="ml-auto flex items-center gap-2 px-3">
-						<div className="flex items-center gap-2 text-xs text-muted-foreground">
-							{saveStatus === "saving" && (
-								<>
-									<Loader2 className="h-3 w-3 animate-spin" />
-									<span className="hidden sm:inline">Saving...</span>
-								</>
-							)}
-							{saveStatus === "saved" && (
-								<>
-									<Check className="h-3 w-3" />
-									<span className="hidden sm:inline">Saved</span>
-								</>
-							)}
-						</div>
-						<NavActions
-							documentId={documentId as Id<"documents">}
-							updatedAt={document?.updatedAt}
-						/>
-					</div>
-				</header>
+				<Header
+					documentId={documentId as Id<"documents">}
+					documentTitle={document?.title}
+					ancestors={ancestors}
+					onTitleChange={onTitleChange}
+					updatedAt={document?.updatedAt}
+					saveStatus={saveStatus}
+				/>
 				<div className="flex flex-1 flex-col px-4 py-10">
 					<div className="mx-auto w-full max-w-3xl">
 						<TiptapEditor

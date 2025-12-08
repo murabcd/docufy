@@ -3,14 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { FileText } from "lucide-react";
 import { AISidebar } from "@/components/ai-sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import {
-	Breadcrumb,
-	BreadcrumbItem,
-	BreadcrumbList,
-	BreadcrumbPage,
-} from "@/components/ui/breadcrumb";
-import { Separator } from "@/components/ui/separator";
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { Header } from "@/components/header";
+import { SidebarInset } from "@/components/ui/sidebar";
 import { api } from "../../convex/_generated/api";
 
 export const Route = createFileRoute("/")({
@@ -28,22 +22,7 @@ function EditorHome() {
 		<>
 			<AppSidebar />
 			<SidebarInset>
-				<header className="flex h-14 shrink-0 items-center gap-2">
-					<div className="flex flex-1 items-center gap-2 px-3">
-						<SidebarTrigger />
-						<Separator
-							orientation="vertical"
-							className="mr-2 data-[orientation=vertical]:h-4"
-						/>
-						<Breadcrumb>
-							<BreadcrumbList>
-								<BreadcrumbItem>
-									<BreadcrumbPage className="line-clamp-1">Home</BreadcrumbPage>
-								</BreadcrumbItem>
-							</BreadcrumbList>
-						</Breadcrumb>
-					</div>
-				</header>
+				<Header title="Home" />
 				<div className="flex flex-1 flex-col items-center justify-center px-4 py-10">
 					<div className="flex flex-col items-center gap-4 text-center">
 						<div className="flex size-16 items-center justify-center rounded-full bg-muted">

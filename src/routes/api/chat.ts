@@ -18,13 +18,16 @@ export const Route = createFileRoute("/api/chat")({
 					);
 				}
 
-				const { messages, conversationId } = await request.json();
+				const { messages, conversationId, model } = await request.json();
+
+				// Use the provided model or default to gpt-4.1-mini (Auto mode)
+				const selectedModel = model || "gpt-4.1-mini";
 
 				try {
 					const stream = chat({
 						adapter: openai(),
 						messages,
-						model: "gpt-4o",
+						model: selectedModel,
 						conversationId,
 					});
 
