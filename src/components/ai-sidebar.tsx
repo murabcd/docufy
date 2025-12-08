@@ -34,15 +34,17 @@ export function AISidebar({
 		return chatModels.find((m) => m.id === DEFAULT_CHAT_MODEL) ?? chatModels[0];
 	});
 
+	const body = React.useMemo(
+		() => ({
+			model: selectedModel.model,
+		}),
+		[selectedModel.model],
+	);
+
 	const { messages, sendMessage, isLoading } = useChat({
 		connection: fetchServerSentEvents("/api/chat"),
-		body: {
-			model: selectedModel.model, // Pass the actual model name to the API
-		},
+		body,
 	});
-
-	// Note: Right sidebar state is now persisted via cookies
-	// It will respect the user's previous preference on page refresh
 
 	const handleSend = () => {
 		if (inputValue.trim() && !isLoading) {
