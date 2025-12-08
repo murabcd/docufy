@@ -1,144 +1,272 @@
-import { ArrowUp, Globe, Paperclip } from "lucide-react";
-import * as React from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { convexQuery } from "@convex-dev/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { ArrowUp, AtSign, FileText, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+	Command,
+	CommandEmpty,
+	CommandGroup,
+	CommandInput,
+	CommandItem,
+	CommandList,
+} from "@/components/ui/command";
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuLabel,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupButton,
+	InputGroupTextarea,
+} from "@/components/ui/input-group";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import {
 	Tooltip,
 	TooltipContent,
-	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+	type ChatModel,
+	chatModels,
+	DEFAULT_CHAT_MODEL,
+} from "@/lib/ai/models";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
+
+function MentionableIcon() {
+	return (
+		<span className="flex size-4 items-center justify-center">
+			<FileText className="size-4" />
+		</span>
+	);
+}
 
 interface ChatInputProps {
-	value: string;
-	onChange: (value: string) => void;
-	onSend: () => void;
+	value?: string;
+	onChange?: (value: string) => void;
+	onSend?: () => void;
 	placeholder?: string;
-	attachmentLabel?: string;
-	sourcesLabel?: string;
 	disabled?: boolean;
+	selectedModel?: ChatModel;
+	onModelChange?: (model: ChatModel) => void;
 }
 
 export function ChatInput({
-	value,
-	onChange,
-	onSend,
-	placeholder = "Ask anything...",
-	attachmentLabel,
-	sourcesLabel,
+	value: propValue,
+	onChange: propOnChange,
+	onSend: propOnSend,
+	placeholder = "Ask, search, or make anything...",
 	disabled = false,
-}: ChatInputProps) {
-	const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+	selectedModel: propSelectedModel,
+	onModelChange,
+}: ChatInputProps = {}) {
+	const [internalValue, setInternalValue] = useState("");
+	const [mentions, setMentions] = useState<Id<"documents">[]>([]);
+	const [mentionPopoverOpen, setMentionPopoverOpen] = useState(false);
+	const [modelPopoverOpen, setModelPopoverOpen] = useState(false);
+	const [internalSelectedModel, setInternalSelectedModel] = useState<ChatModel>(
+		() => {
+			return (
+				chatModels.find((m) => m.id === DEFAULT_CHAT_MODEL) ?? chatModels[0]
+			);
+		},
+	);
 
-	const adjustHeight = React.useCallback(() => {
-		if (textareaRef.current) {
-			textareaRef.current.style.height = "auto";
-			textareaRef.current.style.height = `${textareaRef.current.scrollHeight + 2}px`;
-		}
-	}, []);
+	// Use prop if provided, otherwise use internal state
+	const value = propValue ?? internalValue;
+	const onChange = propOnChange ?? setInternalValue;
+	const selectedModel = propSelectedModel ?? internalSelectedModel;
+	const setSelectedModel = onModelChange ?? setInternalSelectedModel;
 
-	const resetHeight = React.useCallback(() => {
-		if (textareaRef.current) {
-			textareaRef.current.style.height = "auto";
-			textareaRef.current.style.height = "98px";
-		}
-	}, []);
-
-	React.useEffect(() => {
-		if (textareaRef.current && value) {
-			adjustHeight();
-		}
-	}, [value, adjustHeight]);
-
-	const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+	const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
 		onChange(e.target.value);
-		adjustHeight();
+	};
+
+	const handleSend = () => {
+		if (value.trim() && !disabled && propOnSend) {
+			propOnSend();
+		}
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
 			e.preventDefault();
-			if (!disabled) {
-				onSend();
-				resetHeight();
-			}
+			handleSend();
 		}
 	};
 
-	const handleSend = () => {
-		if (value.trim() && !disabled) {
-			onSend();
-			resetHeight();
-		}
-	};
+	const { data: documents } = useSuspenseQuery(
+		convexQuery(api.documents.getAll),
+	);
+
+	const availableDocuments = useMemo(() => {
+		return documents.filter((doc) => !mentions.includes(doc._id));
+	}, [documents, mentions]);
+
+	const hasMentions = mentions.length > 0;
 
 	return (
-		<div className="relative w-full flex flex-col gap-4">
-			<Textarea
-				ref={textareaRef}
-				value={value}
-				onChange={handleInput}
-				onKeyDown={handleKeyDown}
-				placeholder={placeholder}
-				disabled={disabled}
-				className="min-h-[24px] max-h-[calc(75dvh)] overflow-y-auto resize-none rounded-2xl !text-base bg-muted pb-10 dark:border-zinc-700 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-				rows={2}
-			/>
+		<form className="[--radius:1.2rem]">
+			<div>
+				<label htmlFor="notion-prompt" className="sr-only">
+					Prompt
+				</label>
+				<InputGroup>
+					<InputGroupTextarea
+						id="notion-prompt"
+						value={value}
+						onChange={handleInputChange}
+						onKeyDown={handleKeyDown}
+						placeholder={placeholder}
+						disabled={disabled}
+					/>
 
-			<TooltipProvider delayDuration={0}>
-				<div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start gap-1">
-					{attachmentLabel && (
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<span>
-									<Button
-										type="button"
-										variant="ghost"
-										disabled={disabled}
-										className="rounded-md rounded-bl-lg p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200"
-									>
-										<Paperclip className="w-4 h-4" />
-									</Button>
-								</span>
-							</TooltipTrigger>
-							<TooltipContent>
-								<p>{attachmentLabel}</p>
-							</TooltipContent>
-						</Tooltip>
-					)}
-					{sourcesLabel && (
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<span>
-									<Button
-										type="button"
-										variant="ghost"
-										disabled={disabled}
-										className="rounded-md p-[7px] h-fit dark:border-zinc-700 hover:dark:bg-zinc-900 hover:bg-zinc-200"
-									>
-										<Globe className="w-4 h-4" />
-									</Button>
-								</span>
-							</TooltipTrigger>
-							<TooltipContent>
-								<p>{sourcesLabel}</p>
-							</TooltipContent>
-						</Tooltip>
-					)}
-				</div>
-			</TooltipProvider>
+					<InputGroupAddon align="block-start">
+						<Popover
+							open={mentionPopoverOpen}
+							onOpenChange={setMentionPopoverOpen}
+						>
+							<Tooltip>
+								<TooltipTrigger
+									asChild
+									onFocusCapture={(e) => e.stopPropagation()}
+								>
+									<PopoverTrigger asChild>
+										<InputGroupButton
+											variant="outline"
+											size={!hasMentions ? "sm" : "icon-sm"}
+											className="rounded-full transition-transform"
+										>
+											<AtSign /> {!hasMentions && "Add context"}
+										</InputGroupButton>
+									</PopoverTrigger>
+								</TooltipTrigger>
+								<TooltipContent>Mention a document</TooltipContent>
+							</Tooltip>
 
-			<div className="absolute bottom-0 right-0 p-2 w-fit flex flex-row justify-end">
-				<Button
-					size="sm"
-					type="button"
-					onClick={handleSend}
-					disabled={!value.trim() || disabled}
-				>
-					<ArrowUp className="w-4 h-4" />
-					<span className="sr-only">Send message</span>
-				</Button>
+							<PopoverContent className="p-0 [--radius:1.2rem]" align="start">
+								<Command>
+									<CommandInput placeholder="Search documents..." />
+									<CommandList>
+										<CommandEmpty>No documents found</CommandEmpty>
+										{availableDocuments.length > 0 ? (
+											<CommandGroup heading="Documents">
+												{availableDocuments.map((document) => (
+													<CommandItem
+														key={document._id}
+														value={`${document._id} ${document.title}`}
+														onSelect={() => {
+															setMentions((prev) => [...prev, document._id]);
+															setMentionPopoverOpen(false);
+														}}
+													>
+														<MentionableIcon />
+														{document.title}
+													</CommandItem>
+												))}
+											</CommandGroup>
+										) : (
+											<CommandEmpty>No documents available</CommandEmpty>
+										)}
+									</CommandList>
+								</Command>
+							</PopoverContent>
+						</Popover>
+
+						<div className="no-scrollbar -m-1.5 flex gap-1 overflow-y-auto p-1.5">
+							{mentions.map((mentionId) => {
+								const document = documents.find((doc) => doc._id === mentionId);
+
+								if (!document) {
+									return null;
+								}
+
+								return (
+									<InputGroupButton
+										key={mentionId}
+										size="sm"
+										variant="secondary"
+										className="rounded-full !pl-2"
+										onClick={() => {
+											setMentions((prev) =>
+												prev.filter((m) => m !== mentionId),
+											);
+										}}
+									>
+										<MentionableIcon />
+										{document.title}
+										<X />
+									</InputGroupButton>
+								);
+							})}
+						</div>
+					</InputGroupAddon>
+
+					<InputGroupAddon align="block-end" className="gap-1">
+						<DropdownMenu
+							open={modelPopoverOpen}
+							onOpenChange={setModelPopoverOpen}
+						>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<DropdownMenuTrigger asChild>
+										<InputGroupButton size="sm" className="rounded-full">
+											{selectedModel.name}
+										</InputGroupButton>
+									</DropdownMenuTrigger>
+								</TooltipTrigger>
+								<TooltipContent>Select model</TooltipContent>
+							</Tooltip>
+
+							<DropdownMenuContent
+								side="top"
+								align="start"
+								className="[--radius:1rem]"
+							>
+								<DropdownMenuGroup className="w-42">
+									<DropdownMenuLabel className="text-muted-foreground text-xs">
+										Select model
+									</DropdownMenuLabel>
+									{chatModels.map((model) => (
+										<DropdownMenuCheckboxItem
+											key={model.id}
+											checked={model.id === selectedModel.id}
+											onCheckedChange={(checked) => {
+												if (checked) {
+													setSelectedModel(model);
+												}
+											}}
+											className="pl-2 *:[span:first-child]:right-2 *:[span:first-child]:left-auto"
+										>
+											{model.name}
+										</DropdownMenuCheckboxItem>
+									))}
+								</DropdownMenuGroup>
+							</DropdownMenuContent>
+						</DropdownMenu>
+
+						<InputGroupButton
+							aria-label="Send"
+							className="ml-auto rounded-full"
+							variant="default"
+							size="icon-sm"
+							onClick={handleSend}
+							disabled={!value.trim() || disabled}
+						>
+							<ArrowUp />
+						</InputGroupButton>
+					</InputGroupAddon>
+				</InputGroup>
 			</div>
-		</div>
+		</form>
 	);
 }

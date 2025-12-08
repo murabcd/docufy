@@ -1,8 +1,10 @@
-import type { Message } from "@tanstack/ai-react";
+import type { UIMessage } from "@tanstack/ai-react";
 import * as React from "react";
+import { Streamdown } from "streamdown";
+import { ShimmerText } from "@/components/ui/shimmer-text";
 
 interface ChatMessagesProps {
-	messages: Array<Message>;
+	messages: Array<UIMessage>;
 	isLoading?: boolean;
 }
 
@@ -16,16 +18,6 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
 			prevMessagesLengthRef.current = messages.length;
 		}
 	});
-
-	if (messages.length === 0) {
-		return (
-			<div className="flex flex-col justify-end h-full pb-32">
-				<h2 className="text-foreground text-base font-semibold tracking-tight">
-					What do you want to know about?
-				</h2>
-			</div>
-		);
-	}
 
 	const lastMessage = messages[messages.length - 1];
 	const isLastMessageAssistant = lastMessage?.role === "assistant";
@@ -61,7 +53,7 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
 									})}
 								</div>
 							) : (
-								<div className="text-sm whitespace-pre-wrap">
+								<div className="text-sm">
 									{message.parts.map((part, index) => {
 										if (part.type === "thinking") {
 											return (
@@ -75,9 +67,12 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
 										}
 										if (part.type === "text") {
 											return (
-												<div key={`${message.id}-text-${index}`}>
+												<Streamdown
+													key={`${message.id}-text-${index}`}
+													parseIncompleteMarkdown={isStreaming}
+												>
 													{part.content}
-												</div>
+												</Streamdown>
 											);
 										}
 										return null;
@@ -85,7 +80,7 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
 									{/* Show "Thinking..." if this is the last message, it's an assistant message, loading, and has no content yet */}
 									{isStreaming && isEmpty && (
 										<div className="text-sm text-muted-foreground">
-											Thinking...
+											<ShimmerText>Thinking...</ShimmerText>
 										</div>
 									)}
 								</div>
@@ -97,7 +92,9 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
 			{showLoadingIndicator && (
 				<div className="flex gap-4 w-full">
 					<div className="flex flex-col gap-2 w-full">
-						<div className="text-sm text-muted-foreground">Thinking...</div>
+						<div className="text-sm text-muted-foreground">
+							<ShimmerText>Thinking...</ShimmerText>
+						</div>
 					</div>
 				</div>
 			)}
