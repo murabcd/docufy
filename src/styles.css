@@ -5,6 +5,7 @@
 @plugin './tiptap/hero.ts';
 @source './**/*.{ts,tsx}';
 @source '../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}';
+@source "../node_modules/streamdown/dist/*.js";
 
 :root {
   --text-color-gray: 0, 0%, 61%;
