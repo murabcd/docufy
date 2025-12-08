@@ -1,5 +1,4 @@
 import { Check, ChevronDown, Moon, Sun } from "lucide-react";
-import * as React from "react";
 
 import { useTheme } from "@/components/theme-provider";
 
