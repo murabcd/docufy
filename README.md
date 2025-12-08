@@ -7,7 +7,7 @@
   AI Document Management Platform Built with TanStack Start, TanStack AI and Convex.
 </p>
 
-> **⚠️ WARNING: This project is currently in early development. There are a lot of performance issues that I need to fix.**  
+> **⚠️ WARNING: This project is currently in early development.**  
 
 <p align="center">
   <a href="#features"><strong>Features</strong></a> ·
