@@ -1,4 +1,5 @@
-import { useQuery } from "convex/react";
+import { convexQuery } from "@convex-dev/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { FileText, LoaderCircle } from "lucide-react";
 import {
 	CommandDialog,
@@ -22,7 +23,9 @@ export function SearchCommand({
 	onOpenChange,
 	onSelectDocument,
 }: SearchCommandProps) {
-	const documents = useQuery(api.documents.getAll);
+	const { data: documents } = useSuspenseQuery(
+		convexQuery(api.documents.getAll),
+	);
 
 	return (
 		<CommandDialog

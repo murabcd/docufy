@@ -23,11 +23,34 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
+const SIDEBAR_RIGHT_COOKIE_NAME = "sidebar_right_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
+const SIDEBAR_RIGHT_WIDTH = "24rem";
+const SIDEBAR_RIGHT_WIDTH_MOBILE = "22rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+
+function getCookie(name: string): string | null {
+	if (typeof document === "undefined") {
+		return null;
+	}
+	const value = `; ${document.cookie}`;
+	const parts = value.split(`; ${name}=`);
+	if (parts.length === 2) {
+		return parts.pop()?.split(";").shift() ?? null;
+	}
+	return null;
+}
+
+function getCookieBoolean(name: string, defaultValue: boolean): boolean {
+	const value = getCookie(name);
+	if (value === null) {
+		return defaultValue;
+	}
+	return value === "true";
+}
 
 type SidebarContextProps = {
 	state: "expanded" | "collapsed";
@@ -37,7 +60,6 @@ type SidebarContextProps = {
 	setOpenMobile: (open: boolean) => void;
 	isMobile: boolean;
 	toggleSidebar: () => void;
-	// Right sidebar state
 	rightOpen: boolean;
 	setRightOpen: (open: boolean) => void;
 	rightOpenMobile: boolean;
@@ -72,12 +94,9 @@ function SidebarProvider({
 	const isMobile = useIsMobile();
 	const [openMobile, setOpenMobile] = React.useState(false);
 
-	// Right sidebar state
 	const [rightOpen, setRightOpen] = React.useState(false);
 	const [rightOpenMobile, setRightOpenMobile] = React.useState(false);
 
-	// This is the internal state of the sidebar.
-	// We use openProp and setOpenProp for control from outside the component.
 	const [_open, _setOpen] = React.useState(defaultOpen);
 	const open = openProp ?? _open;
 	const setOpen = React.useCallback(
@@ -89,26 +108,51 @@ function SidebarProvider({
 				_setOpen(openState);
 			}
 
-			// This sets the cookie to keep the sidebar state.
 			// biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API not widely supported yet
 			document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
 		},
 		[setOpenProp, open],
 	);
 
-	// Helper to toggle the sidebar.
+	const initRef = React.useRef({ defaultOpen, openProp, initialized: false });
+	React.useEffect(() => {
+		if (initRef.current.initialized) {
+			return;
+		}
+		initRef.current.initialized = true;
+
+		const savedLeftState = getCookieBoolean(
+			SIDEBAR_COOKIE_NAME,
+			initRef.current.defaultOpen,
+		);
+		if (!initRef.current.openProp) {
+			_setOpen(savedLeftState);
+		}
+
+		const savedRightState = getCookieBoolean(SIDEBAR_RIGHT_COOKIE_NAME, false);
+		setRightOpen(savedRightState);
+	}, []);
+
+	const setRightOpenWithCookie = React.useCallback(
+		(value: boolean | ((value: boolean) => boolean)) => {
+			const newState = typeof value === "function" ? value(rightOpen) : value;
+			setRightOpen(newState);
+			// biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API not widely supported yet
+			document.cookie = `${SIDEBAR_RIGHT_COOKIE_NAME}=${newState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+		},
+		[rightOpen],
+	);
+
 	const toggleSidebar = React.useCallback(() => {
 		return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
 	}, [isMobile, setOpen]);
 
-	// Helper to toggle the right sidebar.
 	const toggleRightSidebar = React.useCallback(() => {
 		return isMobile
 			? setRightOpenMobile((open) => !open)
-			: setRightOpen((open) => !open);
-	}, [isMobile]);
+			: setRightOpenWithCookie((open) => !open);
+	}, [isMobile, setRightOpenWithCookie]);
 
-	// Adds a keyboard shortcut to toggle the sidebar.
 	React.useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (
@@ -124,8 +168,6 @@ function SidebarProvider({
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, [toggleSidebar]);
 
-	// We add a state so that we can do data-state="expanded" or "collapsed".
-	// This makes it easier to style the sidebar with Tailwind classes.
 	const state = open ? "expanded" : "collapsed";
 
 	const contextValue = React.useMemo<SidebarContextProps>(
@@ -138,7 +180,7 @@ function SidebarProvider({
 			setOpenMobile,
 			toggleSidebar,
 			rightOpen,
-			setRightOpen,
+			setRightOpen: setRightOpenWithCookie,
 			rightOpenMobile,
 			setRightOpenMobile,
 			toggleRightSidebar,
@@ -151,6 +193,7 @@ function SidebarProvider({
 			openMobile,
 			toggleSidebar,
 			rightOpen,
+			setRightOpenWithCookie,
 			rightOpenMobile,
 			toggleRightSidebar,
 		],
@@ -225,6 +268,9 @@ function Sidebar({
 	}
 
 	if (isMobile) {
+		const mobileWidth = isRightSide
+			? SIDEBAR_RIGHT_WIDTH_MOBILE
+			: SIDEBAR_WIDTH_MOBILE;
 		return (
 			<Sheet
 				open={currentOpenMobile}
@@ -238,7 +284,7 @@ function Sidebar({
 					className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
 					style={
 						{
-							"--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+							"--sidebar-width": mobileWidth,
 						} as React.CSSProperties
 					}
 					side={side}
@@ -266,6 +312,8 @@ function Sidebar({
 			? collapsible
 			: "";
 
+	const desktopWidth = isRightSide ? SIDEBAR_RIGHT_WIDTH : SIDEBAR_WIDTH;
+
 	return (
 		<div
 			className="group peer text-sidebar-foreground hidden md:block"
@@ -288,6 +336,11 @@ function Sidebar({
 						? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
 						: "group-data-[collapsible=icon]:w-(--sidebar-width-icon)",
 				)}
+				style={
+					{
+						"--sidebar-width": desktopWidth,
+					} as React.CSSProperties
+				}
 			/>
 			<div
 				data-slot="sidebar-container"
@@ -302,6 +355,11 @@ function Sidebar({
 						: "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
 					className,
 				)}
+				style={
+					{
+						"--sidebar-width": desktopWidth,
+					} as React.CSSProperties
+				}
 				{...props}
 			>
 				<div
@@ -383,6 +441,7 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
 
 function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
 	const { rightOpen } = useSidebar();
+	const isMobile = useIsMobile();
 
 	return (
 		<main
@@ -391,10 +450,15 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
 			className={cn(
 				"bg-background relative flex w-full flex-1 flex-col transition-[margin] duration-200 ease-linear",
 				"md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
-				// Adjust margin when right sidebar is open
-				"data-[right-sidebar-open=true]:mr-[var(--sidebar-width)]",
 				className,
 			)}
+			style={
+				rightOpen && !isMobile
+					? ({
+							marginRight: SIDEBAR_RIGHT_WIDTH,
+						} as React.CSSProperties)
+					: undefined
+			}
 			{...props}
 		/>
 	);

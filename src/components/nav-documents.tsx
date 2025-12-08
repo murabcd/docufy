@@ -1,3 +1,4 @@
+import { convexQuery } from "@convex-dev/react-query";
 import {
 	closestCenter,
 	DndContext,
@@ -15,8 +16,9 @@ import {
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import {
 	ChevronRight,
 	Copy,
@@ -99,8 +101,9 @@ function DocumentItem({
 	const duplicateDocument = useMutation(api.documents.duplicate);
 	const [, startTransition] = useTransition();
 
-	const children =
-		useQuery(api.documents.list, { parentId: document._id }) ?? [];
+	const { data: children = [] } = useSuspenseQuery(
+		convexQuery(api.documents.list, { parentId: document._id }),
+	);
 
 	const hasChildren = children.length > 0;
 
@@ -446,7 +449,9 @@ export function NavDocuments() {
 	const reorderDocument = useMutation(api.documents.reorder);
 	const [, startTransition] = useTransition();
 
-	const documents = useQuery(api.documents.list, { parentId: null }) ?? [];
+	const { data: documents = [] } = useSuspenseQuery(
+		convexQuery(api.documents.list, { parentId: null }),
+	);
 
 	const MAX_VISIBLE = 5;
 	const visibleDocuments = isExpanded

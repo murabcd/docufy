@@ -18,6 +18,11 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { api } from "../../convex/_generated/api";
 
 export function TeamSwitcher({
@@ -100,13 +105,17 @@ export function TeamSwitcher({
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
-					<SidebarMenuAction
-						onClick={handleCreateDocument}
-						className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
-						title="Create new document"
-					>
-						<SquarePen className="size-4" />
-					</SidebarMenuAction>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<SidebarMenuAction
+								onClick={handleCreateDocument}
+								className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
+							>
+								<SquarePen className="size-4" />
+							</SidebarMenuAction>
+						</TooltipTrigger>
+						<TooltipContent align="end">New document</TooltipContent>
+					</Tooltip>
 				</div>
 			</SidebarMenuItem>
 		</SidebarMenu>

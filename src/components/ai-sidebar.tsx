@@ -7,16 +7,17 @@ import {
 	SidebarContent,
 	SidebarFooter,
 	SidebarHeader,
-	SidebarRail,
-	useSidebar,
 } from "@/components/ui/sidebar";
+import {
+	type ChatModel,
+	chatModels,
+	DEFAULT_CHAT_MODEL,
+} from "@/lib/ai/models";
 
 interface AISidebarProps {
 	chatTitle?: string;
 	onSend?: (message: string) => void;
 	mentionTag?: string;
-	attachmentLabel?: string;
-	sourcesLabel?: string;
 	placeholder?: string;
 	children?: React.ReactNode;
 }
@@ -25,22 +26,23 @@ export function AISidebar({
 	chatTitle,
 	onSend,
 	mentionTag: _mentionTag,
-	attachmentLabel,
-	sourcesLabel,
 	placeholder,
 	children,
 }: AISidebarProps) {
-	const { setRightOpen } = useSidebar();
 	const [inputValue, setInputValue] = React.useState("");
+	const [selectedModel, setSelectedModel] = React.useState<ChatModel>(() => {
+		return chatModels.find((m) => m.id === DEFAULT_CHAT_MODEL) ?? chatModels[0];
+	});
 
 	const { messages, sendMessage, isLoading } = useChat({
 		connection: fetchServerSentEvents("/api/chat"),
+		body: {
+			model: selectedModel.model, // Pass the actual model name to the API
+		},
 	});
 
-	// Open right sidebar when component mounts
-	React.useEffect(() => {
-		setRightOpen(true);
-	}, [setRightOpen]);
+	// Note: Right sidebar state is now persisted via cookies
+	// It will respect the user's previous preference on page refresh
 
 	const handleSend = () => {
 		if (inputValue.trim() && !isLoading) {
@@ -72,12 +74,11 @@ export function AISidebar({
 					onChange={setInputValue}
 					onSend={handleSend}
 					placeholder={placeholder}
-					attachmentLabel={attachmentLabel}
-					sourcesLabel={sourcesLabel}
 					disabled={isLoading}
+					selectedModel={selectedModel}
+					onModelChange={setSelectedModel}
 				/>
 			</SidebarFooter>
-			<SidebarRail />
 		</Sidebar>
 	);
 }

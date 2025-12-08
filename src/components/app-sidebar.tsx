@@ -1,4 +1,6 @@
-import { useQuery } from "convex/react";
+import { convexQuery } from "@convex-dev/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import {
 	Command,
 	FileText,
@@ -15,15 +17,16 @@ import { NavFavorites } from "@/components/nav-favorites";
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavWorkspaces } from "@/components/nav-workspaces";
+import { SearchCommand } from "@/components/search-command";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { TeamSwitcher } from "@/components/team-switcher";
 import {
 	Sidebar,
 	SidebarContent,
 	SidebarHeader,
-	SidebarRail,
 } from "@/components/ui/sidebar";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 
 export interface Team {
 	name: string;
@@ -117,8 +120,12 @@ export function AppSidebar({
 	workspaces = [],
 	...props
 }: AppSidebarProps) {
+	const navigate = useNavigate();
 	const [settingsOpen, setSettingsOpen] = React.useState(false);
-	const favoritesData = useQuery(api.favorites.listWithDocuments);
+	const [searchOpen, setSearchOpen] = React.useState(false);
+	const { data: favoritesData } = useSuspenseQuery(
+		convexQuery(api.favorites.listWithDocuments),
+	);
 
 	// Transform favorites data to match Favorite interface
 	const favorites: Favorite[] = React.useMemo(() => {
@@ -137,12 +144,17 @@ export function AppSidebar({
 			}));
 	}, [favoritesData, propFavorites]);
 
+	const handleSelectDocument = (documentId: Id<"documents">) => {
+		setSearchOpen(false);
+		navigate({ to: "/documents/$documentId", params: { documentId } });
+	};
+
 	return (
 		<>
 			<Sidebar className="border-r-0" {...props}>
 				<SidebarHeader>
 					<TeamSwitcher teams={teams} />
-					<NavMain items={navMain} />
+					<NavMain items={navMain} onSearchOpen={() => setSearchOpen(true)} />
 				</SidebarHeader>
 				<SidebarContent>
 					{favorites.length > 0 && <NavFavorites favorites={favorites} />}
@@ -154,8 +166,12 @@ export function AppSidebar({
 						onSettingsClick={() => setSettingsOpen(true)}
 					/>
 				</SidebarContent>
-				<SidebarRail />
 			</Sidebar>
+			<SearchCommand
+				open={searchOpen}
+				onOpenChange={setSearchOpen}
+				onSelectDocument={handleSelectDocument}
+			/>
 			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 		</>
 	);

@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
-	ArrowUpRight,
 	Link as LinkIcon,
 	type LucideIcon,
 	MoreHorizontal,
@@ -114,16 +113,12 @@ export function NavFavorites({
 									onClick={() => handleRemoveFromFavorites(item)}
 								>
 									<StarOff className="text-muted-foreground" />
-									<span>Remove from Favorites</span>
+									<span>Remove</span>
 								</DropdownMenuItem>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem>
 									<LinkIcon className="text-muted-foreground" />
 									<span>Copy link</span>
-								</DropdownMenuItem>
-								<DropdownMenuItem>
-									<ArrowUpRight className="text-muted-foreground" />
-									<span>Open in New Tab</span>
 								</DropdownMenuItem>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem

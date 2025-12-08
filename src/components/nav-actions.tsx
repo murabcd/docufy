@@ -1,4 +1,6 @@
-import { useMutation, useQuery } from "convex/react";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
 import {
 	ArrowDown,
 	ArrowUp,
@@ -107,10 +109,13 @@ export function NavActions({
 }) {
 	const [isOpen, setIsOpen] = React.useState(false);
 	const toggleFavorite = useMutation(api.favorites.toggle);
-	const isFavorite = useQuery(
-		api.favorites.isFavorite,
-		documentId ? { documentId } : "skip",
-	);
+	const { data: isFavorite } = useQuery({
+		...convexQuery(
+			api.favorites.isFavorite,
+			documentId ? { documentId } : { documentId: "" as Id<"documents"> },
+		),
+		enabled: !!documentId,
+	});
 
 	const handleStarClick = async () => {
 		if (documentId) {
