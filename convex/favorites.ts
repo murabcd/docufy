@@ -17,7 +17,6 @@ export const toggle = mutation({
 			.unique();
 
 		if (existing) {
-			// Remove from favorites
 			await ctx.db.delete(existing._id);
 			return false;
 		} else {
