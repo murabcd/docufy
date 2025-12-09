@@ -26,9 +26,11 @@ import {
 	GripVertical,
 	Link as LinkIcon,
 	MoreHorizontal,
+	Star,
 	Trash2,
 } from "lucide-react";
 import { useEffect, useEffectEvent, useState, useTransition } from "react";
+import { toast } from "sonner";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -99,6 +101,7 @@ function DocumentItem({
 
 	const deleteDocument = useMutation(api.documents.deleteDocument);
 	const duplicateDocument = useMutation(api.documents.duplicate);
+	const toggleFavorite = useMutation(api.favorites.toggle);
 	const [, startTransition] = useTransition();
 
 	const { data: children = [] } = useSuspenseQuery(
@@ -159,6 +162,7 @@ function DocumentItem({
 	const handleDuplicate = async () => {
 		startTransition(async () => {
 			const newId = await duplicateDocument({ id: document._id });
+			toast.success("Document duplicated");
 			navigate({
 				to: "/documents/$documentId",
 				params: { documentId: newId },
@@ -167,9 +171,15 @@ function DocumentItem({
 		});
 	};
 
+	const handleToggleFavorite = async () => {
+		const added = await toggleFavorite({ documentId: document._id });
+		toast.success(added ? "Added to favorites" : "Removed from favorites");
+	};
+
 	const handleCopyLink = () => {
 		const url = `${window.location.origin}/documents/${document._id}`;
 		navigator.clipboard.writeText(url);
+		toast.success("Link copied");
 	};
 
 	if (level > 0) {
@@ -246,10 +256,13 @@ function DocumentItem({
 									<Copy className="text-muted-foreground" />
 									<span>Duplicate</span>
 								</DropdownMenuItem>
-								<DropdownMenuSeparator />
 								<DropdownMenuItem onClick={handleCopyLink}>
 									<LinkIcon className="text-muted-foreground" />
 									<span>Copy link</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={handleToggleFavorite}>
+									<Star className="text-muted-foreground" />
+									<span>Add to favorites</span>
 								</DropdownMenuItem>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem
@@ -374,10 +387,13 @@ function DocumentItem({
 								<Copy className="text-muted-foreground" />
 								<span>Duplicate</span>
 							</DropdownMenuItem>
-							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={handleCopyLink}>
 								<LinkIcon className="text-muted-foreground" />
 								<span>Copy link</span>
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={handleToggleFavorite}>
+								<Star className="text-muted-foreground" />
+								<span>Add to favorites</span>
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem

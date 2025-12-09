@@ -8,7 +8,6 @@ import {
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuLabel,
-	DropdownMenuSeparator,
 	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -94,7 +93,6 @@ export function TeamSwitcher({
 									<DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
 								</DropdownMenuItem>
 							))}
-							<DropdownMenuSeparator />
 							<DropdownMenuItem className="gap-2 p-2">
 								<div className="bg-background flex size-6 items-center justify-center rounded-md border">
 									<Plus className="size-4" />

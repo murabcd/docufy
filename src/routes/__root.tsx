@@ -9,6 +9,7 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "@/styles.css?url";
 
@@ -67,6 +68,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 							]}
 						/>
 						<ToastProvider placement="top-right" />
+						<Toaster position="top-center" />
 						<Scripts />
 					</ThemeProvider>
 				</HeroUIProvider>

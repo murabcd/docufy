@@ -15,6 +15,7 @@ import {
 	useState,
 	useTransition,
 } from "react";
+import { toast } from "sonner";
 import { AISidebar } from "@/components/ai-sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Header } from "@/components/header";
@@ -24,6 +25,39 @@ import TiptapEditor, {
 import { SidebarInset } from "@/components/ui/sidebar";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+
+const globalWithSessionStorage = globalThis as typeof globalThis & {
+	sessionStorage?: Storage;
+};
+
+if (typeof window === "undefined" && !globalWithSessionStorage.sessionStorage) {
+	let store: Record<string, string> = {};
+	// Mimic enough of the Storage interface for SSR so libraries that expect
+	// sessionStorage (like the Convex tiptap sync helpers) keep working.
+	globalWithSessionStorage.sessionStorage = {
+		get length() {
+			return Object.keys(store).length;
+		},
+		clear() {
+			store = {};
+		},
+		getItem(key: string) {
+			return Object.prototype.hasOwnProperty.call(store, key)
+				? store[key]
+				: null;
+		},
+		key(index: number) {
+			const keys = Object.keys(store);
+			return keys[index] ?? null;
+		},
+		removeItem(key: string) {
+			delete store[key];
+		},
+		setItem(key: string, value: string) {
+			store[key] = value;
+		},
+	} satisfies Storage;
+}
 
 const EMPTY_DOCUMENT: JSONContent = { type: "doc", content: [] };
 
@@ -66,6 +100,9 @@ function DocumentEditor() {
 		convexQuery(api.documents.getAncestors, {
 			id: documentId as Id<"documents">,
 		}),
+	);
+	const { data: rootDocuments = [] } = useSuspenseQuery(
+		convexQuery(api.documents.list, { parentId: null }),
 	);
 	const sync = useTiptapSync(api.prosemirrorSync, documentId);
 
@@ -237,35 +274,49 @@ function DocumentEditor() {
 		};
 	}, [isEditorReady]);
 
-	if (document === undefined) {
+	const redirectFromMissingDocument = useEffectEvent(() => {
+		if (document !== null) {
+			return;
+		}
+
+		const currentId = documentId as Id<"documents">;
+		const currentIndex = rootDocuments.findIndex((d) => d._id === currentId);
+
+		const fallbackDocument =
+			currentIndex >= 0
+				? (rootDocuments[currentIndex + 1] ?? rootDocuments[currentIndex - 1])
+				: rootDocuments[0];
+
+		if (fallbackDocument) {
+			navigate({
+				to: "/documents/$documentId",
+				params: { documentId: fallbackDocument._id },
+				replace: true,
+			});
+		} else {
+			navigate({ to: "/", replace: true });
+		}
+	});
+
+	const hasRedirectedFromDeletionRef = useRef(false);
+
+	useEffect(() => {
+		if (document === null) {
+			if (!hasRedirectedFromDeletionRef.current) {
+				hasRedirectedFromDeletionRef.current = true;
+				toast.success("Document deleted");
+			}
+			redirectFromMissingDocument();
+		} else {
+			hasRedirectedFromDeletionRef.current = false;
+		}
+	}, [document]);
+
+	if (document === undefined || document === null) {
 		return null;
 	}
 
-	if (document === null) {
-		return (
-			<div className="flex h-full items-center justify-center">
-				<p className="text-sm text-muted-foreground">Document not found.</p>
-			</div>
-		);
-	}
-
 	const renderEditor = () => {
-		if (sync.isLoading) {
-			return (
-				<div className="rounded-lg border px-4 py-6 text-sm text-muted-foreground">
-					Loading editor&hellip;
-				</div>
-			);
-		}
-
-		if ("create" in sync) {
-			return (
-				<div className="rounded-lg border px-4 py-6 text-sm text-muted-foreground">
-					Preparing document&hellip;
-				</div>
-			);
-		}
-
 		return (
 			<TiptapEditor
 				ref={editorRef}

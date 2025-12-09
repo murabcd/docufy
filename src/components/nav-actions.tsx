@@ -1,5 +1,6 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
 	ArrowDown,
@@ -19,6 +20,7 @@ import {
 	Trash2,
 } from "lucide-react";
 import * as React from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
 	Popover,
@@ -37,69 +39,6 @@ import {
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
-const actions = [
-	[
-		{
-			label: "Customize Page",
-			icon: Settings2,
-		},
-		{
-			label: "Turn into wiki",
-			icon: FileText,
-		},
-	],
-	[
-		{
-			label: "Copy link",
-			icon: LinkIcon,
-		},
-		{
-			label: "Duplicate",
-			icon: Copy,
-		},
-		{
-			label: "Move to",
-			icon: CornerUpRight,
-		},
-		{
-			label: "Move to Trash",
-			icon: Trash2,
-		},
-	],
-	[
-		{
-			label: "Undo",
-			icon: CornerUpLeft,
-		},
-		{
-			label: "View analytics",
-			icon: LineChart,
-		},
-		{
-			label: "Version History",
-			icon: GalleryVerticalEnd,
-		},
-		{
-			label: "Show delete pages",
-			icon: Trash,
-		},
-		{
-			label: "Notifications",
-			icon: Bell,
-		},
-	],
-	[
-		{
-			label: "Import",
-			icon: ArrowUp,
-		},
-		{
-			label: "Export",
-			icon: ArrowDown,
-		},
-	],
-];
-
 export function NavActions({
 	documentId,
 	updatedAt,
@@ -109,6 +48,8 @@ export function NavActions({
 }) {
 	const [isOpen, setIsOpen] = React.useState(false);
 	const toggleFavorite = useMutation(api.favorites.toggle);
+	const duplicateDocument = useMutation(api.documents.duplicate);
+	const navigate = useNavigate();
 	const { data: isFavorite } = useQuery({
 		...convexQuery(
 			api.favorites.isFavorite,
@@ -119,9 +60,99 @@ export function NavActions({
 
 	const handleStarClick = async () => {
 		if (documentId) {
-			await toggleFavorite({ documentId });
+			const added = await toggleFavorite({ documentId });
+			toast.success(added ? "Added to favorites" : "Removed from favorites");
 		}
 	};
+
+	const handleCopyLink = React.useCallback(async () => {
+		if (!documentId) return;
+		const url = `${window.location.origin}/documents/${documentId}`;
+		await navigator.clipboard.writeText(url);
+		toast.success("Link copied");
+		setIsOpen(false);
+	}, [documentId]);
+
+	const handleDuplicate = React.useCallback(async () => {
+		if (!documentId) return;
+		const newId = await duplicateDocument({ id: documentId });
+		toast.success("Document duplicated");
+		setIsOpen(false);
+		navigate({
+			to: "/documents/$documentId",
+			params: { documentId: newId },
+		});
+	}, [documentId, duplicateDocument, navigate]);
+
+	const actions = React.useMemo(
+		() => [
+			[
+				{
+					label: "Customize Page",
+					icon: Settings2,
+				},
+				{
+					label: "Turn into wiki",
+					icon: FileText,
+				},
+			],
+			[
+				{
+					label: "Copy link",
+					icon: LinkIcon,
+					onClick: handleCopyLink,
+					disabled: !documentId,
+				},
+				{
+					label: "Duplicate",
+					icon: Copy,
+					onClick: handleDuplicate,
+					disabled: !documentId,
+				},
+				{
+					label: "Move to",
+					icon: CornerUpRight,
+				},
+				{
+					label: "Move to Trash",
+					icon: Trash2,
+				},
+			],
+			[
+				{
+					label: "Undo",
+					icon: CornerUpLeft,
+				},
+				{
+					label: "View analytics",
+					icon: LineChart,
+				},
+				{
+					label: "Version History",
+					icon: GalleryVerticalEnd,
+				},
+				{
+					label: "Show delete pages",
+					icon: Trash,
+				},
+				{
+					label: "Notifications",
+					icon: Bell,
+				},
+			],
+			[
+				{
+					label: "Import",
+					icon: ArrowUp,
+				},
+				{
+					label: "Export",
+					icon: ArrowDown,
+				},
+			],
+		],
+		[documentId, handleCopyLink, handleDuplicate],
+	);
 
 	// Format the date from updatedAt timestamp
 	const formattedDate = updatedAt
@@ -175,7 +206,10 @@ export function NavActions({
 										<SidebarMenu>
 											{group.map((item) => (
 												<SidebarMenuItem key={item.label}>
-													<SidebarMenuButton>
+													<SidebarMenuButton
+														onClick={item.onClick}
+														disabled={item.disabled}
+													>
 														<item.icon /> <span>{item.label}</span>
 													</SidebarMenuButton>
 												</SidebarMenuItem>
