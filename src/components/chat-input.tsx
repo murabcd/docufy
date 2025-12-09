@@ -115,7 +115,7 @@ export function ChatInput({
 	const hasMentions = mentions.length > 0;
 
 	return (
-		<form className="[--radius:1.2rem]">
+		<form className="[--radius:1.2rem] w-full max-w-[560px] mx-auto">
 			<div>
 				<label htmlFor="notion-prompt" className="sr-only">
 					Prompt
@@ -174,9 +174,7 @@ export function ChatInput({
 													</CommandItem>
 												))}
 											</CommandGroup>
-										) : (
-											<CommandEmpty>No documents available</CommandEmpty>
-										)}
+										) : null}
 									</CommandList>
 								</Command>
 							</PopoverContent>

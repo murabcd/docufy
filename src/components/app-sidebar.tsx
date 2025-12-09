@@ -9,7 +9,6 @@ import {
 	Search,
 	Settings2,
 	Trash2,
-	WandSparkles,
 } from "lucide-react";
 import * as React from "react";
 import { NavDocuments } from "@/components/nav-documents";
@@ -86,10 +85,6 @@ const defaultNavMain: NavMainItem[] = [
 	{
 		title: "Search",
 		icon: Search,
-	},
-	{
-		title: "Ask AI",
-		icon: WandSparkles,
 	},
 	{
 		title: "Home",

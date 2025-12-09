@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, WandSparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NavActions } from "@/components/nav-actions";
 import {
@@ -10,9 +10,10 @@ import {
 	BreadcrumbPage,
 	BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import {
 	Tooltip,
 	TooltipContent,
@@ -41,6 +42,7 @@ export function Header({
 	updatedAt,
 	saveStatus,
 }: HeaderProps) {
+	const { toggleRightSidebar } = useSidebar();
 	const titleInputRef = useRef<HTMLInputElement>(null);
 	const [isEditingTitle, setIsEditingTitle] = useState(false);
 	const [titleValue, setTitleValue] = useState(
@@ -92,6 +94,7 @@ export function Header({
 
 	const displayTitle = documentTitle || title || "Untitled";
 	const canEditTitle = !!documentId && !!onTitleChange;
+	const showDocumentMeta = saveStatus || documentId;
 
 	return (
 		<header className="flex h-12 shrink-0 items-center gap-2">
@@ -181,29 +184,45 @@ export function Header({
 					</BreadcrumbList>
 				</Breadcrumb>
 			</div>
-			{(saveStatus || documentId) && (
-				<div className="ml-auto flex items-center gap-2 px-3">
-					{saveStatus && (
-						<div className="flex items-center gap-2 text-xs text-muted-foreground">
-							{saveStatus === "saving" && (
-								<>
-									<Loader2 className="h-3 w-3 animate-spin" />
-									<span className="hidden sm:inline">Saving...</span>
-								</>
-							)}
-							{saveStatus === "saved" && (
-								<>
-									<Check className="h-3 w-3" />
-									<span className="hidden sm:inline">Saved</span>
-								</>
-							)}
-						</div>
-					)}
-					{documentId && (
-						<NavActions documentId={documentId} updatedAt={updatedAt} />
-					)}
-				</div>
-			)}
+			<div className="ml-auto flex items-center gap-2 px-3">
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-8"
+							onClick={toggleRightSidebar}
+						>
+							<WandSparkles className="mr-2 h-4 w-4" />
+							Ask AI
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent align="end">AI assistant</TooltipContent>
+				</Tooltip>
+				{showDocumentMeta && (
+					<div className="flex items-center gap-2">
+						{saveStatus && (
+							<div className="flex items-center gap-2 text-xs text-muted-foreground">
+								{saveStatus === "saving" && (
+									<>
+										<Loader2 className="h-3 w-3 animate-spin" />
+										<span className="hidden sm:inline">Saving...</span>
+									</>
+								)}
+								{saveStatus === "saved" && (
+									<>
+										<Check className="h-3 w-3" />
+										<span className="hidden sm:inline">Saved</span>
+									</>
+								)}
+							</div>
+						)}
+						{documentId && (
+							<NavActions documentId={documentId} updatedAt={updatedAt} />
+						)}
+					</div>
+				)}
+			</div>
 		</header>
 	);
 }

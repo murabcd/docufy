@@ -62,15 +62,15 @@ export function AISidebar({
 			collapsible="offcanvas"
 			className="border-l flex flex-col"
 		>
-			<SidebarHeader className="flex flex-row items-center justify-between p-4">
+			<SidebarHeader className="flex flex-row items-center justify-between p-3">
 				<div className="flex items-center gap-2">
 					{chatTitle && <div className="text-sm font-medium">{chatTitle}</div>}
 				</div>
 			</SidebarHeader>
-			<SidebarContent className="flex-1 overflow-y-auto p-4">
+			<SidebarContent className="flex-1 overflow-y-auto p-3">
 				{children || <ChatMessages messages={messages} isLoading={isLoading} />}
 			</SidebarContent>
-			<SidebarFooter className="p-4">
+			<SidebarFooter className="p-3">
 				<ChatInput
 					value={inputValue}
 					onChange={setInputValue}
