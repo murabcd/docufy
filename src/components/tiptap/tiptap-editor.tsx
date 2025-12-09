@@ -1,3 +1,4 @@
+import type { AnyExtension } from "@tiptap/core";
 import Highlight from "@tiptap/extension-highlight";
 import { ListKit } from "@tiptap/extension-list";
 import Subscript from "@tiptap/extension-subscript";
@@ -32,7 +33,7 @@ export interface TiptapEditorHandle {
 }
 
 const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
-	({ editorOptions = {}, onChange, ...rest }, ref) => {
+	({ editorOptions = {}, onChange, extraExtensions = [], ...rest }, ref) => {
 		// Serialized key for all options to force recreation
 		const optionsKey = useMemo(
 			() => JSON.stringify({ ...editorOptions }),
@@ -86,11 +87,12 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
 					SlashCommand.configure({
 						suggestion: SlashCommandSuggestion,
 					}),
+					...(extraExtensions.filter(Boolean) as AnyExtension[]),
 				],
 				immediatelyRender: false,
 				...editorOptions,
 			},
-			[optionsKey],
+			[optionsKey, extraExtensions],
 		); // We pass optionsKey as dependency array to useEditor
 
 		// Handle onChange callback with useEffectEvent to avoid re-running effect when onChange changes

@@ -38,7 +38,7 @@ export function SearchCommand({
 			<CommandList>
 				<CommandEmpty>No documents found.</CommandEmpty>
 				{documents ? (
-					documents.length > 0 ? (
+					documents.length > 0 && (
 						<CommandGroup heading="Documents">
 							{documents.map((document) => (
 								<CommandItem
@@ -52,8 +52,6 @@ export function SearchCommand({
 								</CommandItem>
 							))}
 						</CommandGroup>
-					) : (
-						<CommandEmpty>No documents available.</CommandEmpty>
 					)
 				) : (
 					<div className="p-4 flex justify-center items-center">

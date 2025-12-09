@@ -1,3 +1,4 @@
+import type { AnyExtension } from "@tiptap/core";
 import type {
 	Editor,
 	EditorContentProps,
@@ -81,6 +82,7 @@ export type TiptapEditorProps = Omit<
 		>,
 		"extensions"
 	>;
+	extraExtensions?: AnyExtension[];
 };
 
 export interface ColorButtonProps {

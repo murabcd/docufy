@@ -1,5 +1,4 @@
 import { mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 export const toggle = mutation({

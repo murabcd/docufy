@@ -1,6 +1,9 @@
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
+import { prosemirrorSync } from "./prosemirrorSync";
+
+const EMPTY_PROSEMIRROR_DOC = { type: "doc", content: [] };
 
 export const create = mutation({
 	args: {
@@ -31,6 +34,7 @@ export const create = mutation({
 			createdAt: now,
 			updatedAt: now,
 		});
+		await prosemirrorSync.create(ctx, documentId, EMPTY_PROSEMIRROR_DOC);
 		return documentId;
 	},
 });
@@ -343,4 +347,3 @@ export const getAll = query({
 		return docs.sort((a, b) => b.updatedAt - a.updatedAt);
 	},
 });
-
