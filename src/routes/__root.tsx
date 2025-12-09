@@ -7,6 +7,7 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { NotFound } from "@/components/not-found";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
@@ -43,6 +44,7 @@ export const Route = createRootRouteWithContext<{
 		],
 	}),
 
+	notFoundComponent: () => <NotFound />,
 	shellComponent: RootDocument,
 });
 
