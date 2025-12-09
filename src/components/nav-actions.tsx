@@ -61,7 +61,7 @@ export function NavActions({
 	const handleStarClick = async () => {
 		if (documentId) {
 			const added = await toggleFavorite({ documentId });
-			toast.success(added ? "Added to favorites" : "Removed from favorites");
+			toast.success(added ? "Starred" : "Unstarred");
 		}
 	};
 

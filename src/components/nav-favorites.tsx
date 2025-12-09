@@ -45,7 +45,7 @@ export function NavFavorites({
 		: favorites.slice(0, MAX_VISIBLE);
 	const hasMore = favorites.length > MAX_VISIBLE;
 
-	const handleRemoveFromFavorites = async (item: {
+	const handleUnstar = async (item: {
 		name: string;
 		url: string;
 		icon: LucideIcon;
@@ -55,7 +55,7 @@ export function NavFavorites({
 		if (urlMatch) {
 			const documentId = urlMatch[1] as Id<"documents">;
 			await removeFavorite({ documentId });
-			toast.success("Removed from favorites");
+			toast.success("Unstarred");
 		}
 	};
 
@@ -66,7 +66,12 @@ export function NavFavorites({
 
 	return (
 		<SidebarGroup className="group-data-[collapsible=icon]:hidden">
-			<SidebarGroupLabel>Favorites</SidebarGroupLabel>
+			<SidebarGroupLabel>Starred</SidebarGroupLabel>
+			{favorites.length === 0 && (
+				<p className="text-sidebar-foreground/50 text-xs px-2 pb-2">
+					Star documents to keep them close
+				</p>
+			)}
 			<SidebarMenu>
 				{visibleFavorites.map((item) => (
 					<SidebarMenuItem key={item.name}>
@@ -88,11 +93,9 @@ export function NavFavorites({
 								side={isMobile ? "bottom" : "right"}
 								align={isMobile ? "end" : "start"}
 							>
-								<DropdownMenuItem
-									onClick={() => handleRemoveFromFavorites(item)}
-								>
+								<DropdownMenuItem onClick={() => handleUnstar(item)}>
 									<StarOff className="text-muted-foreground" />
-									<span>Remove from favorites</span>
+									<span>Unstar</span>
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={() => handleCopyLink(item.url)}>
 									<LinkIcon className="text-muted-foreground" />

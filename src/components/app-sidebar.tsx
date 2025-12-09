@@ -152,7 +152,7 @@ export function AppSidebar({
 					<NavMain items={navMain} onSearchOpen={() => setSearchOpen(true)} />
 				</SidebarHeader>
 				<SidebarContent>
-					{favorites.length > 0 && <NavFavorites favorites={favorites} />}
+					<NavFavorites favorites={favorites} />
 					{workspaces.length > 0 && <NavWorkspaces workspaces={workspaces} />}
 					<NavDocuments />
 					<NavSecondary

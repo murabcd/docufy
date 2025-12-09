@@ -30,12 +30,12 @@ import {
 	SidebarProvider,
 } from "@/components/ui/sidebar";
 
-type SettingsPage = "Profile" | "Appearance" | "Data Controls";
+type SettingsPage = "Profile" | "Appearance" | "Data controls";
 
 const settingsNav: { name: SettingsPage; icon: React.ElementType }[] = [
 	{ name: "Profile", icon: User },
 	{ name: "Appearance", icon: Paintbrush },
-	{ name: "Data Controls", icon: Trash2 },
+	{ name: "Data controls", icon: Trash2 },
 ];
 
 interface SettingsDialogProps {
@@ -65,7 +65,7 @@ export function SettingsDialog({
 				return <ProfileSettings />;
 			case "Appearance":
 				return <AppearanceSettings />;
-			case "Data Controls":
+			case "Data controls":
 				return <DataControlsSettings />;
 			default:
 				return <ProfileSettings />;

@@ -16,7 +16,7 @@ import {
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
@@ -108,6 +108,10 @@ function DocumentItem({
 		convexQuery(api.documents.list, { parentId: document._id }),
 	);
 
+	const { data: isFavorite } = useQuery({
+		...convexQuery(api.favorites.isFavorite, { documentId: document._id }),
+	});
+
 	const hasChildren = children.length > 0;
 
 	const {
@@ -173,7 +177,7 @@ function DocumentItem({
 
 	const handleToggleFavorite = async () => {
 		const added = await toggleFavorite({ documentId: document._id });
-		toast.success(added ? "Added to favorites" : "Removed from favorites");
+		toast.success(added ? "Starred" : "Unstarred");
 	};
 
 	const handleCopyLink = () => {
@@ -262,7 +266,7 @@ function DocumentItem({
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={handleToggleFavorite}>
 									<Star className="text-muted-foreground" />
-									<span>Add to favorites</span>
+									<span>{isFavorite ? "Unstar" : "Star"}</span>
 								</DropdownMenuItem>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem
@@ -393,7 +397,7 @@ function DocumentItem({
 							</DropdownMenuItem>
 							<DropdownMenuItem onClick={handleToggleFavorite}>
 								<Star className="text-muted-foreground" />
-								<span>Add to favorites</span>
+								<span>{isFavorite ? "Unstar" : "Star"}</span>
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem
@@ -547,10 +551,6 @@ export function NavDocuments() {
 		}
 	};
 
-	if (documents.length === 0) {
-		return null;
-	}
-
 	return (
 		<SidebarGroup>
 			<Collapsible
@@ -563,6 +563,11 @@ export function NavDocuments() {
 					</SidebarGroupLabel>
 				</CollapsibleTrigger>
 				<CollapsibleContent>
+					{documents.length === 0 && (
+						<p className="text-sidebar-foreground/50 text-xs px-2 pb-2">
+							Create a document to get started
+						</p>
+					)}
 					<SidebarGroupContent>
 						<DndContext
 							sensors={sensors}
