@@ -1,6 +1,7 @@
-import { Link } from "@tanstack/react-router";
-import { Check, Loader2, WandSparkles } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useMutation } from "convex/react";
+import { Check, Loader2, Plus, WandSparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { NavActions } from "@/components/nav-actions";
 import {
 	Breadcrumb,
@@ -19,6 +20,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
 type HeaderProps = {
@@ -42,12 +44,32 @@ export function Header({
 	updatedAt,
 	saveStatus,
 }: HeaderProps) {
-	const { toggleRightSidebar } = useSidebar();
+	const { toggleRightSidebar, state, isMobile } = useSidebar();
+	const navigate = useNavigate();
+	const createDocument = useMutation(api.documents.create);
+	const [, startTransition] = useTransition();
 	const titleInputRef = useRef<HTMLInputElement>(null);
 	const [isEditingTitle, setIsEditingTitle] = useState(false);
 	const [titleValue, setTitleValue] = useState(
 		documentTitle || title || "Untitled",
 	);
+
+	// Show Plus button in header when sidebar is collapsed OR on mobile (like openchat)
+	const showPlusButton = state === "collapsed" || isMobile;
+
+	const handleCreateDocument = useCallback(async () => {
+		startTransition(async () => {
+			try {
+				const documentId = await createDocument({});
+				navigate({
+					to: "/documents/$documentId",
+					params: { documentId },
+				});
+			} catch (error) {
+				console.error("Failed to create document:", error);
+			}
+		});
+	}, [createDocument, navigate]);
 
 	// Sync title with document when it changes externally
 	useEffect(() => {
@@ -105,10 +127,34 @@ export function Header({
 					</TooltipTrigger>
 					<TooltipContent align="start">Toggle sidebar</TooltipContent>
 				</Tooltip>
-				<Separator
-					orientation="vertical"
-					className="mr-2 data-[orientation=vertical]:h-4"
-				/>
+				{showPlusButton && (
+					<>
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<Button
+									variant="ghost"
+									size="icon"
+									className="h-8 w-8"
+									onClick={handleCreateDocument}
+								>
+									<Plus className="h-4 w-4" />
+									<span className="sr-only">New document</span>
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent align="start">New document</TooltipContent>
+						</Tooltip>
+						<Separator
+							orientation="vertical"
+							className="mr-2 data-[orientation=vertical]:h-4"
+						/>
+					</>
+				)}
+				{!showPlusButton && (
+					<Separator
+						orientation="vertical"
+						className="mr-2 data-[orientation=vertical]:h-4"
+					/>
+				)}
 				<Breadcrumb>
 					<BreadcrumbList>
 						{ancestors.length > 0 ? (

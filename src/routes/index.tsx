@@ -31,8 +31,8 @@ function EditorHome() {
 						<div className="space-y-2">
 							<h2 className="text-2xl font-semibold">No document open</h2>
 							<p className="text-muted-foreground max-w-md">
-								Create a new document to get started. Click the SquarePen icon
-								next to your workspace name to create a new document.
+								Create a new document to get started. Click the Plus icon next
+								to your workspace name to create a new document.
 							</p>
 						</div>
 					</div>

@@ -1,8 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
-import { ChevronDown, Plus, SquarePen } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import * as React from "react";
 import { useTransition } from "react";
+import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -13,9 +14,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
 	SidebarMenu,
-	SidebarMenuAction,
 	SidebarMenuButton,
 	SidebarMenuItem,
+	useSidebar,
 } from "@/components/ui/sidebar";
 import {
 	Tooltip,
@@ -37,10 +38,13 @@ export function TeamSwitcher({
 	const navigate = useNavigate();
 	const createDocument = useMutation(api.documents.create);
 	const [, startTransition] = useTransition();
+	const { state, isMobile } = useSidebar();
 
 	if (!activeTeam) {
 		return null;
 	}
+
+	const showPlusButton = state === "expanded" && !isMobile;
 
 	const handleCreateDocument = async () => {
 		startTransition(async () => {
@@ -103,17 +107,22 @@ export function TeamSwitcher({
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<SidebarMenuAction
-								onClick={handleCreateDocument}
-								className="text-sidebar-foreground/70 hover:text-sidebar-foreground"
-							>
-								<SquarePen className="size-4" />
-							</SidebarMenuAction>
-						</TooltipTrigger>
-						<TooltipContent align="end">New document</TooltipContent>
-					</Tooltip>
+					{showPlusButton && (
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={handleCreateDocument}
+									className="ml-auto h-8 w-8 text-sidebar-foreground/70 hover:text-sidebar-foreground"
+								>
+									<Plus className="size-4" />
+									<span className="sr-only">New document</span>
+								</Button>
+							</TooltipTrigger>
+							<TooltipContent align="end">New document</TooltipContent>
+						</Tooltip>
+					)}
 				</div>
 			</SidebarMenuItem>
 		</SidebarMenu>
