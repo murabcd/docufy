@@ -34,68 +34,78 @@ export interface TiptapEditorHandle {
 
 const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
 	({ editorOptions = {}, onChange, extraExtensions = [], ...rest }, ref) => {
-		// Serialized key for all options to force recreation
-		const optionsKey = useMemo(
-			() => JSON.stringify({ ...editorOptions }),
-			[editorOptions],
-		);
+		const allExtensions = useMemo(() => {
+			return [
+				StarterKit.configure({
+					bulletList: false,
+					orderedList: false,
+					listItem: false,
+					listKeymap: false,
+					codeBlock: false,
+					heading: {
+						levels: [1, 2, 3],
+					},
+					horizontalRule: false,
+					link: {
+						openOnClick: false,
+						defaultProtocol: "https",
+					},
+					dropcursor: {
+						width: 1.5,
+						color: "hsl(var(--heroui-primary))",
+					},
+				}),
+				ListKit,
+				Placeholder.configure({
+					placeholder: "Write something, or type '/' for commands.",
+				}),
+				HorizontalRule,
+				CodeBlock,
+				TextStyle,
+				Color,
+				Highlight.configure({
+					multicolor: true,
+				}),
+				TextAlign.configure({
+					types: ["paragraph", "heading"],
+				}),
+				Subscript,
+				Superscript,
+				TiptapEmoji,
+				ImageUploader,
+				ImageUploaderExtension.configure({
+					imgUploadUrl: editorOptions.imgUploadUrl,
+					imgUploadResponseKey: editorOptions.imgUploadResponseKey,
+				}),
+				SlashCommand.configure({
+					suggestion: SlashCommandSuggestion,
+				}),
+				...(extraExtensions.filter(Boolean) as AnyExtension[]),
+			];
+		}, [
+			editorOptions.imgUploadUrl,
+			editorOptions.imgUploadResponseKey,
+			extraExtensions,
+		]);
 
 		const editor = useEditor(
 			{
-				extensions: [
-					StarterKit.configure({
-						bulletList: false,
-						orderedList: false,
-						listItem: false,
-						listKeymap: false,
-						codeBlock: false,
-						heading: {
-							levels: [1, 2, 3],
-						},
-						horizontalRule: false,
-						link: {
-							openOnClick: false,
-							defaultProtocol: "https",
-						},
-						dropcursor: {
-							width: 1.5,
-							color: "hsl(var(--heroui-primary))",
-						},
-					}),
-					ListKit,
-					Placeholder.configure({
-						placeholder: "Write something, or type '/' for commands.",
-					}),
-					HorizontalRule,
-					CodeBlock,
-					TextStyle,
-					Color,
-					Highlight.configure({
-						multicolor: true,
-					}),
-					TextAlign.configure({
-						types: ["paragraph", "heading"],
-					}),
-					Subscript,
-					Superscript,
-					TiptapEmoji,
-					ImageUploader,
-					ImageUploaderExtension.configure({
-						imgUploadUrl: editorOptions.imgUploadUrl,
-						imgUploadResponseKey: editorOptions.imgUploadResponseKey,
-					}),
-					SlashCommand.configure({
-						suggestion: SlashCommandSuggestion,
-					}),
-					...(extraExtensions.filter(Boolean) as AnyExtension[]),
-				],
+				extensions: allExtensions,
 				immediatelyRender: false,
 				...editorOptions,
+				autofocus: false,
+				onCreate: ({ editor }) => {
+					editorOptions.onCreate?.({ editor });
+					setTimeout(() => {
+						if (!editor.isDestroyed) {
+							editor.commands.focus("end");
+						}
+					}, 0);
+				},
 			},
-			[optionsKey, extraExtensions],
-		); // We pass optionsKey as dependency array to useEditor
+			[allExtensions, editorOptions.content],
+		);
 
-		// Handle onChange callback with useEffectEvent to avoid re-running effect when onChange changes
 		const onEditorChange = useEffectEvent(
 			(content: string, isSlashCommandActive?: boolean) => {
 				onChange?.(content, isSlashCommandActive);
@@ -106,25 +116,20 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
 			if (!editor) return;
 
 			const handleUpdate = () => {
-				// Check if slash command menu exists in DOM
-				// Use requestAnimationFrame to check after React renders
 				requestAnimationFrame(() => {
 					const isSlashCommandActive = !!document.body.querySelector(
 						'[role="menu"][aria-label="Command menu"]',
 					);
-
 					const content = editor.getJSON();
-					// Pass both content and whether slash command is active
 					onEditorChange(JSON.stringify(content), isSlashCommandActive);
 				});
 			};
 
 			editor.on("update", handleUpdate);
-
 			return () => {
 				editor.off("update", handleUpdate);
 			};
-		}, [editor]); // onEditorChange is an Effect Event, doesn't need to be in dependencies
+		}, [editor]);
 
 		useImperativeHandle(
 			ref,

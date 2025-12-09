@@ -277,22 +277,23 @@ Do you need to avoid re-running the effect when a callback/prop changes?
 ## Best Practices Summary
 
 ### Data Fetching
-- ✅ Use `convexQuery()` for all Convex API calls with TanStack Query
-- ✅ Prefer `useSuspenseQuery` for non-conditional queries
-- ✅ Use `useQuery` only when you need conditional queries or manual loading states
-- ✅ Prefetch data in route loaders for better SSR performance
+- Use `convexQuery()` for all Convex API calls with TanStack Query
+- Prefer `useSuspenseQuery` for non-conditional queries
+- Use `useQuery` only when you need conditional queries or manual loading states
+- Prefetch data in route loaders for better SSR performance
 
 ### Side Effects
-- ✅ Use `useEffect` for standard side effects with stable dependencies
-- ✅ Use `useEffectEvent` for callbacks that change frequently but shouldn't trigger effect re-runs
-- ✅ Always include cleanup functions for subscriptions and event listeners
-- ✅ Document why Effect Events are used with comments
+- Use `useEffect` for standard side effects with stable dependencies
+- Use `useEffectEvent` for callbacks that change frequently but shouldn't trigger effect re-runs
+- Always include cleanup functions for subscriptions and event listeners
 
 ### Code Quality
-- ✅ Remove unnecessary null checks when using `useSuspenseQuery`
-- ✅ Keep dependency arrays minimal and accurate
-- ✅ Use TypeScript for type safety
-- ✅ Comment complex effect logic
+- Remove unnecessary null checks when using `useSuspenseQuery`
+- Keep dependency arrays minimal and accurate
+- Use TypeScript for type safety
+- Do NOT add redundant comments that describe what the next line does
+- Do NOT add JSDoc comments unless they provide API documentation
+- Only add comments when the code's intent is non-obvious or requires context
 
 ---
 

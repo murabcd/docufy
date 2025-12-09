@@ -1,4 +1,4 @@
-import type { AnyExtension } from "@tiptap/core";
+import type { AnyExtension, JSONContent } from "@tiptap/core";
 import type {
 	Editor,
 	EditorContentProps,
@@ -6,6 +6,12 @@ import type {
 	UseEditorOptions,
 } from "@tiptap/react";
 import type { icons } from "lucide-react";
+
+// Keep in sync with convex/documents.ts
+export const EMPTY_DOCUMENT: JSONContent = {
+	type: "doc",
+	content: [{ type: "paragraph" }],
+};
 
 export interface EditorButtonProps {
 	tooltipText?: React.ReactNode;

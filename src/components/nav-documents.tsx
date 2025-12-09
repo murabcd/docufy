@@ -598,7 +598,7 @@ export function NavDocuments() {
 												onClick={() => setIsExpanded(!isExpanded)}
 											>
 												<MoreHorizontal />
-												<span>{isExpanded ? "Show Less" : "More"}</span>
+												<span>{isExpanded ? "Show less" : "More"}</span>
 											</SidebarMenuButton>
 										</SidebarMenuItem>
 									)}

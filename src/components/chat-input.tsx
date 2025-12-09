@@ -150,7 +150,7 @@ export function ChatInput({
 										</InputGroupButton>
 									</PopoverTrigger>
 								</TooltipTrigger>
-								<TooltipContent>Mention a document</TooltipContent>
+								<TooltipContent>Mention document</TooltipContent>
 							</Tooltip>
 
 							<PopoverContent className="p-0 [--radius:1.2rem]" align="start">

@@ -1,6 +1,5 @@
 import { useTiptapSync } from "@convex-dev/prosemirror-sync/tiptap";
 import { convexQuery } from "@convex-dev/react-query";
-import { useDebouncer } from "@tanstack/react-pacer";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { JSONContent } from "@tiptap/core";
@@ -12,7 +11,6 @@ import {
 	useEffectEvent,
 	useMemo,
 	useRef,
-	useState,
 	useTransition,
 } from "react";
 import { toast } from "sonner";
@@ -23,61 +21,65 @@ import TiptapEditor, {
 	type TiptapEditorHandle,
 } from "@/components/tiptap/tiptap-editor";
 import { SidebarInset } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EMPTY_DOCUMENT } from "@/tiptap/types";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
-const globalWithSessionStorage = globalThis as typeof globalThis & {
-	sessionStorage?: Storage;
-};
-
-if (typeof window === "undefined" && !globalWithSessionStorage.sessionStorage) {
-	let store: Record<string, string> = {};
-	// Mimic enough of the Storage interface for SSR so libraries that expect
-	// sessionStorage (like the Convex tiptap sync helpers) keep working.
-	globalWithSessionStorage.sessionStorage = {
-		get length() {
-			return Object.keys(store).length;
-		},
-		clear() {
-			store = {};
-		},
-		getItem(key: string) {
-			return Object.hasOwn(store, key) ? store[key] : null;
-		},
-		key(index: number) {
-			const keys = Object.keys(store);
-			return keys[index] ?? null;
-		},
-		removeItem(key: string) {
-			delete store[key];
-		},
-		setItem(key: string, value: string) {
-			store[key] = value;
-		},
-	} satisfies Storage;
+function DocumentSkeleton() {
+	return (
+		<>
+			<AppSidebar />
+			<SidebarInset>
+				<header className="flex h-12 shrink-0 items-center gap-2">
+					<div className="flex flex-1 items-center gap-2 px-3">
+						<Skeleton className="h-6 w-6 rounded" />
+						<Skeleton className="h-4 w-px" />
+						<Skeleton className="h-4 w-32" />
+					</div>
+					<div className="flex items-center gap-2 px-3">
+						<Skeleton className="h-8 w-20 rounded" />
+					</div>
+				</header>
+				<div className="flex flex-1 flex-col px-4 py-10">
+					<div className="mx-auto w-full max-w-3xl space-y-4">
+						<Skeleton className="h-8 w-3/4" />
+						<div className="space-y-2">
+							<Skeleton className="h-4 w-full" />
+							<Skeleton className="h-4 w-full" />
+							<Skeleton className="h-4 w-2/3" />
+						</div>
+						<div className="space-y-2 pt-4">
+							<Skeleton className="h-4 w-full" />
+							<Skeleton className="h-4 w-5/6" />
+						</div>
+					</div>
+				</div>
+			</SidebarInset>
+			<AISidebar />
+		</>
+	);
 }
-
-const EMPTY_DOCUMENT: JSONContent = { type: "doc", content: [] };
 
 export const Route = createFileRoute("/documents/$documentId")({
 	component: DocumentEditor,
-	loader: async ({ context, params }) => {
+	pendingComponent: DocumentSkeleton,
+	loader: ({ context, params }) => {
 		const { queryClient } = context;
-		await Promise.all([
-			queryClient.prefetchQuery(
-				convexQuery(api.documents.get, {
-					id: params.documentId as Id<"documents">,
-				}),
-			),
-			queryClient.prefetchQuery(
-				convexQuery(api.documents.getAncestors, {
-					id: params.documentId as Id<"documents">,
-				}),
-			),
-			queryClient.prefetchQuery(
-				convexQuery(api.documents.list, { parentId: null }),
-			),
-		]);
+		// Non-blocking prefetch - navigation happens immediately, data loads in background
+		queryClient.prefetchQuery(
+			convexQuery(api.documents.get, {
+				id: params.documentId as Id<"documents">,
+			}),
+		);
+		queryClient.prefetchQuery(
+			convexQuery(api.documents.getAncestors, {
+				id: params.documentId as Id<"documents">,
+			}),
+		);
+		queryClient.prefetchQuery(
+			convexQuery(api.documents.list, { parentId: null }),
+		);
 	},
 });
 
@@ -88,7 +90,6 @@ function DocumentEditor() {
 	const updateDocumentTitle = useMutation(api.documents.update);
 	const editorRef = useRef<TiptapEditorHandle>(null);
 	const [, startTransition] = useTransition();
-	const [saveStatus, setSaveStatus] = useState<"saving" | "saved">("saved");
 	const { data: document } = useSuspenseQuery(
 		convexQuery(api.documents.get, {
 			id: documentId as Id<"documents">,
@@ -109,18 +110,19 @@ function DocumentEditor() {
 			return EMPTY_DOCUMENT;
 		}
 		try {
-			return JSON.parse(document.content) as JSONContent;
+			const parsed = JSON.parse(document.content) as JSONContent;
+			// Ensure doc has at least one block child
+			if (
+				parsed.type === "doc" &&
+				(!parsed.content || parsed.content.length === 0)
+			) {
+				return EMPTY_DOCUMENT;
+			}
+			return parsed;
 		} catch {
 			return EMPTY_DOCUMENT;
 		}
 	}, [document?.content]);
-
-	const readyExtension = "create" in sync ? null : sync.extension;
-	const readyContent = "create" in sync ? null : sync.initialContent;
-	const extraExtensions = useMemo(
-		() => (readyExtension ? [readyExtension] : []),
-		[readyExtension],
-	);
 
 	const hasSeededSyncRef = useRef(false);
 	useEffect(() => {
@@ -159,28 +161,6 @@ function DocumentEditor() {
 	const isEditorReady = useCallback((editor: Editor | null): boolean => {
 		return !!(editor && !editor.isDestroyed && editor.view && editor.view.dom);
 	}, []);
-
-	const markDocumentSaved = useDebouncer(
-		() => {
-			setSaveStatus("saved");
-		},
-		{ wait: 1500 },
-	);
-
-	const onChange = useCallback(
-		(_: string, isSlashCommandActive?: boolean) => {
-			if (isSlashCommandActive) return;
-			setSaveStatus((status) => (status === "saving" ? status : "saving"));
-			markDocumentSaved.maybeExecute();
-		},
-		[markDocumentSaved],
-	);
-
-	useEffect(() => {
-		return () => {
-			markDocumentSaved.cancel();
-		};
-	}, [markDocumentSaved]);
 
 	const onCreateNestedPage = useEffectEvent(async (event: Event) => {
 		event.preventDefault();
@@ -310,19 +290,77 @@ function DocumentEditor() {
 		}
 	}, [document]);
 
+	const isSyncReady =
+		!sync.isLoading && "initialContent" in sync && "extension" in sync;
+
+	const syncExtensionRef =
+		useRef<typeof sync extends { extension: infer E } ? E : null>(null);
+	if (isSyncReady && "extension" in sync) {
+		syncExtensionRef.current = sync.extension;
+	}
+
+	const initialContentRef = useRef<JSONContent | null>(null);
+	if (
+		isSyncReady &&
+		"initialContent" in sync &&
+		initialContentRef.current === null
+	) {
+		const content = sync.initialContent;
+		if (typeof content === "string") {
+			try {
+				const parsed = JSON.parse(content) as JSONContent;
+				if (
+					parsed.type === "doc" &&
+					(!parsed.content || parsed.content.length === 0)
+				) {
+					initialContentRef.current = EMPTY_DOCUMENT;
+				} else {
+					initialContentRef.current = parsed;
+				}
+			} catch {
+				initialContentRef.current = EMPTY_DOCUMENT;
+			}
+		} else if (Array.isArray(content)) {
+			initialContentRef.current =
+				content.length > 0 ? { type: "doc", content } : EMPTY_DOCUMENT;
+		} else if (content && typeof content === "object") {
+			if (
+				content.type === "doc" &&
+				(!content.content || content.content.length === 0)
+			) {
+				initialContentRef.current = EMPTY_DOCUMENT;
+			} else {
+				initialContentRef.current = content;
+			}
+		} else {
+			initialContentRef.current = EMPTY_DOCUMENT;
+		}
+	}
+
+	const prevDocumentIdRef = useRef(documentId);
+	if (prevDocumentIdRef.current !== documentId) {
+		prevDocumentIdRef.current = documentId;
+		syncExtensionRef.current = null;
+		initialContentRef.current = null;
+	}
+
 	if (document === undefined || document === null) {
 		return null;
 	}
 
 	const renderEditor = () => {
+		if (sync.isLoading || !isSyncReady || !syncExtensionRef.current) {
+			return null;
+		}
+
 		return (
 			<TiptapEditor
+				key={documentId}
 				ref={editorRef}
-				onChange={onChange}
 				editorOptions={{
-					content: readyContent ?? EMPTY_DOCUMENT,
+					content: initialContentRef.current ?? EMPTY_DOCUMENT,
 				}}
-				extraExtensions={extraExtensions}
+				extraExtensions={[syncExtensionRef.current]}
 			/>
 		);
 	};
@@ -337,7 +375,6 @@ function DocumentEditor() {
 					ancestors={ancestors}
 					onTitleChange={onTitleChange}
 					updatedAt={document?.updatedAt}
-					saveStatus={saveStatus}
 				/>
 				<div className="flex flex-1 flex-col px-4 py-10">
 					<div className="mx-auto w-full max-w-3xl">{renderEditor()}</div>

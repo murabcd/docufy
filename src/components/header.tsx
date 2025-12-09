@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
-import { Check, Loader2, Plus, WandSparkles } from "lucide-react";
+import { Plus, WandSparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { NavActions } from "@/components/nav-actions";
 import {
@@ -24,15 +24,12 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
 type HeaderProps = {
-	// Simple mode: just show a title
 	title?: string;
-	// Document mode: show ancestors and editable title
 	documentId?: Id<"documents">;
 	documentTitle?: string;
 	ancestors?: Array<{ _id: Id<"documents">; title: string }>;
 	onTitleChange?: (title: string) => void;
 	updatedAt?: number;
-	saveStatus?: "idle" | "saving" | "saved";
 };
 
 export function Header({
@@ -42,7 +39,6 @@ export function Header({
 	ancestors = [],
 	onTitleChange,
 	updatedAt,
-	saveStatus,
 }: HeaderProps) {
 	const { toggleRightSidebar, state, isMobile } = useSidebar();
 	const navigate = useNavigate();
@@ -116,7 +112,6 @@ export function Header({
 
 	const displayTitle = documentTitle || title || "Untitled";
 	const canEditTitle = !!documentId && !!onTitleChange;
-	const showDocumentMeta = saveStatus || documentId;
 
 	return (
 		<header className="flex h-12 shrink-0 items-center gap-2">
@@ -245,28 +240,8 @@ export function Header({
 					</TooltipTrigger>
 					<TooltipContent align="end">AI assistant</TooltipContent>
 				</Tooltip>
-				{showDocumentMeta && (
-					<div className="flex items-center gap-2">
-						{saveStatus && (
-							<div className="flex items-center gap-2 text-xs text-muted-foreground">
-								{saveStatus === "saving" && (
-									<>
-										<Loader2 className="h-3 w-3 animate-spin" />
-										<span className="hidden sm:inline">Saving...</span>
-									</>
-								)}
-								{saveStatus === "saved" && (
-									<>
-										<Check className="h-3 w-3" />
-										<span className="hidden sm:inline">Saved</span>
-									</>
-								)}
-							</div>
-						)}
-						{documentId && (
-							<NavActions documentId={documentId} updatedAt={updatedAt} />
-						)}
-					</div>
+				{documentId && (
+					<NavActions documentId={documentId} updatedAt={updatedAt} />
 				)}
 			</div>
 		</header>

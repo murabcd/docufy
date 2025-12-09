@@ -3,7 +3,8 @@ import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { prosemirrorSync } from "./prosemirrorSync";
 
-const EMPTY_PROSEMIRROR_DOC = { type: "doc", content: [] };
+// Keep in sync with src/tiptap/types.ts
+const EMPTY_DOCUMENT = { type: "doc", content: [{ type: "paragraph" }] };
 
 export const create = mutation({
 	args: {
@@ -34,7 +35,7 @@ export const create = mutation({
 			createdAt: now,
 			updatedAt: now,
 		});
-		await prosemirrorSync.create(ctx, documentId, EMPTY_PROSEMIRROR_DOC);
+		await prosemirrorSync.create(ctx, documentId, EMPTY_DOCUMENT);
 		return documentId;
 	},
 });
