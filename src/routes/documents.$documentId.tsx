@@ -42,9 +42,7 @@ if (typeof window === "undefined" && !globalWithSessionStorage.sessionStorage) {
 			store = {};
 		},
 		getItem(key: string) {
-			return Object.prototype.hasOwnProperty.call(store, key)
-				? store[key]
-				: null;
+			return Object.hasOwn(store, key) ? store[key] : null;
 		},
 		key(index: number) {
 			const keys = Object.keys(store);
