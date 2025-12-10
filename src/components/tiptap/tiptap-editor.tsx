@@ -5,6 +5,7 @@ import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
 import TextAlign from "@tiptap/extension-text-align";
 import { Color, TextStyle } from "@tiptap/extension-text-style";
+import UniqueID from "@tiptap/extension-unique-id";
 import { Placeholder } from "@tiptap/extensions";
 import { EditorContent, useEditor, type useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -79,6 +80,19 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
 				}),
 				SlashCommand.configure({
 					suggestion: SlashCommandSuggestion,
+				}),
+				UniqueID.configure({
+					types: [
+						"paragraph",
+						"heading",
+						"bulletList",
+						"orderedList",
+						"listItem",
+						"taskList",
+						"taskItem",
+						"blockquote",
+						"codeBlock",
+					],
 				}),
 				...(extraExtensions.filter(Boolean) as AnyExtension[]),
 			];

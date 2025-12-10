@@ -1,7 +1,7 @@
 import { convexQuery } from "@convex-dev/react-query";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { ArrowUp, AtSign, FileText, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
 	Command,
 	CommandEmpty,
@@ -42,6 +42,9 @@ import {
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
+const CONTEXT_PREFIX = "__DOCCTX__";
+const CONTEXT_SUFFIX = "__ENDDOCCTX__";
+
 function MentionableIcon() {
 	return (
 		<span className="flex size-4 items-center justify-center">
@@ -53,7 +56,7 @@ function MentionableIcon() {
 interface ChatInputProps {
 	value?: string;
 	onChange?: (value: string) => void;
-	onSend?: () => void;
+	onSend?: (payload: string, question: string) => void;
 	placeholder?: string;
 	disabled?: boolean;
 	selectedModel?: ChatModel;
@@ -73,6 +76,7 @@ export function ChatInput({
 	const [mentions, setMentions] = useState<Id<"documents">[]>([]);
 	const [mentionPopoverOpen, setMentionPopoverOpen] = useState(false);
 	const [modelPopoverOpen, setModelPopoverOpen] = useState(false);
+	const [documentSearchTerm, setDocumentSearchTerm] = useState("");
 	const [internalSelectedModel, setInternalSelectedModel] = useState<ChatModel>(
 		() => {
 			return (
@@ -92,9 +96,22 @@ export function ChatInput({
 	};
 
 	const handleSend = () => {
-		if (value.trim() && !disabled && propOnSend) {
-			propOnSend();
+		const trimmed = value.trim();
+		if (!trimmed || disabled || !propOnSend) {
+			return;
 		}
+		const mentionsWithContent = mentionDetails.map((doc) => ({
+			id: doc._id,
+			title: doc.title,
+			searchableText: doc.searchableText.slice(0, 2000),
+		}));
+		const payload =
+			mentionDetails.length > 0
+				? `${CONTEXT_PREFIX}${JSON.stringify({
+						mentions: mentionsWithContent,
+					})}${CONTEXT_SUFFIX}${trimmed}`
+				: trimmed;
+		propOnSend(payload, trimmed);
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -108,11 +125,47 @@ export function ChatInput({
 		convexQuery(api.documents.getAll),
 	);
 
-	const availableDocuments = useMemo(() => {
+	const deferredSearchTerm = useDeferredValue(documentSearchTerm);
+	const normalizedSearchTerm = deferredSearchTerm.trim();
+	const shouldSearchDocuments = normalizedSearchTerm.length > 0;
+
+	const documentSearchQuery = useQuery({
+		...convexQuery(api.documents.search, {
+			term: normalizedSearchTerm,
+			limit: 25,
+		}),
+		enabled: shouldSearchDocuments,
+	});
+
+	const searchResults = documentSearchQuery.data ?? [];
+
+	useEffect(() => {
+		if (!mentionPopoverOpen) {
+			setDocumentSearchTerm("");
+		}
+	}, [mentionPopoverOpen]);
+
+	const defaultDocuments = useMemo(() => {
 		return documents.filter((doc) => !mentions.includes(doc._id));
 	}, [documents, mentions]);
 
+	const mentionDetails = useMemo(() => {
+		return mentions
+			.map((id) => documents.find((doc) => doc._id === id))
+			.filter((doc): doc is (typeof documents)[number] => !!doc);
+	}, [documents, mentions]);
+
+	const mentionableDocuments = useMemo(() => {
+		if (shouldSearchDocuments) {
+			return searchResults.filter((doc) => !mentions.includes(doc._id));
+		}
+		return defaultDocuments;
+	}, [defaultDocuments, mentions, searchResults, shouldSearchDocuments]);
+
 	const hasMentions = mentions.length > 0;
+	const emptyStateMessage = shouldSearchDocuments
+		? "No documents match your search"
+		: "No documents available";
 
 	return (
 		<form className="[--radius:1.2rem] w-full max-w-[560px] mx-auto">
@@ -155,17 +208,26 @@ export function ChatInput({
 
 							<PopoverContent className="p-0 [--radius:1.2rem]" align="start">
 								<Command>
-									<CommandInput placeholder="Search documents..." />
+									<CommandInput
+										placeholder="Search documents..."
+										value={documentSearchTerm}
+										onValueChange={setDocumentSearchTerm}
+									/>
 									<CommandList>
-										<CommandEmpty>No documents found</CommandEmpty>
-										{availableDocuments.length > 0 ? (
-											<CommandGroup heading="Documents">
-												{availableDocuments.map((document) => (
+										<CommandEmpty>{emptyStateMessage}</CommandEmpty>
+										{mentionableDocuments.length > 0 ? (
+											<CommandGroup
+												heading={
+													shouldSearchDocuments ? "Search results" : "Documents"
+												}
+											>
+												{mentionableDocuments.map((document) => (
 													<CommandItem
 														key={document._id}
 														value={`${document._id} ${document.title}`}
 														onSelect={() => {
 															setMentions((prev) => [...prev, document._id]);
+															setDocumentSearchTerm("");
 															setMentionPopoverOpen(false);
 														}}
 													>
