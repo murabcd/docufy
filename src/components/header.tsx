@@ -49,6 +49,7 @@ export function Header({
 	const [titleValue, setTitleValue] = useState(
 		documentTitle || title || "Untitled",
 	);
+	const canEditTitle = !!documentId && !!onTitleChange;
 
 	// Show Plus button in header when sidebar is collapsed OR on mobile (like openchat)
 	const showPlusButton = state === "collapsed" || isMobile;
@@ -69,15 +70,38 @@ export function Header({
 
 	// Sync title with document when it changes externally
 	useEffect(() => {
-		if (!isEditingTitle && documentTitle) {
-			setTitleValue(documentTitle);
+		if (!isEditingTitle) {
+			setTitleValue(documentTitle || title || "Untitled");
 		}
-	}, [documentTitle, isEditingTitle]);
+	}, [documentTitle, title, isEditingTitle]);
+
+	const commitTitleChange = useCallback(() => {
+		if (!canEditTitle) {
+			return;
+		}
+		const normalizedTitle = titleValue.trim() || "Untitled";
+		if (normalizedTitle === (documentTitle || "Untitled")) {
+			return;
+		}
+		setTitleValue(normalizedTitle);
+		onTitleChange?.(normalizedTitle);
+	}, [canEditTitle, documentTitle, onTitleChange, titleValue]);
+
+	const exitTitleEdit = useCallback(
+		(commit = true) => {
+			if (commit) {
+				commitTitleChange();
+			} else {
+				setTitleValue(documentTitle || title || "Untitled");
+			}
+			setIsEditingTitle(false);
+		},
+		[commitTitleChange, documentTitle, title],
+	);
 
 	// Handle title editing
 	const enableTitleEdit = useCallback(() => {
-		if (!documentId) return; // Can't edit simple title mode
-		setTitleValue(documentTitle || "Untitled");
+		if (!canEditTitle) return; // Can't edit simple title mode
 		setIsEditingTitle(true);
 		setTimeout(() => {
 			titleInputRef.current?.focus();
@@ -86,32 +110,33 @@ export function Header({
 				titleInputRef.current.value.length,
 			);
 		}, 0);
-	}, [documentId, documentTitle]);
+	}, [canEditTitle]);
 
 	const disableTitleEdit = useCallback(() => {
-		setIsEditingTitle(false);
-	}, []);
+		exitTitleEdit(true);
+	}, [exitTitleEdit]);
 
 	const onTitleChangeHandler = useCallback(
 		(event: React.ChangeEvent<HTMLInputElement>) => {
-			const newTitle = event.target.value;
-			setTitleValue(newTitle);
-			onTitleChange?.(newTitle || "Untitled");
+			setTitleValue(event.target.value);
 		},
-		[onTitleChange],
+		[],
 	);
 
 	const onTitleKeyDown = useCallback(
 		(event: React.KeyboardEvent<HTMLInputElement>) => {
 			if (event.key === "Enter") {
-				disableTitleEdit();
+				event.preventDefault();
+				exitTitleEdit(true);
+			} else if (event.key === "Escape") {
+				event.preventDefault();
+				exitTitleEdit(false);
 			}
 		},
-		[disableTitleEdit],
+		[exitTitleEdit],
 	);
 
 	const displayTitle = documentTitle || title || "Untitled";
-	const canEditTitle = !!documentId && !!onTitleChange;
 
 	return (
 		<header className="flex h-12 shrink-0 items-center gap-2">
@@ -173,7 +198,6 @@ export function Header({
 									{isEditingTitle && canEditTitle ? (
 										<Input
 											ref={titleInputRef}
-											onClick={enableTitleEdit}
 											onBlur={disableTitleEdit}
 											onChange={onTitleChangeHandler}
 											onKeyDown={onTitleKeyDown}
@@ -200,7 +224,6 @@ export function Header({
 								{isEditingTitle && canEditTitle ? (
 									<Input
 										ref={titleInputRef}
-										onClick={enableTitleEdit}
 										onBlur={disableTitleEdit}
 										onChange={onTitleChangeHandler}
 										onKeyDown={onTitleKeyDown}

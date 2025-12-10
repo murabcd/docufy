@@ -52,6 +52,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
+				<script src="https://unpkg.com/react-scan/dist/auto.global.js" />
 				<HeadContent />
 			</head>
 			<body className="min-h-screen bg-background text-foreground">
