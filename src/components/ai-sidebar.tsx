@@ -46,13 +46,14 @@ export function AISidebar({
 		body,
 	});
 
-	const handleSend = () => {
-		if (inputValue.trim() && !isLoading) {
-			sendMessage(inputValue);
-			setInputValue("");
-			if (onSend) {
-				onSend(inputValue);
-			}
+	const handleSend = (payload: string, question: string) => {
+		if (!payload || isLoading) {
+			return;
+		}
+		void sendMessage(payload);
+		setInputValue("");
+		if (onSend) {
+			onSend(question);
 		}
 	};
 

@@ -3,6 +3,20 @@ import * as React from "react";
 import { Streamdown } from "streamdown";
 import { ShimmerText } from "@/components/ui/shimmer-text";
 
+const CONTEXT_PREFIX = "__DOCCTX__";
+const CONTEXT_SUFFIX = "__ENDDOCCTX__";
+
+const stripContextMetadata = (text: string) => {
+	if (!text.startsWith(CONTEXT_PREFIX)) {
+		return text;
+	}
+	const endIndex = text.indexOf(CONTEXT_SUFFIX, CONTEXT_PREFIX.length);
+	if (endIndex === -1) {
+		return text;
+	}
+	return text.slice(endIndex + CONTEXT_SUFFIX.length);
+};
+
 interface ChatMessagesProps {
 	messages: Array<UIMessage>;
 	isLoading?: boolean;
@@ -45,7 +59,7 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
 										if (part.type === "text") {
 											return (
 												<div key={`${message.id}-text-${index}`}>
-													{part.content}
+													{stripContextMetadata(part.content)}
 												</div>
 											);
 										}
@@ -66,12 +80,13 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
 											);
 										}
 										if (part.type === "text") {
+											const cleanedContent = stripContextMetadata(part.content);
 											return (
 												<Streamdown
 													key={`${message.id}-text-${index}`}
 													parseIncompleteMarkdown={isStreaming}
 												>
-													{part.content}
+													{cleanedContent}
 												</Streamdown>
 											);
 										}
