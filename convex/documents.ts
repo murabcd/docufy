@@ -1,10 +1,33 @@
 import { mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { prosemirrorSync } from "./prosemirrorSync";
 
 // Keep in sync with src/tiptap/types.ts
 const EMPTY_DOCUMENT = { type: "doc", content: [{ type: "paragraph" }] };
+
+const DEFAULT_USER_ID = "demo-user";
+
+const documentFields = {
+	_id: v.id("documents"),
+	_creationTime: v.number(),
+	userId: v.optional(v.string()),
+	title: v.string(),
+	content: v.optional(v.string()),
+	searchableText: v.string(),
+	parentId: v.optional(v.id("documents")),
+	order: v.optional(v.number()),
+	icon: v.optional(v.string()),
+	coverImage: v.optional(v.string()),
+	isArchived: v.boolean(),
+	isPublished: v.boolean(),
+	includeInAi: v.boolean(),
+	lastEditedAt: v.number(),
+	lastEmbeddedAt: v.optional(v.number()),
+	contentHash: v.optional(v.string()),
+	createdAt: v.number(),
+	updatedAt: v.number(),
+};
 
 export const create = mutation({
 	args: {
@@ -21,6 +44,7 @@ export const create = mutation({
 			.withIndex("by_parentId", (q) =>
 				q.eq("parentId", args.parentId ?? undefined),
 			)
+			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
 		
 		const maxOrder = siblings.reduce((max, doc) => {
@@ -28,10 +52,20 @@ export const create = mutation({
 		}, -1);
 		
 		const documentId = await ctx.db.insert("documents", {
+			userId: DEFAULT_USER_ID,
 			title: args.title || "Untitled",
 			content: JSON.stringify(EMPTY_DOCUMENT),
-			parentId: args.parentId,
+			searchableText: "",
+			parentId: args.parentId ?? undefined,
 			order: maxOrder + 1,
+			icon: undefined,
+			coverImage: undefined,
+			isArchived: false,
+			isPublished: false,
+			includeInAi: true,
+			lastEditedAt: now,
+			lastEmbeddedAt: undefined,
+			contentHash: undefined,
 			createdAt: now,
 			updatedAt: now,
 		});
@@ -45,16 +79,7 @@ export const get = query({
 		id: v.id("documents"),
 	},
 	returns: v.union(
-		v.object({
-			_id: v.id("documents"),
-			_creationTime: v.number(),
-			title: v.string(),
-			content: v.optional(v.string()),
-			parentId: v.optional(v.id("documents")),
-			order: v.optional(v.number()),
-			createdAt: v.number(),
-			updatedAt: v.number(),
-		}),
+		v.object(documentFields),
 		v.null(),
 	),
 	handler: async (ctx, args) => {
@@ -67,14 +92,28 @@ export const update = mutation({
 		id: v.id("documents"),
 		title: v.optional(v.string()),
 		content: v.optional(v.string()),
+		searchableText: v.optional(v.string()),
+		icon: v.optional(v.string()),
+		coverImage: v.optional(v.string()),
+		isArchived: v.optional(v.boolean()),
+		isPublished: v.optional(v.boolean()),
+		includeInAi: v.optional(v.boolean()),
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
 		const { id, ...updates } = args;
-		await ctx.db.patch(id, {
-			...updates,
-			updatedAt: Date.now(),
-		});
+		const now = Date.now();
+		const patch: Record<string, unknown> = {};
+		for (const [key, value] of Object.entries(updates)) {
+			if (value !== undefined) {
+				patch[key] = value;
+			}
+		}
+		if ("content" in patch || "searchableText" in patch) {
+			patch.lastEditedAt = now;
+		}
+		patch.updatedAt = now;
+		await ctx.db.patch(id, patch);
 		return null;
 	},
 });
@@ -84,16 +123,7 @@ export const list = query({
 		parentId: v.optional(v.union(v.id("documents"), v.null())),
 	},
 	returns: v.array(
-		v.object({
-			_id: v.id("documents"),
-			_creationTime: v.number(),
-			title: v.string(),
-			content: v.optional(v.string()),
-			parentId: v.optional(v.id("documents")),
-			order: v.optional(v.number()),
-			createdAt: v.number(),
-			updatedAt: v.number(),
-		}),
+		v.object(documentFields),
 	),
 	handler: async (ctx, args) => {
 		// If parentId is explicitly null or undefined, get root level documents
@@ -104,6 +134,7 @@ export const list = query({
 			const docs = await ctx.db
 				.query("documents")
 				.withIndex("by_parentId", (q) => q.eq("parentId", undefined))
+				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
 			
 			// Sort by order, then by createdAt
@@ -121,6 +152,7 @@ export const list = query({
 		const docs = await ctx.db
 			.query("documents")
 			.withIndex("by_parentId", (q) => q.eq("parentId", parentId))
+			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
 		
 		// Sort by order, then by createdAt
@@ -247,6 +279,20 @@ export const deleteDocument = mutation({
 	returns: v.null(),
 	handler: async (ctx, args) => {
 		await ctx.db.delete(args.id);
+		const relatedChunks = await ctx.db
+			.query("chunks")
+			.withIndex("by_documentId", (q) => q.eq("documentId", args.id))
+			.collect();
+		for (const chunk of relatedChunks) {
+			await ctx.db.delete(chunk._id);
+		}
+		const relatedFavorites = await ctx.db
+			.query("favorites")
+			.withIndex("by_documentId", (q) => q.eq("documentId", args.id))
+			.collect();
+		for (const favorite of relatedFavorites) {
+			await ctx.db.delete(favorite._id);
+		}
 		return null;
 	},
 });
@@ -264,10 +310,20 @@ export const duplicate = mutation({
 		
 		const now = Date.now();
 		const documentId = await ctx.db.insert("documents", {
+			userId: original.userId ?? DEFAULT_USER_ID,
 			title: `${original.title} (Copy)`,
-			content: original.content ?? "",
+			content: original.content ?? JSON.stringify(EMPTY_DOCUMENT),
+			searchableText: original.searchableText ?? "",
 			parentId: original.parentId,
 			order: (original.order ?? 0) + 1,
+			icon: original.icon,
+			coverImage: original.coverImage,
+			isArchived: false,
+			isPublished: false,
+			includeInAi: original.includeInAi,
+			lastEditedAt: now,
+			lastEmbeddedAt: undefined,
+			contentHash: original.contentHash,
 			createdAt: now,
 			updatedAt: now,
 		});
@@ -281,28 +337,10 @@ export const getAncestors = query({
 		id: v.id("documents"),
 	},
 	returns: v.array(
-		v.object({
-			_id: v.id("documents"),
-			_creationTime: v.number(),
-			title: v.string(),
-			content: v.optional(v.string()),
-			parentId: v.optional(v.id("documents")),
-			order: v.optional(v.number()),
-			createdAt: v.number(),
-			updatedAt: v.number(),
-		}),
+		v.object(documentFields),
 	),
 	handler: async (ctx, args) => {
-		const ancestors: Array<{
-			_id: Id<"documents">;
-			_creationTime: number;
-			title: string;
-			content?: string;
-			parentId?: Id<"documents">;
-			order?: number;
-			createdAt: number;
-			updatedAt: number;
-		}> = [];
+		const ancestors: Doc<"documents">[] = [];
 		
 		// Start from the parent, not the current document
 		const currentDoc = await ctx.db.get(args.id);
@@ -329,22 +367,41 @@ export const getAncestors = query({
 export const getAll = query({
 	args: {},
 	returns: v.array(
-		v.object({
-			_id: v.id("documents"),
-			_creationTime: v.number(),
-			title: v.string(),
-			content: v.optional(v.string()),
-			parentId: v.optional(v.id("documents")),
-			order: v.optional(v.number()),
-			createdAt: v.number(),
-			updatedAt: v.number(),
-		}),
+		v.object(documentFields),
 	),
 	handler: async (ctx) => {
 		// Get all documents for search
-		const docs = await ctx.db.query("documents").collect();
+		const docs = await ctx.db
+			.query("documents")
+			.filter((q) => q.eq(q.field("isArchived"), false))
+			.collect();
 		
 		// Sort by updatedAt (most recently updated first)
 		return docs.sort((a, b) => b.updatedAt - a.updatedAt);
+	},
+});
+
+export const search = query({
+	args: {
+		term: v.string(),
+		limit: v.optional(v.number()),
+	},
+	returns: v.array(v.object(documentFields)),
+	handler: async (ctx, args) => {
+		const limit = Math.max(1, Math.min(args.limit ?? 20, 50));
+		const term = args.term.trim();
+		if (!term) {
+			return [];
+		}
+		const results = await ctx.db
+			.query("documents")
+			.withSearchIndex("search_body", (q) =>
+				q
+					.search("searchableText", term)
+					.eq("userId", DEFAULT_USER_ID)
+					.eq("isArchived", false),
+			)
+			.take(limit);
+		return results;
 	},
 });

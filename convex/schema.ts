@@ -3,19 +3,56 @@ import { v } from "convex/values";
 
 export default defineSchema({
 	documents: defineTable({
+		userId: v.optional(v.string()),
 		title: v.string(),
 		content: v.optional(v.string()),
+		searchableText: v.string(),
 		parentId: v.optional(v.id("documents")),
 		order: v.optional(v.number()),
+		icon: v.optional(v.string()),
+		coverImage: v.optional(v.string()),
+		isArchived: v.boolean(),
+		isPublished: v.boolean(),
+		includeInAi: v.boolean(),
+		lastEditedAt: v.number(),
+		lastEmbeddedAt: v.optional(v.number()),
+		contentHash: v.optional(v.string()),
 		createdAt: v.number(),
 		updatedAt: v.number(),
 	})
+		.index("by_user", ["userId"])
+		.index("by_user_parent", ["userId", "parentId"])
 		.index("by_createdAt", ["createdAt"])
 		.index("by_parentId", ["parentId"])
-		.index("by_parentId_and_order", ["parentId", "order"]),
+		.index("by_parentId_and_order", ["parentId", "order"])
+		.searchIndex("search_title", {
+			searchField: "title",
+			filterFields: ["userId", "isArchived"],
+		})
+		.searchIndex("search_body", {
+			searchField: "searchableText",
+			filterFields: ["userId", "isArchived"],
+		}),
+	chunks: defineTable({
+		documentId: v.id("documents"),
+		blockId: v.optional(v.string()),
+		text: v.string(),
+		contentHash: v.optional(v.string()),
+		embedding: v.array(v.float64()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_documentId", ["documentId"])
+		.vectorIndex("by_embedding", {
+			vectorField: "embedding",
+			dimensions: 1536,
+			filterFields: ["documentId"],
+		}),
 	favorites: defineTable({
+		userId: v.optional(v.string()),
 		documentId: v.id("documents"),
 		createdAt: v.number(),
 	})
-		.index("by_documentId", ["documentId"]),
+		.index("by_documentId", ["documentId"])
+		.index("by_user_document", ["userId", "documentId"]),
 });
