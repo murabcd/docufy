@@ -2,7 +2,7 @@ import { useTiptapSync } from "@convex-dev/prosemirror-sync/tiptap";
 import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import type { JSONContent } from "@tiptap/core";
+import type { AnyExtension, JSONContent } from "@tiptap/core";
 import type { Editor } from "@tiptap/react";
 import { useMutation } from "convex/react";
 import {
@@ -295,8 +295,18 @@ function DocumentEditor() {
 
 	const syncExtensionRef =
 		useRef<typeof sync extends { extension: infer E } ? E : null>(null);
+	const extraExtensionsRef = useRef<AnyExtension[]>([]);
 	if (isSyncReady && "extension" in sync) {
-		syncExtensionRef.current = sync.extension;
+		if (syncExtensionRef.current !== sync.extension) {
+			syncExtensionRef.current = sync.extension;
+		}
+		if (extraExtensionsRef.current[0] !== syncExtensionRef.current) {
+			extraExtensionsRef.current = syncExtensionRef.current
+				? [syncExtensionRef.current as AnyExtension]
+				: [];
+		}
+	} else if (extraExtensionsRef.current.length > 0) {
+		extraExtensionsRef.current = [];
 	}
 
 	const initialContentRef = useRef<JSONContent | null>(null);
@@ -342,6 +352,7 @@ function DocumentEditor() {
 		prevDocumentIdRef.current = documentId;
 		syncExtensionRef.current = null;
 		initialContentRef.current = null;
+		extraExtensionsRef.current = [];
 	}
 
 	if (document === undefined || document === null) {
@@ -360,7 +371,7 @@ function DocumentEditor() {
 				editorOptions={{
 					content: initialContentRef.current ?? EMPTY_DOCUMENT,
 				}}
-				extraExtensions={[syncExtensionRef.current]}
+				extraExtensions={extraExtensionsRef.current}
 			/>
 		);
 	};

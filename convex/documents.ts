@@ -29,7 +29,7 @@ export const create = mutation({
 		
 		const documentId = await ctx.db.insert("documents", {
 			title: args.title || "Untitled",
-			content: "",
+			content: JSON.stringify(EMPTY_DOCUMENT),
 			parentId: args.parentId,
 			order: maxOrder + 1,
 			createdAt: now,
