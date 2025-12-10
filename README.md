@@ -28,22 +28,20 @@
 - [Tiptap v3](https://tiptap.dev/)
   - Modern rich text editor framework
   - Extensible with custom extensions (code blocks, emojis, slash commands, etc.)
-  - Collaboration support with Yjs
 - [Convex](https://www.convex.dev/)
-  - Reactive queries for instant UI updates
-  - Optimized for real-time document synchronization
+  - Collaborative editing with [ProseMirror Sync from Convex](https://www.convex.dev/components/prosemirror-sync)
+  - [Full-text search](https://docs.convex.dev/search/text-search) for document content
 - [Shadcn/UI](https://ui.shadcn.com)
   - Styling with [Tailwind CSS](https://tailwindcss.com)
   - Component primitives from [Radix UI](https://radix-ui.com) for accessibility and flexibility
-- [OpenAI](https://openai.com/)
-  - GPT-4o model for AI chat functionality
-  - Streaming responses for real-time AI interactions
 
 ## Model provider
 
-This app utilizes the [OpenAI API](https://openai.com/) for its AI capabilities. You will need to provide your own OpenAI API key in the environment variables.
+This app ships with [OpenAI](https://openai.com/) provider as the default. However, with the [Tanstack AI](https://tanstack.com/ai/latest), you can switch LLM providers to [Anthropic](https://anthropic.com), [Ollama](https://ollama.com), [Gemini](https://cohere.com/), and [many more](https://tanstack.com/ai/latest/docs/getting-started/overview) with just a few lines of code.
 
-This app ships with [OpenAI API](https://openai.com/) provider as the default. However, with the [Tanstack AI](https://tanstack.com/ai/latest), you can switch LLM providers to [OpenAI](https://openai.com/), [Ollama](https://ollama.com), [Gemini](https://cohere.com/), and [many more](https://tanstack.com/ai/latest/docs/getting-started/overview) with just a few lines of code.
+- GPT-4.1 (`gpt-4.1`): Excelling in instruction following and tool calling
+- GPT-4.1 mini (`gpt-4.1-mini`): Faster version designed for efficiency without compromising performance
+- GPT-4.1 nano (`gpt-4.1-nano`): Most cost-effective and fastest model
 
 ## Deploy your own
 
