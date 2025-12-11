@@ -11,15 +11,11 @@ type ProsemirrorNode = {
 
 type AnyCtx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>;
 
-const getDocumentOrThrow = async (
+const getDocument = async (
 	ctx: AnyCtx,
 	id: Id<"documents">,
 ) => {
-	const document = await ctx.db.get(id);
-	if (!document) {
-		throw new Error("Document not found");
-	}
-	return document;
+	return await ctx.db.get(id);
 };
 
 const prosemirrorSync = new ProsemirrorSync<Id<"documents">>(
@@ -84,13 +80,26 @@ export const {
 	submitSteps,
 } = prosemirrorSync.syncApi<DataModel>({
 	checkRead: async (ctx, id) => {
-		await getDocumentOrThrow(ctx, id);
+		// When a document is deleted, clients can still briefly call `latestVersion`
+		// while redirecting/unmounting the editor. Treat "missing doc" as a normal
+		// terminal state instead of throwing (which would spam the console).
+		const document = await getDocument(ctx, id);
+		if (!document) {
+			return;
+		}
 	},
 	checkWrite: async (ctx, id) => {
-		await getDocumentOrThrow(ctx, id);
+		// Same rationale as `checkRead`: avoid noisy errors during deletion races.
+		const document = await getDocument(ctx, id);
+		if (!document) {
+			return;
+		}
 	},
 	onSnapshot: async (ctx, id, snapshot) => {
-		await getDocumentOrThrow(ctx, id);
+		const document = await getDocument(ctx, id);
+		if (!document) {
+			return;
+		}
 		const now = Date.now();
 		const searchableText = snapshotToPlainText(snapshot);
 		const contentHash = hashPlainText(searchableText);

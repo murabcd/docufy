@@ -1,3 +1,5 @@
+import "./polyfills/session-storage";
+
 import { ConvexQueryClient } from "@convex-dev/react-query";
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
