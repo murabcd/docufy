@@ -1,6 +1,6 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
 	Command,
 	FileText,
@@ -90,7 +90,6 @@ const defaultNavMain: NavMainItem[] = [
 		title: "Home",
 		url: "/",
 		icon: Home,
-		isActive: true,
 	},
 ];
 
@@ -116,11 +115,24 @@ export function AppSidebar({
 	...props
 }: AppSidebarProps) {
 	const navigate = useNavigate();
+	const location = useLocation();
 	const [settingsOpen, setSettingsOpen] = React.useState(false);
 	const [searchOpen, setSearchOpen] = React.useState(false);
 	const { data: favoritesData } = useSuspenseQuery(
 		convexQuery(api.favorites.listWithDocuments),
 	);
+
+	const pathname = location.pathname;
+	const isHomeActive = pathname === "/";
+
+	const navMainWithActiveState = React.useMemo(() => {
+		return navMain.map((item) => {
+			if (item.url === "/") {
+				return { ...item, isActive: isHomeActive };
+			}
+			return { ...item, isActive: false };
+		});
+	}, [navMain, isHomeActive]);
 
 	// Transform favorites data to match Favorite interface
 	const favorites: Favorite[] = React.useMemo(() => {
@@ -149,7 +161,10 @@ export function AppSidebar({
 			<Sidebar className="border-r-0" {...props}>
 				<SidebarHeader>
 					<TeamSwitcher teams={teams} />
-					<NavMain items={navMain} onSearchOpen={() => setSearchOpen(true)} />
+					<NavMain
+						items={navMainWithActiveState}
+						onSearchOpen={() => setSearchOpen(true)}
+					/>
 				</SidebarHeader>
 				<SidebarContent>
 					<NavFavorites favorites={favorites} />
