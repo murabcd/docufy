@@ -16,7 +16,7 @@ import type { Node } from "@tiptap/pm/model";
 import { NodeSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 import type { icons } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { commandGroups } from "@/tiptap/constants";
 import {
 	canShowColorTransform,
@@ -40,13 +40,16 @@ const formattedTransformOptions = commandGroups
 	.flatMap((group) => group.commands)
 	.filter((command) => !excludedCommands.includes(command.key));
 
-const TiptapDragHandle = ({ editor }: { editor: Editor }) => {
+const DRAG_HANDLE_POSITION_CONFIG = { placement: "left" as const };
+
+const TiptapDragHandle = memo(({ editor }: { editor: Editor }) => {
 	const [currentNodePos, setCurrentNodePos] = useState<number>(-1);
 	const [dropdownOpened, setDropdownOpened] = useState<boolean>(false);
 	const [isOpenColorMenu, setIsOpenColorMenu] = useState<boolean>(false);
 	const [isOpenTransformMenu, setIsOpenTransformMenu] =
 		useState<boolean>(false);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: avoid re-render on every transaction
 	const dragHandleDisabledKeys = useMemo(() => {
 		const isUploading = isUploadingImage(editor.state);
 
@@ -54,7 +57,7 @@ const TiptapDragHandle = ({ editor }: { editor: Editor }) => {
 			return ["duplicate_node"];
 		}
 		return [];
-	}, [editor.state]);
+	}, [dropdownOpened]);
 
 	const handleNodeChange = useCallback(
 		({ pos }: { editor: Editor; node: Node | null; pos: number }) => {
@@ -109,9 +112,7 @@ const TiptapDragHandle = ({ editor }: { editor: Editor }) => {
 	return (
 		<DragHandle
 			editor={editor}
-			computePositionConfig={{
-				placement: "left",
-			}}
+			computePositionConfig={DRAG_HANDLE_POSITION_CONFIG}
 			onNodeChange={handleNodeChange}
 		>
 			<div className="flex items-center pr-3">
@@ -347,6 +348,8 @@ const TiptapDragHandle = ({ editor }: { editor: Editor }) => {
 			</div>
 		</DragHandle>
 	);
-};
+});
+
+TiptapDragHandle.displayName = "TiptapDragHandle";
 
 export default TiptapDragHandle;
