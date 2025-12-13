@@ -139,7 +139,7 @@ export function Header({
 	const displayTitle = documentTitle || title || "Untitled";
 
 	return (
-		<header className="flex h-12 shrink-0 items-center gap-2">
+		<header className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-2 bg-background/95 backdrop-blur">
 			<div className="flex flex-1 items-center gap-2 px-3">
 				<Tooltip>
 					<TooltipTrigger asChild>

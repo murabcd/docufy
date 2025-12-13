@@ -145,15 +145,8 @@ export const Route = createFileRoute("/api/chat")({
 				try {
 					const stream = chat({
 						adapter: openai(),
-						messages: contextPrompt
-							? [
-									{
-										role: "system",
-										content: contextPrompt,
-									} satisfies ModelMessage,
-									...sanitized,
-								]
-							: sanitized,
+						messages: sanitized,
+						systemPrompts: contextPrompt ? [contextPrompt] : undefined,
 						model: selectedModel,
 						conversationId,
 					});
