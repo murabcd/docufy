@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { prosemirrorSync } from "./prosemirrorSync";
+import { components } from "./_generated/api";
 
 // Keep in sync with src/tiptap/types.ts
 const EMPTY_DOCUMENT = { type: "doc", content: [{ type: "paragraph" }] };
@@ -278,20 +279,48 @@ export const deleteDocument = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		await ctx.db.delete(args.id);
-		const relatedChunks = await ctx.db
-			.query("chunks")
-			.withIndex("by_documentId", (q) => q.eq("documentId", args.id))
-			.collect();
-		for (const chunk of relatedChunks) {
-			await ctx.db.delete(chunk._id);
+		// Cascade delete: deleting a page deletes all of its subpages recursively.
+		const idsToDelete: Id<"documents">[] = [];
+		const stack: Id<"documents">[] = [args.id];
+
+		while (stack.length > 0) {
+			const currentId = stack.pop() as Id<"documents">;
+			idsToDelete.push(currentId);
+
+			const children = await ctx.db
+				.query("documents")
+				.withIndex("by_parentId", (q) => q.eq("parentId", currentId))
+				.collect();
+
+			for (const child of children) {
+				stack.push(child._id);
+			}
 		}
-		const relatedFavorites = await ctx.db
-			.query("favorites")
-			.withIndex("by_documentId", (q) => q.eq("documentId", args.id))
-			.collect();
-		for (const favorite of relatedFavorites) {
-			await ctx.db.delete(favorite._id);
+
+		// Delete leaves first to avoid any transient "parent missing" UI states.
+		for (const documentId of idsToDelete.reverse()) {
+			const relatedChunks = await ctx.db
+				.query("chunks")
+				.withIndex("by_documentId", (q) => q.eq("documentId", documentId))
+				.collect();
+			for (const chunk of relatedChunks) {
+				await ctx.db.delete(chunk._id);
+			}
+
+			const relatedFavorites = await ctx.db
+				.query("favorites")
+				.withIndex("by_documentId", (q) => q.eq("documentId", documentId))
+				.collect();
+			for (const favorite of relatedFavorites) {
+				await ctx.db.delete(favorite._id);
+			}
+
+			// Clean up ProseMirror sync snapshots/steps for this document.
+			await ctx.runMutation(components.prosemirrorSync.lib.deleteDocument, {
+				id: String(documentId),
+			});
+
+			await ctx.db.delete(documentId);
 		}
 		return null;
 	},
