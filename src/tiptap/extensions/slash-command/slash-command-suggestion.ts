@@ -67,7 +67,32 @@ export default {
 				items: SlashCommandGroupProps[];
 				command: (item: SlashCommandGroupCommandsProps) => void;
 			}
-		>;
+		> | null = null;
+
+		const cleanup = () => {
+			if (!reactRenderer) {
+				return;
+			}
+
+			try {
+				reactRenderer.destroy();
+			} catch {
+				// no-op
+			}
+
+			const el = reactRenderer.element as HTMLElement | null;
+			if (el?.parentNode) {
+				el.parentNode.removeChild(el);
+			}
+
+			try {
+				reactRenderer.editor.commands.setMeta("lockDragHandle", false);
+			} catch {
+				// no-op
+			}
+
+			reactRenderer = null;
+		};
 
 		return {
 			onStart: (props: SuggestionProps) => {
@@ -90,33 +115,28 @@ export default {
 			},
 
 			onUpdate(props: SuggestionProps) {
-				reactRenderer.updateProps(props);
+				reactRenderer?.updateProps(props);
 
 				if (!props.clientRect) {
 					return;
 				}
 
-				updatePosition(props.editor, reactRenderer.element as HTMLElement);
+				if (reactRenderer) {
+					updatePosition(props.editor, reactRenderer.element as HTMLElement);
+				}
 			},
 
 			onKeyDown(props: SuggestionKeyDownProps) {
 				if (props.event.key === "Escape") {
-					reactRenderer.destroy();
-					reactRenderer.element.remove();
-
-					reactRenderer.editor.commands.setMeta("lockDragHandle", false);
-
+					cleanup();
 					return true;
 				}
 
-				return reactRenderer.ref?.onKeyDown(props);
+				return reactRenderer?.ref?.onKeyDown(props);
 			},
 
 			onExit() {
-				reactRenderer.destroy();
-				reactRenderer.element.remove();
-
-				reactRenderer.editor.commands.setMeta("lockDragHandle", false);
+				cleanup();
 			},
 		};
 	},
