@@ -27,6 +27,7 @@ import "prosemirror-view/style/prosemirror.css";
 import TiptapEmoji from "@/tiptap/extensions/emoji/tiptap-emoji";
 import { ImageUploader } from "@/tiptap/extensions/image/image-uploader";
 import ImageUploaderExtension from "@/tiptap/extensions/image/image-uploader-extension";
+import { NestedPage } from "@/tiptap/extensions/nested-page/nested-page";
 import type { TiptapEditorProps } from "@/tiptap/types";
 
 export interface TiptapEditorHandle {
@@ -78,6 +79,7 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
 					imgUploadUrl: editorOptions.imgUploadUrl,
 					imgUploadResponseKey: editorOptions.imgUploadResponseKey,
 				}),
+				NestedPage,
 				SlashCommand.configure({
 					suggestion: SlashCommandSuggestion,
 				}),
