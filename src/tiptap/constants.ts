@@ -267,11 +267,11 @@ export const commandGroups = [
 		commands: [
 			{
 				key: "page",
-				title: "Page",
+				title: "Subpage",
 				icon: "FileText",
-				description: "Create a nested page",
+				description: "Create a subpage",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
-					editor.chain().focus().deleteRange(range).insertContent("").run();
+					editor.chain().focus().deleteRange(range).run();
 					// Dispatch custom event for creating nested page
 					// Check if view is available before accessing dom
 					const event = new CustomEvent("createNestedPage", {
