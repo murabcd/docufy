@@ -1,6 +1,6 @@
 import { useTiptapSync } from "@convex-dev/prosemirror-sync/tiptap";
 import { convexQuery } from "@convex-dev/react-query";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { AnyExtension, JSONContent } from "@tiptap/core";
 import type { Editor } from "@tiptap/react";
@@ -22,6 +22,7 @@ import TiptapEditor, {
 } from "@/components/tiptap/tiptap-editor";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { nestedPagePluginKey } from "@/tiptap/extensions/nested-page/nested-page";
 import { EMPTY_DOCUMENT } from "@/tiptap/types";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -80,12 +81,14 @@ export const Route = createFileRoute("/documents/$documentId")({
 		queryClient.prefetchQuery(
 			convexQuery(api.documents.list, { parentId: null }),
 		);
+		queryClient.prefetchQuery(convexQuery(api.documents.getAll));
 	},
 });
 
 function DocumentEditor() {
 	const { documentId } = Route.useParams();
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 	const createDocument = useMutation(api.documents.create);
 	const updateDocumentTitle = useMutation(api.documents.update);
 	const editorRef = useRef<TiptapEditorHandle>(null);
@@ -102,6 +105,9 @@ function DocumentEditor() {
 	);
 	const { data: rootDocuments = [] } = useSuspenseQuery(
 		convexQuery(api.documents.list, { parentId: null }),
+	);
+	const { data: allDocuments } = useSuspenseQuery(
+		convexQuery(api.documents.getAll),
 	);
 	const sync = useTiptapSync(api.prosemirrorSync, documentId);
 
@@ -149,53 +155,125 @@ function DocumentEditor() {
 	}, [document, sync, legacyContent]);
 
 	const onTitleChange = useCallback(
-		(newTitle: string) => {
-			updateDocumentTitle({
+		async (newTitle: string) => {
+			await updateDocumentTitle({
 				id: documentId as Id<"documents">,
 				title: newTitle || "Untitled",
 			});
+
+			// Ensure the title map used by inline subpage chips refreshes immediately.
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.documents.getAll).queryKey,
+			});
 		},
-		[documentId, updateDocumentTitle],
+		[documentId, queryClient, updateDocumentTitle],
 	);
 
 	const isEditorReady = useCallback((editor: Editor | null): boolean => {
 		return !!(editor && !editor.isDestroyed && editor.view && editor.view.dom);
 	}, []);
 
+	const titlesById = useMemo(() => {
+		const map: Record<string, string> = {};
+		for (const doc of allDocuments ?? []) {
+			map[String(doc._id)] = doc.title ?? "Untitled";
+		}
+		return map;
+	}, [allDocuments]);
+
+	useEffect(() => {
+		const activeDocumentId = documentId;
+		let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+		const tryUpdate = () => {
+			if (!activeDocumentId) {
+				return;
+			}
+			const editor = editorRef.current?.getEditor() as Editor | null;
+			if (!editor || !isEditorReady(editor)) {
+				timeoutId = setTimeout(tryUpdate, 50);
+				return;
+			}
+
+			editor.view.dispatch(
+				editor.state.tr.setMeta(nestedPagePluginKey, { titlesById }),
+			);
+		};
+
+		tryUpdate();
+
+		return () => {
+			if (timeoutId) clearTimeout(timeoutId);
+		};
+	}, [documentId, isEditorReady, titlesById]);
+
 	const onCreateNestedPage = useEffectEvent(async (event: Event) => {
 		event.preventDefault();
 		const editor = editorRef.current?.getEditor() as Editor | null;
 		if (!editor || !isEditorReady(editor)) return;
 
+		const tempId = `nested-page-${Date.now()}-${Math.random()
+			.toString(36)
+			.slice(2, 8)}`;
+
+		// Insert a placeholder block immediately so typing can continue uninterrupted.
+		editor
+			.chain()
+			.focus()
+			.insertContent([
+				{ type: "nestedPage", attrs: { tempId } },
+				{ type: "text", text: " " },
+			])
+			.run();
+
 		startTransition(async () => {
-			const newId = await createDocument({
-				parentId: documentId as Id<"documents">,
-			});
+			try {
+				const newId = await createDocument({
+					parentId: documentId as Id<"documents">,
+				});
 
-			const linkUrl = `/documents/${newId}`;
-			const linkText = "Untitled";
+				// Replace placeholder attrs with the real document id.
+				let updated = false;
+				editor.state.doc.descendants((node, pos) => {
+					if (
+						node.type.name === "nestedPage" &&
+						(node.attrs.tempId as string | null) === tempId
+					) {
+						const nextAttrs = {
+							...node.attrs,
+							documentId: newId,
+							tempId: null,
+						};
+						editor.view.dispatch(
+							editor.state.tr.setNodeMarkup(pos, undefined, nextAttrs),
+						);
+						updated = true;
+						return false;
+					}
+					return true;
+				});
 
-			editor
-				.chain()
-				.focus()
-				.insertContent({
-					type: "paragraph",
-					content: [
-						{
-							type: "text",
-							text: linkText,
-							marks: [
-								{
-									type: "link",
-									attrs: {
-										href: linkUrl,
-									},
-								},
-							],
-						},
-					],
-				})
-				.run();
+				if (!updated) {
+					return;
+				}
+			} catch (error) {
+				console.error("Failed to create nested page:", error);
+				toast.error("Failed to create page");
+
+				// Remove placeholder if creation failed.
+				editor.state.doc.descendants((node, pos) => {
+					if (
+						node.type.name === "nestedPage" &&
+						(node.attrs.tempId as string | null) === tempId
+					) {
+						editor.view.dispatch(
+							editor.state.tr.delete(pos, pos + node.nodeSize),
+						);
+						return false;
+					}
+					return true;
+				});
+			}
 		});
 	});
 
@@ -221,13 +299,21 @@ function DocumentEditor() {
 	});
 
 	useEffect(() => {
-		const editor = editorRef.current?.getEditor() as Editor | null;
-		if (!editor || !isEditorReady(editor)) return;
-
+		const activeDocumentId = documentId;
 		let timeoutId: ReturnType<typeof setTimeout> | undefined;
+		let editor: Editor | null = null;
 		let editorDom: HTMLElement | null = null;
 
 		const checkAndSetup = () => {
+			if (!activeDocumentId) {
+				return;
+			}
+			editor = editorRef.current?.getEditor() as Editor | null;
+			if (!editor || !isEditorReady(editor)) {
+				timeoutId = setTimeout(checkAndSetup, 50);
+				return;
+			}
+
 			const dom = editor.view?.dom;
 			if (!dom) {
 				timeoutId = setTimeout(checkAndSetup, 50);
@@ -250,7 +336,7 @@ function DocumentEditor() {
 				editorDom.removeEventListener("click", onLinkClick);
 			}
 		};
-	}, [isEditorReady]);
+	}, [documentId, isEditorReady]);
 
 	const redirectFromMissingDocument = useEffectEvent(() => {
 		if (document !== null) {
@@ -388,7 +474,12 @@ function DocumentEditor() {
 					updatedAt={document?.updatedAt}
 				/>
 				<div className="flex flex-1 flex-col px-4 py-10">
-					<div className="mx-auto w-full max-w-3xl">{renderEditor()}</div>
+					<div className="mx-auto w-full max-w-3xl space-y-6">
+						<h1 className="text-4xl font-semibold tracking-tight">
+							{document?.title || "Untitled"}
+						</h1>
+						{renderEditor()}
+					</div>
 				</div>
 			</SidebarInset>
 			<AISidebar />
