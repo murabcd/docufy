@@ -1,7 +1,14 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { Plus, WandSparkles } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import {
+	Fragment,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+	useTransition,
+} from "react";
 import { NavActions } from "@/components/nav-actions";
 import {
 	Breadcrumb,
@@ -180,7 +187,7 @@ export function Header({
 						{ancestors.length > 0 ? (
 							<>
 								{ancestors.map((ancestor) => (
-									<>
+									<Fragment key={ancestor._id}>
 										<BreadcrumbItem key={ancestor._id}>
 											<BreadcrumbLink asChild>
 												<Link
@@ -192,7 +199,7 @@ export function Header({
 											</BreadcrumbLink>
 										</BreadcrumbItem>
 										<BreadcrumbSeparator />
-									</>
+									</Fragment>
 								))}
 								<BreadcrumbItem>
 									{isEditingTitle && canEditTitle ? (
