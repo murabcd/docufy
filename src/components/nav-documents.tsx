@@ -198,7 +198,7 @@ function DocumentItem({
 					style={style}
 					className="group"
 				>
-					<div className="flex items-center gap-1">
+					<div className="flex w-full min-w-0 items-center gap-1">
 						<Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
 							<CollapsibleTrigger asChild>
 								<button
@@ -231,7 +231,7 @@ function DocumentItem({
 						<SidebarMenuSubButton
 							asChild
 							isActive={isActive}
-							className="flex-1"
+							className="flex-1 min-w-0 pr-8"
 						>
 							<Link
 								to="/documents/$documentId"
@@ -245,7 +245,7 @@ function DocumentItem({
 							<DropdownMenuTrigger asChild>
 								<button
 									type="button"
-									className="opacity-0 group-hover:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
+									className="absolute right-0.5 top-0.5 opacity-0 group-hover:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
 								>
 									<MoreHorizontal className="size-4" />
 									<span className="sr-only">More</span>
