@@ -1,5 +1,5 @@
 import { convexQuery } from "@convex-dev/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
@@ -55,6 +55,7 @@ export function NavActions({
 	updatedAt?: number;
 }) {
 	const [isOpen, setIsOpen] = React.useState(false);
+	const queryClient = useQueryClient();
 	const toggleFavorite = useMutation(api.favorites.toggle);
 	const duplicateDocument = useMutation(api.documents.duplicate);
 	const archiveDocument = useMutation(api.documents.archive);
@@ -71,6 +72,16 @@ export function NavActions({
 		if (documentId) {
 			const added = await toggleFavorite({ documentId });
 			toast.success(added ? "Starred" : "Unstarred");
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
+					0,
+					2,
+				),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.favorites.isFavorite, { documentId })
+					.queryKey,
+			});
 		}
 	};
 

@@ -74,6 +74,28 @@ export const listWithDocuments = query({
 		}),
 	),
 	handler: async (ctx) => {
+		const toFavoriteDocument = (document: {
+			_id: any;
+			_creationTime: number;
+			title: string;
+			content?: string;
+			parentId?: any;
+			order?: number;
+			icon?: string;
+			createdAt: number;
+			updatedAt: number;
+		}) => ({
+			_id: document._id,
+			_creationTime: document._creationTime,
+			title: document.title,
+			content: document.content,
+			parentId: document.parentId,
+			order: document.order,
+			icon: document.icon,
+			createdAt: document.createdAt,
+			updatedAt: document.updatedAt,
+		});
+
 		const favorites = await ctx.db
 			.query("favorites")
 			.withIndex("by_user", (q) => q.eq("userId", DEFAULT_USER_ID))
@@ -83,9 +105,16 @@ export const listWithDocuments = query({
 		const favoritesWithDocuments = await Promise.all(
 			sortedFavorites.map(async (favorite) => {
 				const document = await ctx.db.get(favorite.documentId);
+				const safeFavorite = {
+					_id: favorite._id,
+					_creationTime: favorite._creationTime,
+					documentId: favorite.documentId,
+					createdAt: favorite.createdAt,
+				};
 				return {
-					...favorite,
-					document: document?.isArchived ? null : document,
+					...safeFavorite,
+					document:
+						document && !document.isArchived ? toFavoriteDocument(document) : null,
 				};
 			}),
 		);

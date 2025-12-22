@@ -16,7 +16,11 @@ import {
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import {
+	useQuery,
+	useQueryClient,
+	useSuspenseQuery,
+} from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
@@ -99,6 +103,7 @@ function DocumentItem({
 	const [isMounted, setIsMounted] = useState(false);
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+	const queryClient = useQueryClient();
 	const archiveDocument = useMutation(api.documents.archive);
 	const duplicateDocument = useMutation(api.documents.duplicate);
 	const toggleFavorite = useMutation(api.favorites.toggle);
@@ -178,6 +183,17 @@ function DocumentItem({
 	const handleToggleFavorite = async () => {
 		const added = await toggleFavorite({ documentId: document._id });
 		toast.success(added ? "Starred" : "Unstarred");
+		await queryClient.invalidateQueries({
+			queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
+				0,
+				2,
+			),
+		});
+		await queryClient.invalidateQueries({
+			queryKey: convexQuery(api.favorites.isFavorite, {
+				documentId: document._id,
+			}).queryKey,
+		});
 	};
 
 	const handleCopyLink = () => {

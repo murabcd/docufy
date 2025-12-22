@@ -23,6 +23,7 @@ export default defineSchema({
 	})
 		.index("by_user", ["userId"])
 		.index("by_user_parent", ["userId", "parentId"])
+		.index("by_user_isArchived_updatedAt", ["userId", "isArchived", "updatedAt"])
 		.index("by_createdAt", ["createdAt"])
 		.index("by_parentId", ["parentId"])
 		.index("by_parentId_and_order", ["parentId", "order"])

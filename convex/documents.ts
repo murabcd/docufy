@@ -628,6 +628,25 @@ export const getAll = query({
 	},
 });
 
+export const getRecentlyUpdated = query({
+	args: {
+		limit: v.optional(v.number()),
+	},
+	returns: v.array(
+		v.object(documentFields),
+	),
+	handler: async (ctx, args) => {
+		const limit = Math.max(1, Math.min(args.limit ?? 6, 50));
+		return await ctx.db
+			.query("documents")
+			.withIndex("by_user_isArchived_updatedAt", (q) =>
+				q.eq("userId", DEFAULT_USER_ID).eq("isArchived", false),
+			)
+			.order("desc")
+			.take(limit);
+	},
+});
+
 export const search = query({
 	args: {
 		term: v.string(),

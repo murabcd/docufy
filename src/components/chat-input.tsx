@@ -162,7 +162,6 @@ export function ChatInput({
 		return defaultDocuments;
 	}, [defaultDocuments, mentions, searchResults, shouldSearchDocuments]);
 
-	const hasMentions = mentions.length > 0;
 	const emptyStateMessage = shouldSearchDocuments
 		? "No documents match your search"
 		: "No documents available";
@@ -196,14 +195,14 @@ export function ChatInput({
 									<PopoverTrigger asChild>
 										<InputGroupButton
 											variant="outline"
-											size={!hasMentions ? "sm" : "icon-sm"}
+											size="icon-sm"
 											className="rounded-full transition-transform"
 										>
-											<AtSign /> {!hasMentions && "Add context"}
+											<AtSign />
 										</InputGroupButton>
 									</PopoverTrigger>
 								</TooltipTrigger>
-								<TooltipContent>Mention document</TooltipContent>
+								<TooltipContent>Mention documents</TooltipContent>
 							</Tooltip>
 
 							<PopoverContent className="p-0 [--radius:1.2rem]" align="start">
@@ -255,7 +254,7 @@ export function ChatInput({
 										key={mentionId}
 										size="sm"
 										variant="secondary"
-										className="rounded-full !pl-2"
+										className="rounded-full pl-2!"
 										onClick={() => {
 											setMentions((prev) =>
 												prev.filter((m) => m !== mentionId),

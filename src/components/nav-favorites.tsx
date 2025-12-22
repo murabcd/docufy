@@ -1,3 +1,5 @@
+import { convexQuery } from "@convex-dev/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
@@ -36,6 +38,7 @@ export function NavFavorites({
 	}[];
 }) {
 	const { isMobile } = useSidebar();
+	const queryClient = useQueryClient();
 	const removeFavorite = useMutation(api.favorites.remove);
 	const [isExpanded, setIsExpanded] = useState(false);
 
@@ -56,6 +59,16 @@ export function NavFavorites({
 			const documentId = urlMatch[1] as Id<"documents">;
 			await removeFavorite({ documentId });
 			toast.success("Unstarred");
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
+					0,
+					2,
+				),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.favorites.isFavorite, { documentId })
+					.queryKey,
+			});
 		}
 	};
 

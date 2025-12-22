@@ -1,10 +1,14 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { FileText } from "lucide-react";
+import { Clock } from "lucide-react";
+import { useEffect, useState } from "react";
 import { AISidebar } from "@/components/ai-sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Header } from "@/components/header";
+import { RecentlyUpdatedCards } from "@/components/recently-updated-cards";
 import { SidebarInset } from "@/components/ui/sidebar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getGreeting } from "@/lib/utils";
 import { api } from "../../convex/_generated/api";
 
 export const Route = createFileRoute("/")({
@@ -12,28 +16,67 @@ export const Route = createFileRoute("/")({
 	loader: async ({ context }) => {
 		const { queryClient } = context;
 		await queryClient.prefetchQuery(
-			convexQuery(api.documents.list, { parentId: null }),
+			convexQuery(api.documents.getRecentlyUpdated, { limit: 6 }),
 		);
 	},
 });
 
 function EditorHome() {
+	const [greeting, setGreeting] = useState<string | null>(null);
+
+	useEffect(() => {
+		let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+		const scheduleNextUpdate = () => {
+			const now = new Date();
+			setGreeting(getGreeting(now));
+
+			const next = new Date(now);
+			const hour = now.getHours();
+			if (hour < 5) {
+				next.setHours(5, 0, 0, 0);
+			} else if (hour < 12) {
+				next.setHours(12, 0, 0, 0);
+			} else if (hour < 18) {
+				next.setHours(18, 0, 0, 0);
+			} else if (hour < 22) {
+				next.setHours(22, 0, 0, 0);
+			} else {
+				next.setDate(next.getDate() + 1);
+				next.setHours(5, 0, 0, 0);
+			}
+
+			timeoutId = setTimeout(
+				scheduleNextUpdate,
+				next.getTime() - now.getTime() + 1000,
+			);
+		};
+
+		scheduleNextUpdate();
+
+		return () => {
+			if (timeoutId) clearTimeout(timeoutId);
+		};
+	}, []);
+
 	return (
 		<>
 			<AppSidebar />
 			<SidebarInset>
 				<Header title="Home" />
-				<div className="flex flex-1 flex-col items-center justify-center px-4 py-10">
-					<div className="flex flex-col items-center gap-4 text-center">
-						<div className="flex size-16 items-center justify-center rounded-full bg-muted">
-							<FileText className="size-8 text-muted-foreground" />
-						</div>
-						<div className="space-y-2">
-							<h2 className="text-2xl font-semibold">No document open</h2>
-							<p className="text-muted-foreground max-w-md">
-								Create a new document to get started. Click the Plus icon next
-								to your workspace name to create a new document.
-							</p>
+				<div className="flex flex-1 flex-col px-8 py-10">
+					<div className="flex flex-col gap-8 max-w-6xl mx-auto w-full">
+						{greeting ? (
+							<h1 className="text-4xl font-semibold">{greeting}</h1>
+						) : (
+							<Skeleton className="h-10 w-64" />
+						)}
+						<div className="flex flex-col gap-4">
+							<div className="flex items-center gap-2 text-sm text-muted-foreground">
+								<Clock className="size-4" />
+								<span>Recently updated</span>
+							</div>
+							<RecentlyUpdatedCards />
 						</div>
 					</div>
 				</div>

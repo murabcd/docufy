@@ -229,10 +229,10 @@ function TrashBoxContent({
 											}}
 										>
 											<Trash2 className="size-4" />
-											<span className="sr-only">Delete forever</span>
+											<span className="sr-only">Delete</span>
 										</Button>
 									</TooltipTrigger>
-									<TooltipContent>Delete forever</TooltipContent>
+									<TooltipContent>Delete</TooltipContent>
 								</Tooltip>
 							</div>
 						</div>
