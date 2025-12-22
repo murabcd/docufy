@@ -1,4 +1,4 @@
-<a href="https://docufy.vercel.app">
+<a href="https://docufy-oss.vercel.app">
   <img alt="AI Document Management Platform Built with TanStack Start, TanStack AI and Convex." src="./public/preview/docufy.png">
   <h1 align="center">Docufy</h1>
 </a>
@@ -47,7 +47,7 @@ This app ships with [OpenAI](https://openai.com/) provider as the default. Howev
 
 You can deploy your own version of Docufy to Vercel with one click:
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmurabcd%2Fdocs&env=CONVEX_DEPLOYMENT,VITE_CONVEX_URL,OPENAI_API_KEY&envDescription=Learn%20more%20about%20how%20to%20get%20the%20API%20Keys%20for%20the%20application&envLink=https%3A%2F%2Fgithub.com%2Fmurabcd%2Fdocs%2Fblob%2Fmain%2F.env.example&demo-title=Docufy&demo-description=AI-powered%20document%20management%20platform%20built%20with%20Tanstack%20Start%2C%20Tiptap%20v3%2C%20Convex%2C%20and%20OpenAI.&demo-url=https%3A%2F%2Fdocufy.vercel.app)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fmurabcd%2Fdocs&env=CONVEX_DEPLOYMENT,VITE_CONVEX_URL,OPENAI_API_KEY&envDescription=Learn%20more%20about%20how%20to%20get%20the%20API%20Keys%20for%20the%20application&envLink=https%3A%2F%2Fgithub.com%2Fmurabcd%2Fdocs%2Fblob%2Fmain%2F.env.example&demo-title=Docufy&demo-description=AI-powered%20document%20management%20platform%20built%20with%20Tanstack%20Start%2C%20Tiptap%20v3%2C%20Convex%2C%20and%20OpenAI.&demo-url=https%3A%2F%2Fdocufy-oss.vercel.app)
 
 ## Running locally
 

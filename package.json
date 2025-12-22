@@ -8,7 +8,7 @@
     "dev:frontend": "vite dev",
     "dev:backend": "convex dev --tail-logs",
     "dev": "vite dev --port 3000",
-    "build": "vite build",
+    "build": "NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=3072} vite build",
     "serve": "vite preview",
     "test": "vitest run",
     "lint": "biome lint --write",
