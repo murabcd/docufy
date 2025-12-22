@@ -12,6 +12,7 @@ export default defineSchema({
 		icon: v.optional(v.string()),
 		coverImage: v.optional(v.string()),
 		isArchived: v.boolean(),
+		archivedAt: v.optional(v.number()),
 		isPublished: v.boolean(),
 		includeInAi: v.boolean(),
 		lastEditedAt: v.number(),
@@ -25,6 +26,8 @@ export default defineSchema({
 		.index("by_createdAt", ["createdAt"])
 		.index("by_parentId", ["parentId"])
 		.index("by_parentId_and_order", ["parentId", "order"])
+		.index("by_isArchived_archivedAt", ["isArchived", "archivedAt"])
+		.index("by_user_isArchived_archivedAt", ["userId", "isArchived", "archivedAt"])
 		.searchIndex("search_title", {
 			searchField: "title",
 			filterFields: ["userId", "isArchived"],
@@ -54,5 +57,6 @@ export default defineSchema({
 		createdAt: v.number(),
 	})
 		.index("by_documentId", ["documentId"])
+		.index("by_user", ["userId"])
 		.index("by_user_document", ["userId", "documentId"]),
 });

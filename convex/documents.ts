@@ -1,10 +1,10 @@
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { prosemirrorSync } from "./prosemirrorSync";
-import { components } from "./_generated/api";
+import { components, internal } from "./_generated/api";
 
-// Keep in sync with src/tiptap/types.ts
 const EMPTY_DOCUMENT = { type: "doc", content: [{ type: "paragraph" }] };
 
 const DEFAULT_USER_ID = "demo-user";
@@ -21,6 +21,7 @@ const documentFields = {
 	icon: v.optional(v.string()),
 	coverImage: v.optional(v.string()),
 	isArchived: v.boolean(),
+	archivedAt: v.optional(v.number()),
 	isPublished: v.boolean(),
 	includeInAi: v.boolean(),
 	lastEditedAt: v.number(),
@@ -38,20 +39,19 @@ export const create = mutation({
 	returns: v.id("documents"),
 	handler: async (ctx, args) => {
 		const now = Date.now();
-		
-		// Get the max order for this parent (or root if no parent)
+
 		const siblings = await ctx.db
 			.query("documents")
-			.withIndex("by_parentId", (q) =>
-				q.eq("parentId", args.parentId ?? undefined),
+			.withIndex("by_user_parent", (q) =>
+				q.eq("userId", DEFAULT_USER_ID).eq("parentId", args.parentId ?? undefined),
 			)
 			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
-		
+
 		const maxOrder = siblings.reduce((max, doc) => {
 			return Math.max(max, doc.order ?? 0);
 		}, -1);
-		
+
 		const documentId = await ctx.db.insert("documents", {
 			userId: DEFAULT_USER_ID,
 			title: args.title || "Untitled",
@@ -62,6 +62,7 @@ export const create = mutation({
 			icon: undefined,
 			coverImage: undefined,
 			isArchived: false,
+			archivedAt: undefined,
 			isPublished: false,
 			includeInAi: true,
 			lastEditedAt: now,
@@ -94,8 +95,9 @@ export const update = mutation({
 		title: v.optional(v.string()),
 		content: v.optional(v.string()),
 		searchableText: v.optional(v.string()),
-		icon: v.optional(v.string()),
-		coverImage: v.optional(v.string()),
+		// Allow `null` to explicitly clear these optional fields.
+		icon: v.optional(v.union(v.string(), v.null())),
+		coverImage: v.optional(v.union(v.string(), v.null())),
 		isArchived: v.optional(v.boolean()),
 		isPublished: v.optional(v.boolean()),
 		includeInAi: v.optional(v.boolean()),
@@ -106,9 +108,8 @@ export const update = mutation({
 		const now = Date.now();
 		const patch: Record<string, unknown> = {};
 		for (const [key, value] of Object.entries(updates)) {
-			if (value !== undefined) {
-				patch[key] = value;
-			}
+			if (value === undefined) continue;
+			patch[key] = value === null ? undefined : value;
 		}
 		if ("content" in patch || "searchableText" in patch) {
 			patch.lastEditedAt = now;
@@ -127,36 +128,16 @@ export const list = query({
 		v.object(documentFields),
 	),
 	handler: async (ctx, args) => {
-		// If parentId is explicitly null or undefined, get root level documents
 		const parentId = args.parentId === null ? undefined : args.parentId;
-		
-		if (parentId === undefined) {
-			// Get root level documents (no parent)
-			const docs = await ctx.db
-				.query("documents")
-				.withIndex("by_parentId", (q) => q.eq("parentId", undefined))
-				.filter((q) => q.eq(q.field("isArchived"), false))
-				.collect();
-			
-			// Sort by order, then by createdAt
-			return docs.sort((a, b) => {
-				const orderA = a.order ?? 0;
-				const orderB = b.order ?? 0;
-				if (orderA !== orderB) {
-					return orderA - orderB;
-				}
-				return a.createdAt - b.createdAt;
-			});
-		}
-		
-		// Get children of a specific parent
+
 		const docs = await ctx.db
 			.query("documents")
-			.withIndex("by_parentId", (q) => q.eq("parentId", parentId))
+			.withIndex("by_user_parent", (q) =>
+				q.eq("userId", DEFAULT_USER_ID).eq("parentId", parentId),
+			)
 			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
-		
-		// Sort by order, then by createdAt
+
 		return docs.sort((a, b) => {
 			const orderA = a.order ?? 0;
 			const orderB = b.order ?? 0;
@@ -180,20 +161,22 @@ export const reorder = mutation({
 		if (!document) {
 			throw new Error("Document not found");
 		}
+		if (document.isArchived) {
+			throw new Error("Cannot reorder an archived document");
+		}
 		
 		const oldParentId = document.parentId;
 		const newParentId = args.newParentId ?? undefined;
 		
-		// If parent changed, we need to update orders in both old and new parents
 		if (oldParentId !== newParentId) {
-			// Remove from old parent's order
 			const oldSiblings = await ctx.db
 				.query("documents")
-				.withIndex("by_parentId", (q) =>
-					q.eq("parentId", oldParentId ?? undefined),
+				.withIndex("by_user_parent", (q) =>
+					q.eq("userId", DEFAULT_USER_ID).eq("parentId", oldParentId ?? undefined),
 				)
+				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
-			
+
 			for (const sibling of oldSiblings) {
 				if (sibling.order !== undefined && sibling.order > (document.order ?? 0)) {
 					await ctx.db.patch(sibling._id, {
@@ -202,15 +185,15 @@ export const reorder = mutation({
 					});
 				}
 			}
-			
-			// Add to new parent's order
+
 			const newSiblings = await ctx.db
 				.query("documents")
-				.withIndex("by_parentId", (q) =>
-					q.eq("parentId", newParentId ?? undefined),
+				.withIndex("by_user_parent", (q) =>
+					q.eq("userId", DEFAULT_USER_ID).eq("parentId", newParentId ?? undefined),
 				)
+				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
-			
+
 			for (const sibling of newSiblings) {
 				if (sibling._id !== args.id && (sibling.order ?? 0) >= args.newOrder) {
 					await ctx.db.patch(sibling._id, {
@@ -220,19 +203,18 @@ export const reorder = mutation({
 				}
 			}
 		} else {
-			// Same parent, just reordering
 			const siblings = await ctx.db
 				.query("documents")
-				.withIndex("by_parentId", (q) =>
-					q.eq("parentId", oldParentId ?? undefined),
+				.withIndex("by_user_parent", (q) =>
+					q.eq("userId", DEFAULT_USER_ID).eq("parentId", oldParentId ?? undefined),
 				)
+				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
-			
+
 			const oldOrder = document.order ?? 0;
 			const newOrder = args.newOrder;
-			
+
 			if (oldOrder < newOrder) {
-				// Moving down
 				for (const sibling of siblings) {
 					if (
 						sibling._id !== args.id &&
@@ -246,7 +228,6 @@ export const reorder = mutation({
 					}
 				}
 			} else if (oldOrder > newOrder) {
-				// Moving up
 				for (const sibling of siblings) {
 					if (
 						sibling._id !== args.id &&
@@ -261,8 +242,7 @@ export const reorder = mutation({
 				}
 			}
 		}
-		
-		// Update the document
+
 		await ctx.db.patch(args.id, {
 			order: args.newOrder,
 			parentId: newParentId,
@@ -273,55 +253,258 @@ export const reorder = mutation({
 	},
 });
 
-export const deleteDocument = mutation({
+export const archive = mutation({
 	args: {
 		id: v.id("documents"),
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		// Cascade delete: deleting a page deletes all of its subpages recursively.
-		const idsToDelete: Id<"documents">[] = [];
-		const stack: Id<"documents">[] = [args.id];
+		const now = Date.now();
+		const document = await ctx.db.get(args.id);
+		if (!document) {
+			throw new Error("Document not found");
+		}
 
-		while (stack.length > 0) {
-			const currentId = stack.pop() as Id<"documents">;
-			idsToDelete.push(currentId);
-
+		const recursiveArchive = async (documentId: Id<"documents">) => {
 			const children = await ctx.db
 				.query("documents")
-				.withIndex("by_parentId", (q) => q.eq("parentId", currentId))
+				.withIndex("by_user_parent", (q) =>
+					q.eq("userId", DEFAULT_USER_ID).eq("parentId", documentId),
+				)
+				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
 
 			for (const child of children) {
-				stack.push(child._id);
+				await ctx.db.patch(child._id, {
+					isArchived: true,
+					archivedAt: now,
+					updatedAt: now,
+				});
+				await recursiveArchive(child._id);
+			}
+		};
+
+		await ctx.db.patch(args.id, {
+			isArchived: true,
+			archivedAt: now,
+			updatedAt: now,
+		});
+
+		await recursiveArchive(args.id);
+		await ctx.runMutation(internal.init.ensureTrashCleanupCron, {});
+
+		return null;
+	},
+});
+
+export const getTrash = query({
+	args: {},
+	returns: v.array(v.object(documentFields)),
+	handler: async (ctx) => {
+		const documents = await ctx.db
+			.query("documents")
+			.withIndex("by_user_isArchived_archivedAt", (q) =>
+				q.eq("userId", DEFAULT_USER_ID).eq("isArchived", true),
+			)
+			.collect();
+
+		return documents.sort((a, b) => {
+			const aArchivedAt = a.archivedAt ?? a.updatedAt;
+			const bArchivedAt = b.archivedAt ?? b.updatedAt;
+			return bArchivedAt - aArchivedAt;
+		});
+	},
+});
+
+export const restore = mutation({
+	args: {
+		id: v.id("documents"),
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const now = Date.now();
+		const document = await ctx.db.get(args.id);
+		if (!document) {
+			throw new Error("Document not found");
+		}
+
+		const recursiveRestore = async (documentId: Id<"documents">) => {
+			const children = await ctx.db
+				.query("documents")
+				.withIndex("by_user_parent", (q) =>
+					q.eq("userId", DEFAULT_USER_ID).eq("parentId", documentId),
+				)
+				.filter((q) => q.eq(q.field("isArchived"), true))
+				.collect();
+
+			for (const child of children) {
+				await ctx.db.patch(child._id, {
+					isArchived: false,
+					archivedAt: undefined,
+					updatedAt: now,
+				});
+				await recursiveRestore(child._id);
+			}
+		};
+
+		const patch: {
+			isArchived: boolean;
+			parentId?: Id<"documents"> | undefined;
+			order?: number | undefined;
+			archivedAt?: number | undefined;
+			updatedAt: number;
+		} = {
+			isArchived: false,
+			archivedAt: undefined,
+			updatedAt: now,
+		};
+
+		let targetParentId: Id<"documents"> | undefined = document.parentId;
+		if (targetParentId) {
+			const parent = await ctx.db.get(targetParentId);
+			if (parent?.isArchived) {
+				targetParentId = undefined;
 			}
 		}
 
-		// Delete leaves first to avoid any transient "parent missing" UI states.
-		for (const documentId of idsToDelete.reverse()) {
-			const relatedChunks = await ctx.db
-				.query("chunks")
-				.withIndex("by_documentId", (q) => q.eq("documentId", documentId))
-				.collect();
-			for (const chunk of relatedChunks) {
-				await ctx.db.delete(chunk._id);
-			}
+		patch.parentId = targetParentId;
 
-			const relatedFavorites = await ctx.db
-				.query("favorites")
-				.withIndex("by_documentId", (q) => q.eq("documentId", documentId))
-				.collect();
-			for (const favorite of relatedFavorites) {
-				await ctx.db.delete(favorite._id);
-			}
+		const siblings = await ctx.db
+			.query("documents")
+			.withIndex("by_user_parent", (q) =>
+				q.eq("userId", DEFAULT_USER_ID).eq("parentId", targetParentId),
+			)
+			.filter((q) => q.eq(q.field("isArchived"), false))
+			.collect();
+		const maxOrder = siblings.reduce(
+			(max, doc) => Math.max(max, doc.order ?? 0),
+			-1,
+		);
+		patch.order = maxOrder + 1;
 
-			// Clean up ProseMirror sync snapshots/steps for this document.
-			await ctx.runMutation(components.prosemirrorSync.lib.deleteDocument, {
-				id: String(documentId),
-			});
+		await ctx.db.patch(args.id, patch);
 
-			await ctx.db.delete(documentId);
+		await recursiveRestore(args.id);
+
+		return null;
+	},
+});
+
+async function cascadeDelete(ctx: MutationCtx, rootId: Id<"documents">) {
+	const idsToDelete: Id<"documents">[] = [];
+	const stack: Id<"documents">[] = [rootId];
+
+	while (stack.length > 0) {
+		const currentId = stack.pop() as Id<"documents">;
+		idsToDelete.push(currentId);
+
+		const children = await ctx.db
+			.query("documents")
+			.withIndex("by_user_parent", (q) =>
+				q.eq("userId", DEFAULT_USER_ID).eq("parentId", currentId),
+			)
+			.collect();
+
+		for (const child of children) {
+			stack.push(child._id);
 		}
+	}
+
+	for (const documentId of idsToDelete.reverse()) {
+		const relatedChunks = await ctx.db
+			.query("chunks")
+			.withIndex("by_documentId", (q: any) => q.eq("documentId", documentId))
+			.collect();
+		for (const chunk of relatedChunks) {
+			await ctx.db.delete(chunk._id);
+		}
+
+		const relatedFavorites = await ctx.db
+			.query("favorites")
+			.withIndex("by_documentId", (q: any) => q.eq("documentId", documentId))
+			.collect();
+		for (const favorite of relatedFavorites) {
+			await ctx.db.delete(favorite._id);
+		}
+
+		await ctx.runMutation(components.prosemirrorSync.lib.deleteDocument, {
+			id: String(documentId),
+		});
+
+		await ctx.db.delete(documentId);
+	}
+}
+
+export const remove = mutation({
+	args: {
+		id: v.id("documents"),
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const document = await ctx.db.get(args.id);
+		if (!document) {
+			throw new Error("Document not found");
+		}
+
+		if (!document.isArchived) {
+			throw new Error("Document must be archived before permanent deletion");
+		}
+		await cascadeDelete(ctx, args.id);
+		return null;
+	},
+});
+
+export const cleanupTrash = internalMutation({
+	args: {
+		retentionDays: v.optional(v.number()),
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const retentionDays = args.retentionDays ?? 30;
+		const now = Date.now();
+		const cutoff = now - retentionDays * 24 * 60 * 60 * 1000;
+
+		const archived = await ctx.db
+			.query("documents")
+			.withIndex("by_user_isArchived_archivedAt", (q) =>
+				q.eq("userId", DEFAULT_USER_ID).eq("isArchived", true),
+			)
+			.collect();
+
+		const candidates = archived.filter((doc) => {
+			const archivedAt = doc.archivedAt ?? doc.updatedAt;
+			return archivedAt < cutoff;
+		});
+
+		const parentCache = new Map<string, Doc<"documents"> | null>();
+		const rootsToDelete: Array<Doc<"documents">> = [];
+
+		for (const doc of candidates) {
+			if (!doc.parentId) {
+				rootsToDelete.push(doc);
+				continue;
+			}
+
+			const parentKey = String(doc.parentId);
+			let parent = parentCache.get(parentKey);
+			if (parent === undefined) {
+				parent = await ctx.db.get(doc.parentId);
+				parentCache.set(parentKey, parent);
+			}
+
+			if (!parent?.isArchived) {
+				rootsToDelete.push(doc);
+			}
+		}
+
+		for (const doc of rootsToDelete) {
+			const current = await ctx.db.get(doc._id);
+			if (!current?.isArchived) continue;
+			const archivedAt = current.archivedAt ?? current.updatedAt;
+			if (archivedAt >= cutoff) continue;
+			await cascadeDelete(ctx, current._id);
+		}
+
 		return null;
 	},
 });
@@ -336,18 +519,49 @@ export const duplicate = mutation({
 		if (!original) {
 			throw new Error("Document not found");
 		}
-		
+
 		const now = Date.now();
+
+		let targetParentId: Id<"documents"> | undefined = original.parentId;
+		if (targetParentId) {
+			const parent = await ctx.db.get(targetParentId);
+			if (parent?.isArchived) {
+				targetParentId = undefined;
+			}
+		}
+
+		const siblings = await ctx.db
+			.query("documents")
+			.withIndex("by_user_parent", (q) =>
+				q.eq("userId", DEFAULT_USER_ID).eq("parentId", targetParentId),
+			)
+			.filter((q) => q.eq(q.field("isArchived"), false))
+			.collect();
+		const maxOrder = siblings.reduce(
+			(max, doc) => Math.max(max, doc.order ?? 0),
+			-1,
+		);
+
+		let contentJson = EMPTY_DOCUMENT;
+		try {
+			if (original.content) {
+				contentJson = JSON.parse(original.content) as typeof EMPTY_DOCUMENT;
+			}
+		} catch {
+			contentJson = EMPTY_DOCUMENT;
+		}
+
 		const documentId = await ctx.db.insert("documents", {
 			userId: original.userId ?? DEFAULT_USER_ID,
 			title: `${original.title} (Copy)`,
-			content: original.content ?? JSON.stringify(EMPTY_DOCUMENT),
+			content: JSON.stringify(contentJson),
 			searchableText: original.searchableText ?? "",
-			parentId: original.parentId,
-			order: (original.order ?? 0) + 1,
+			parentId: targetParentId,
+			order: maxOrder + 1,
 			icon: original.icon,
 			coverImage: original.coverImage,
 			isArchived: false,
+			archivedAt: undefined,
 			isPublished: false,
 			includeInAi: original.includeInAi,
 			lastEditedAt: now,
@@ -356,7 +570,9 @@ export const duplicate = mutation({
 			createdAt: now,
 			updatedAt: now,
 		});
-		
+
+		await prosemirrorSync.create(ctx, documentId, contentJson);
+
 		return documentId;
 	},
 });
@@ -370,25 +586,24 @@ export const getAncestors = query({
 	),
 	handler: async (ctx, args) => {
 		const ancestors: Doc<"documents">[] = [];
-		
-		// Start from the parent, not the current document
+
 		const currentDoc = await ctx.db.get(args.id);
 		if (!currentDoc) {
 			return ancestors;
 		}
-		
+
 		let currentId: Id<"documents"> | undefined = currentDoc.parentId;
-		
+
 		while (currentId) {
 			const doc = await ctx.db.get(currentId);
 			if (!doc) {
 				break;
 			}
-			
+
 			ancestors.unshift(doc);
 			currentId = doc.parentId;
 		}
-		
+
 		return ancestors;
 	},
 });
@@ -399,13 +614,16 @@ export const getAll = query({
 		v.object(documentFields),
 	),
 	handler: async (ctx) => {
-		// Get all documents for search
 		const docs = await ctx.db
 			.query("documents")
-			.filter((q) => q.eq(q.field("isArchived"), false))
+			.filter((q) =>
+				q.and(
+					q.eq(q.field("userId"), DEFAULT_USER_ID),
+					q.eq(q.field("isArchived"), false),
+				),
+			)
 			.collect();
-		
-		// Sort by updatedAt (most recently updated first)
+
 		return docs.sort((a, b) => b.updatedAt - a.updatedAt);
 	},
 });
