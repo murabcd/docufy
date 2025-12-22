@@ -3,7 +3,7 @@
 }
 
 .ProseMirror {
-	@apply w-full max-w-4xl mx-auto px-11 pt-6 pb-48 caret-primary outline-0;
+	@apply w-full px-11 pt-6 pb-48 caret-primary outline-0;
 
 	font-family:
 		DM Sans,
