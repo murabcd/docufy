@@ -5,6 +5,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { AnyExtension, JSONContent } from "@tiptap/core";
 import type { Editor } from "@tiptap/react";
 import { useMutation } from "convex/react";
+import { ImageIcon, Smile, X } from "lucide-react";
 import {
 	useCallback,
 	useEffect,
@@ -16,13 +17,19 @@ import {
 import { toast } from "sonner";
 import { AISidebar } from "@/components/ai-sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { CoverImage } from "@/components/cover-image";
+import { CoverImageModal } from "@/components/cover-image-modal";
 import { DocumentTitle } from "@/components/document-title";
 import { Header } from "@/components/header";
+import { IconPicker } from "@/components/icon-picker";
 import TiptapEditor, {
 	type TiptapEditorHandle,
 } from "@/components/tiptap/tiptap-editor";
+import { TrashBanner } from "@/components/trash-banner";
+import { Button } from "@/components/ui/button";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCoverImage } from "@/hooks/use-cover-image";
 import { nestedPagePluginKey } from "@/tiptap/extensions/nested-page/nested-page";
 import { EMPTY_DOCUMENT } from "@/tiptap/types";
 import { api } from "../../convex/_generated/api";
@@ -164,11 +171,63 @@ function DocumentEditor() {
 
 			// Ensure the title map used by inline subpage chips refreshes immediately.
 			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.getAll).queryKey,
+				queryKey: convexQuery(api.documents.getAll).queryKey.slice(0, 2),
 			});
 		},
 		[documentId, queryClient, updateDocumentTitle],
 	);
+
+	const removeIcon = useMutation(api.documents.update);
+	const coverImage = useCoverImage();
+
+	const onIconSelect = useCallback(
+		async (icon: string) => {
+			await updateDocumentTitle({
+				id: documentId as Id<"documents">,
+				icon,
+			});
+
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.documents.getAll).queryKey.slice(0, 2),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.documents.list).queryKey.slice(0, 2),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.documents.getTrash).queryKey.slice(0, 2),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
+					0,
+					2,
+				),
+			});
+		},
+		[documentId, queryClient, updateDocumentTitle],
+	);
+
+	const onRemoveIcon = useCallback(async () => {
+		await removeIcon({
+			id: documentId as Id<"documents">,
+			icon: null,
+		});
+
+		await queryClient.invalidateQueries({
+			queryKey: convexQuery(api.documents.getAll).queryKey.slice(0, 2),
+		});
+		await queryClient.invalidateQueries({
+			queryKey: convexQuery(api.documents.list).queryKey.slice(0, 2),
+		});
+		await queryClient.invalidateQueries({
+			queryKey: convexQuery(api.documents.getTrash).queryKey.slice(0, 2),
+		});
+		await queryClient.invalidateQueries({
+			queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
+				0,
+				2,
+			),
+		});
+	}, [documentId, queryClient, removeIcon]);
 
 	const isEditorReady = useCallback((editor: Editor | null): boolean => {
 		return !!(editor && !editor.isDestroyed && editor.view && editor.view.dom);
@@ -210,6 +269,7 @@ function DocumentEditor() {
 
 	const onCreateNestedPage = useEffectEvent(async (event: Event) => {
 		event.preventDefault();
+		if (document?.isArchived) return;
 		const editor = editorRef.current?.getEditor() as Editor | null;
 		if (!editor || !isEditorReady(editor)) return;
 
@@ -446,6 +506,10 @@ function DocumentEditor() {
 		return null;
 	}
 
+	const onTitleChangeIfEditable = document.isArchived
+		? undefined
+		: onTitleChange;
+
 	const renderEditor = () => {
 		if (sync.isLoading || !isSyncReady || !syncExtensionRef.current) {
 			return null;
@@ -457,6 +521,7 @@ function DocumentEditor() {
 				ref={editorRef}
 				editorOptions={{
 					content: initialContentRef.current ?? EMPTY_DOCUMENT,
+					editable: !document.isArchived,
 				}}
 				extraExtensions={extraExtensionsRef.current}
 			/>
@@ -471,19 +536,61 @@ function DocumentEditor() {
 					documentId={documentId as Id<"documents">}
 					documentTitle={document?.title}
 					ancestors={ancestors}
-					onTitleChange={onTitleChange}
+					onTitleChange={onTitleChangeIfEditable}
 					updatedAt={document?.updatedAt}
 				/>
-				<div className="flex flex-1 flex-col px-4 py-10">
-					<div className="mx-auto w-full max-w-4xl space-y-4">
-						<div className="px-11">
+				{document?.isArchived && (
+					<TrashBanner documentId={documentId as Id<"documents">} />
+				)}
+				<div className="flex flex-1 flex-col pb-40">
+					<CoverImage
+						url={document.coverImage}
+						documentId={documentId as Id<"documents">}
+					/>
+					<div className="mx-auto w-full max-w-4xl">
+						<div className="px-11 group relative">
+							{!!document.icon && !document.isArchived && (
+								<div className="flex items-center gap-x-2 group/icon pt-6">
+									<IconPicker onChange={onIconSelect}>
+										<p className="text-6xl hover:opacity-75 transition cursor-pointer">
+											{document.icon}
+										</p>
+									</IconPicker>
+									<Button
+										onClick={onRemoveIcon}
+										variant="ghost"
+										size="icon"
+										className="rounded-full opacity-0 group-hover/icon:opacity-100 transition"
+									>
+										<X className="h-4 w-4" />
+									</Button>
+								</div>
+							)}
+							{!!document.icon && document.isArchived && (
+								<p className="text-6xl pt-6">{document.icon}</p>
+							)}
+							<div className="opacity-0 group-hover:opacity-100 flex items-center gap-x-1 py-4">
+								{!document.icon && !document.isArchived && (
+									<IconPicker asChild onChange={onIconSelect}>
+										<Button variant="ghost" size="sm">
+											<Smile className="h-4 w-4 mr-2" /> Add icon
+										</Button>
+									</IconPicker>
+								)}
+								{!document.coverImage && !document.isArchived && (
+									<Button onClick={coverImage.onOpen} variant="ghost" size="sm">
+										<ImageIcon className="h-4 w-4 mr-2" /> Add cover
+									</Button>
+								)}
+							</div>
 							<DocumentTitle
 								title={document.title}
-								onTitleChange={onTitleChange}
+								onTitleChange={onTitleChangeIfEditable}
 							/>
 						</div>
 						{renderEditor()}
 					</div>
+					<CoverImageModal documentId={documentId as Id<"documents">} />
 				</div>
 			</SidebarInset>
 			<AISidebar />
