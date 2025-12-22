@@ -109,12 +109,19 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
 				extensions: allExtensions,
 				immediatelyRender: false,
 				...editorOptions,
-				autofocus: false,
+				autofocus: editorOptions.autofocus ?? false,
 				onCreate: ({ editor }) => {
 					editorOptions.onCreate?.({ editor });
+					if (editorOptions.autofocus) {
+						return;
+					}
+					const isEmpty = editor.state.doc.textContent.trim().length === 0;
+					if (!isEmpty) {
+						return;
+					}
 					setTimeout(() => {
 						if (!editor.isDestroyed) {
-							editor.commands.focus("end");
+							editor.commands.focus("start");
 						}
 					}, 0);
 				},

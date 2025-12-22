@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { AISidebar } from "@/components/ai-sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { DocumentTitle } from "@/components/document-title";
 import { Header } from "@/components/header";
 import TiptapEditor, {
 	type TiptapEditorHandle,
@@ -474,10 +475,13 @@ function DocumentEditor() {
 					updatedAt={document?.updatedAt}
 				/>
 				<div className="flex flex-1 flex-col px-4 py-10">
-					<div className="mx-auto w-full max-w-3xl space-y-6">
-						<h1 className="text-4xl font-semibold tracking-tight">
-							{document?.title || "Untitled"}
-						</h1>
+					<div className="mx-auto w-full max-w-4xl space-y-4">
+						<div className="px-11">
+							<DocumentTitle
+								title={document.title}
+								onTitleChange={onTitleChange}
+							/>
+						</div>
 						{renderEditor()}
 					</div>
 				</div>

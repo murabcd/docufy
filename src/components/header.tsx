@@ -209,7 +209,7 @@ export function Header({
 											onChange={onTitleChangeHandler}
 											onKeyDown={onTitleKeyDown}
 											value={titleValue}
-											className="h-auto px-1 py-0 text-sm focus-visible:ring-transparent border-transparent bg-transparent shadow-none hover:bg-accent/50 rounded"
+											className="h-auto px-1 py-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 border-0 bg-transparent shadow-none rounded outline-none"
 											style={{ minWidth: "100px", maxWidth: "300px" }}
 										/>
 									) : (
@@ -235,7 +235,7 @@ export function Header({
 										onChange={onTitleChangeHandler}
 										onKeyDown={onTitleKeyDown}
 										value={titleValue}
-										className="h-auto px-1 py-0 text-sm focus-visible:ring-transparent border-transparent bg-transparent shadow-none hover:bg-accent/50 rounded"
+										className="h-auto px-1 py-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 border-0 bg-transparent shadow-none rounded outline-none"
 										style={{ minWidth: "100px", maxWidth: "300px" }}
 									/>
 								) : (
