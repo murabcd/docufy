@@ -1,6 +1,13 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import type React from "react";
+import { useEffect, useState } from "react";
+import { TrashBoxPopover } from "@/components/trash-box";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import {
 	SidebarGroup,
 	SidebarGroupContent,
@@ -8,6 +15,7 @@ import {
 	SidebarMenuBadge,
 	SidebarMenuButton,
 	SidebarMenuItem,
+	useSidebar,
 } from "@/components/ui/sidebar";
 
 export function NavSecondary({
@@ -23,13 +31,21 @@ export function NavSecondary({
 	}[];
 	onSettingsClick?: () => void;
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
+	const { isMobile } = useSidebar();
+	const location = useLocation();
+	const pathname = location.pathname;
+	const [trashOpen, setTrashOpen] = useState(false);
+
+	useEffect(() => {
+		if (pathname) setTrashOpen(false);
+	}, [pathname]);
+
 	return (
 		<SidebarGroup {...props}>
 			<SidebarGroupContent>
 				<SidebarMenu>
 					{items.map((item) => {
-						// Special handling for Settings item
-						if (item.title === "Settings" && onSettingsClick) {
+						if (item.url === "/settings" && onSettingsClick) {
 							return (
 								<SidebarMenuItem key={item.title}>
 									<SidebarMenuButton asChild>
@@ -51,7 +67,37 @@ export function NavSecondary({
 							);
 						}
 
-						// Regular items
+						if (item.url === "/trash") {
+							return (
+								<SidebarMenuItem key={item.title}>
+									<Popover open={trashOpen} onOpenChange={setTrashOpen}>
+										<PopoverTrigger asChild>
+											<SidebarMenuButton>
+												<item.icon />
+												<span>{item.title}</span>
+											</SidebarMenuButton>
+										</PopoverTrigger>
+										<PopoverContent
+											className="p-0 w-72"
+											side={isMobile ? "bottom" : "right"}
+											align="end"
+											alignOffset={-24}
+										>
+											{trashOpen && (
+												<TrashBoxPopover
+													open={trashOpen}
+													onRequestClose={() => setTrashOpen(false)}
+												/>
+											)}
+										</PopoverContent>
+									</Popover>
+									{item.badge && (
+										<SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
+									)}
+								</SidebarMenuItem>
+							);
+						}
+
 						return (
 							<SidebarMenuItem key={item.title}>
 								<SidebarMenuButton asChild>

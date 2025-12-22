@@ -23,7 +23,6 @@ import {
 	ChevronRight,
 	Copy,
 	FileText,
-	GripVertical,
 	Link as LinkIcon,
 	MoreHorizontal,
 	Star,
@@ -76,6 +75,7 @@ interface Document {
 	content?: string;
 	parentId?: Id<"documents">;
 	order?: number;
+	icon?: string;
 	createdAt: number;
 	updatedAt: number;
 }
@@ -99,7 +99,7 @@ function DocumentItem({
 	const [isMounted, setIsMounted] = useState(false);
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-	const deleteDocument = useMutation(api.documents.deleteDocument);
+	const archiveDocument = useMutation(api.documents.archive);
 	const duplicateDocument = useMutation(api.documents.duplicate);
 	const toggleFavorite = useMutation(api.favorites.toggle);
 	const [, startTransition] = useTransition();
@@ -131,13 +131,10 @@ function DocumentItem({
 		disabled: isDragging,
 	});
 
-	// Track client-side mount to prevent hydration mismatches
 	useEffect(() => {
 		setIsMounted(true);
 	}, []);
 
-	// Auto-expand when dragging over
-	// Use useEffectEvent to avoid re-running effect when onDragOver changes
 	const onDragOverEvent = useEffectEvent((documentId: Id<"documents">) => {
 		onDragOver?.(documentId);
 	});
@@ -158,8 +155,12 @@ function DocumentItem({
 
 	const handleDelete = async () => {
 		startTransition(async () => {
-			await deleteDocument({ id: document._id });
+			await archiveDocument({ id: document._id });
 			setShowDeleteDialog(false);
+			toast.success("Document moved to trash");
+			if (currentDocumentId === document._id) {
+				navigate({ to: "/" });
+			}
 		});
 	};
 
@@ -171,7 +172,6 @@ function DocumentItem({
 				to: "/documents/$documentId",
 				params: { documentId: newId },
 			});
-			// Convex automatically updates queries via reactivity - no manual invalidation needed
 		});
 	};
 
@@ -187,7 +187,6 @@ function DocumentItem({
 	};
 
 	if (level > 0) {
-		// Nested item - use SidebarMenuSubItem
 		return (
 			<>
 				<SidebarMenuSubItem
@@ -198,7 +197,12 @@ function DocumentItem({
 					style={style}
 					className="group"
 				>
-					<div className="flex w-full min-w-0 items-center gap-1">
+					<div
+						className="flex w-full min-w-0 items-center gap-1 cursor-grab active:cursor-grabbing"
+						{...(isMounted ? attributes : {})}
+						{...(isMounted ? listeners : {})}
+						suppressHydrationWarning
+					>
 						<Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
 							<CollapsibleTrigger asChild>
 								<button
@@ -206,6 +210,7 @@ function DocumentItem({
 									className="size-4 p-0 flex items-center justify-center hover:bg-sidebar-accent rounded"
 									onClick={(e) => {
 										e.preventDefault();
+										e.stopPropagation();
 										setIsExpanded(!isExpanded);
 									}}
 								>
@@ -215,29 +220,25 @@ function DocumentItem({
 								</button>
 							</CollapsibleTrigger>
 						</Collapsible>
-						<button
-							type="button"
-							{...(isMounted ? attributes : {})}
-							{...(isMounted ? listeners : {})}
-							suppressHydrationWarning
-							className="opacity-0 group-hover:opacity-100 transition-opacity size-4 flex items-center justify-center hover:bg-sidebar-accent rounded cursor-grab active:cursor-grabbing"
-							onMouseDown={(e) => {
-								e.stopPropagation();
-							}}
-							title="Drag to reorder"
-						>
-							<GripVertical className="size-3" />
-						</button>
 						<SidebarMenuSubButton
 							asChild
 							isActive={isActive}
 							className="flex-1 min-w-0 pr-8"
+							onPointerDown={(e) => {
+								e.stopPropagation();
+							}}
 						>
 							<Link
 								to="/documents/$documentId"
 								params={{ documentId: document._id }}
 							>
-								<FileText className="size-4" />
+								{document.icon ? (
+									<span className="text-base leading-none">
+										{document.icon}
+									</span>
+								) : (
+									<FileText className="size-4" />
+								)}
 								<span className="truncate">{document.title}</span>
 							</Link>
 						</SidebarMenuSubButton>
@@ -284,49 +285,54 @@ function DocumentItem({
 						>
 							<AlertDialogContent>
 								<AlertDialogHeader>
-									<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+									<AlertDialogTitle>Move to trash?</AlertDialogTitle>
 									<AlertDialogDescription>
-										This action cannot be undone. This will permanently delete
-										your document and all associated data.
+										This will move the document to trash. You can restore it
+										later from the trash.
 									</AlertDialogDescription>
 								</AlertDialogHeader>
 								<AlertDialogFooter>
 									<AlertDialogCancel>Cancel</AlertDialogCancel>
 									<AlertDialogAction onClick={handleDelete}>
-										Delete
+										Move to trash
 									</AlertDialogAction>
 								</AlertDialogFooter>
 							</AlertDialogContent>
 						</AlertDialog>
 					</div>
 				</SidebarMenuSubItem>
-				{hasChildren && isExpanded && (
+				{isExpanded && (
 					<SidebarMenuSub>
-						<SortableContext
-							items={children.map((c) => c._id)}
-							strategy={verticalListSortingStrategy}
-						>
-							{children.map((child) => {
-								const childIsActive = currentDocumentId === child._id;
-								return (
-									<DocumentItem
-										key={child._id}
-										document={child}
-										isActive={childIsActive}
-										level={level + 1}
-										currentDocumentId={currentDocumentId}
-										onDragOver={onDragOver}
-									/>
-								);
-							})}
-						</SortableContext>
+						{hasChildren ? (
+							<SortableContext
+								items={children.map((c) => c._id)}
+								strategy={verticalListSortingStrategy}
+							>
+								{children.map((child) => {
+									const childIsActive = currentDocumentId === child._id;
+									return (
+										<DocumentItem
+											key={child._id}
+											document={child}
+											isActive={childIsActive}
+											level={level + 1}
+											currentDocumentId={currentDocumentId}
+											onDragOver={onDragOver}
+										/>
+									);
+								})}
+							</SortableContext>
+						) : (
+							<p className="text-sidebar-foreground/50 text-xs px-2 py-1">
+								No pages inside
+							</p>
+						)}
 					</SidebarMenuSub>
 				)}
 			</>
 		);
 	}
 
-	// Root level item - use SidebarMenuItem
 	return (
 		<>
 			<SidebarMenuItem
@@ -336,7 +342,12 @@ function DocumentItem({
 				}}
 				style={style}
 			>
-				<div className="flex items-center gap-1">
+				<div
+					className="flex items-center gap-1 cursor-grab active:cursor-grabbing"
+					{...(isMounted ? attributes : {})}
+					{...(isMounted ? listeners : {})}
+					suppressHydrationWarning
+				>
 					<Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
 						<CollapsibleTrigger asChild>
 							<button
@@ -344,6 +355,7 @@ function DocumentItem({
 								className="size-4 p-0 flex items-center justify-center hover:bg-sidebar-accent rounded"
 								onClick={(e) => {
 									e.preventDefault();
+									e.stopPropagation();
 									setIsExpanded(!isExpanded);
 								}}
 							>
@@ -353,25 +365,23 @@ function DocumentItem({
 							</button>
 						</CollapsibleTrigger>
 					</Collapsible>
-					<button
-						type="button"
-						{...(isMounted ? attributes : {})}
-						{...(isMounted ? listeners : {})}
-						suppressHydrationWarning
-						className="opacity-0 group-hover:opacity-100 transition-opacity size-4 flex items-center justify-center hover:bg-sidebar-accent rounded cursor-grab active:cursor-grabbing"
-						onMouseDown={(e) => {
+					<SidebarMenuButton
+						asChild
+						isActive={isActive}
+						className="flex-1"
+						onPointerDown={(e) => {
 							e.stopPropagation();
 						}}
-						title="Drag to reorder"
 					>
-						<GripVertical className="size-3" />
-					</button>
-					<SidebarMenuButton asChild isActive={isActive} className="flex-1">
 						<Link
 							to="/documents/$documentId"
 							params={{ documentId: document._id }}
 						>
-							<FileText className="size-4" />
+							{document.icon ? (
+								<span className="text-base leading-none">{document.icon}</span>
+							) : (
+								<FileText className="size-4" />
+							)}
 							<span className="truncate">{document.title}</span>
 						</Link>
 					</SidebarMenuButton>
@@ -431,26 +441,32 @@ function DocumentItem({
 					</AlertDialog>
 				</div>
 			</SidebarMenuItem>
-			{hasChildren && isExpanded && (
+			{isExpanded && (
 				<SidebarMenuSub>
-					<SortableContext
-						items={children.map((c) => c._id)}
-						strategy={verticalListSortingStrategy}
-					>
-						{children.map((child) => {
-							const childIsActive = currentDocumentId === child._id;
-							return (
-								<DocumentItem
-									key={child._id}
-									document={child}
-									isActive={childIsActive}
-									level={level + 1}
-									currentDocumentId={currentDocumentId}
-									onDragOver={onDragOver}
-								/>
-							);
-						})}
-					</SortableContext>
+					{hasChildren ? (
+						<SortableContext
+							items={children.map((c) => c._id)}
+							strategy={verticalListSortingStrategy}
+						>
+							{children.map((child) => {
+								const childIsActive = currentDocumentId === child._id;
+								return (
+									<DocumentItem
+										key={child._id}
+										document={child}
+										isActive={childIsActive}
+										level={level + 1}
+										currentDocumentId={currentDocumentId}
+										onDragOver={onDragOver}
+									/>
+								);
+							})}
+						</SortableContext>
+					) : (
+						<p className="text-sidebar-foreground/50 text-xs px-2 py-1">
+							No pages inside
+						</p>
+					)}
 				</SidebarMenuSub>
 			)}
 		</>
@@ -490,9 +506,7 @@ export function NavDocuments() {
 		}),
 	);
 
-	const handleDragOver = (_documentId: Id<"documents">) => {
-		// Used for auto-expanding on drag over
-	};
+	const handleDragOver = (_documentId: Id<"documents">) => {};
 
 	const handleDragEnd = async (event: DragEndEvent) => {
 		const { active, over } = event;
@@ -504,20 +518,13 @@ export function NavDocuments() {
 		const activeId = active.id as Id<"documents">;
 		const overId = over.id as Id<"documents">;
 
-		// Check if dropping on a droppable (nested page)
 		if (typeof overId === "string" && overId.startsWith("drop-")) {
 			const targetId = overId.replace("drop-", "") as Id<"documents">;
 
-			// Prevent nesting a page into itself or its descendants
 			if (activeId === targetId) {
 				return;
 			}
 
-			// Prevent nesting a page into itself or its descendants
-			// (targetDoc check removed - mutation will handle validation)
-
-			// For nested documents, we'll append to the end (order will be calculated by the mutation)
-			// Using a large number ensures it goes to the end - the mutation will handle proper ordering
 			const newOrder = 999999;
 
 			startTransition(async () => {
@@ -526,12 +533,10 @@ export function NavDocuments() {
 					newOrder,
 					newParentId: targetId,
 				});
-				// Convex automatically updates queries via reactivity - no manual invalidation needed
 			});
 			return;
 		}
 
-		// Regular reordering within same level
 		if (activeId === overId) {
 			return;
 		}
@@ -546,7 +551,6 @@ export function NavDocuments() {
 					newOrder: newIndex,
 					newParentId: null,
 				});
-				// Convex automatically updates queries via reactivity - no manual invalidation needed
 			});
 		}
 	};

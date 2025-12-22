@@ -32,7 +32,7 @@ export function NavFavorites({
 	favorites: {
 		name: string;
 		url: string;
-		icon: LucideIcon;
+		icon: LucideIcon | string;
 	}[];
 }) {
 	const { isMobile } = useSidebar();
@@ -48,7 +48,7 @@ export function NavFavorites({
 	const handleUnstar = async (item: {
 		name: string;
 		url: string;
-		icon: LucideIcon;
+		icon: LucideIcon | string;
 	}) => {
 		// Extract documentId from URL
 		const urlMatch = item.url.match(/\/documents\/(.+)$/);
@@ -77,7 +77,11 @@ export function NavFavorites({
 					<SidebarMenuItem key={item.name}>
 						<SidebarMenuButton asChild>
 							<Link to={item.url} title={item.name}>
-								<item.icon />
+								{typeof item.icon === "string" ? (
+									<span className="text-base leading-none">{item.icon}</span>
+								) : (
+									<item.icon />
+								)}
 								<span>{item.name}</span>
 							</Link>
 						</SidebarMenuButton>

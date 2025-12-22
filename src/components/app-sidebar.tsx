@@ -50,7 +50,7 @@ export interface NavSecondaryItem {
 export interface Favorite {
 	name: string;
 	url: string;
-	icon: LucideIcon;
+	icon: LucideIcon | string;
 }
 
 export interface WorkspacePage {
@@ -144,11 +144,16 @@ export function AppSidebar({
 		}
 		return favoritesData
 			.filter((fav) => fav.document !== null)
-			.map((fav) => ({
-				name: fav.document?.title ?? "Untitled",
-				url: `/documents/${fav.documentId}`,
-				icon: FileText, // Default icon for documents
-			}));
+			.map((fav) => {
+				const document = fav.document;
+				if (!document) return null;
+				return {
+					name: document.title ?? "Untitled",
+					url: `/documents/${fav.documentId}`,
+					icon: document.icon ?? FileText,
+				};
+			})
+			.filter((fav): fav is Favorite => fav !== null);
 	}, [favoritesData, propFavorites]);
 
 	const handleSelectDocument = (documentId: Id<"documents">) => {

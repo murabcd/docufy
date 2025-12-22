@@ -13,6 +13,7 @@ import {
 	GalleryVerticalEnd,
 	LineChart,
 	Link as LinkIcon,
+	type LucideIcon,
 	MoreHorizontal,
 	Settings2,
 	Star,
@@ -39,6 +40,13 @@ import {
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
+type ActionItem = {
+	label: string;
+	icon: LucideIcon;
+	onClick?: () => void | Promise<void>;
+	disabled?: boolean;
+};
+
 export function NavActions({
 	documentId,
 	updatedAt,
@@ -49,6 +57,7 @@ export function NavActions({
 	const [isOpen, setIsOpen] = React.useState(false);
 	const toggleFavorite = useMutation(api.favorites.toggle);
 	const duplicateDocument = useMutation(api.documents.duplicate);
+	const archiveDocument = useMutation(api.documents.archive);
 	const navigate = useNavigate();
 	const { data: isFavorite } = useQuery({
 		...convexQuery(
@@ -84,7 +93,20 @@ export function NavActions({
 		});
 	}, [documentId, duplicateDocument, navigate]);
 
-	const actions = React.useMemo(
+	const handleMoveToTrash = React.useCallback(async () => {
+		if (!documentId) return;
+		await archiveDocument({ id: documentId });
+		toast.success("Document moved to trash");
+		setIsOpen(false);
+		navigate({ to: "/" });
+	}, [archiveDocument, documentId, navigate]);
+
+	const handleShowTrash = React.useCallback(() => {
+		setIsOpen(false);
+		navigate({ to: "/trash" });
+	}, [navigate]);
+
+	const actions = React.useMemo<ActionItem[][]>(
 		() => [
 			[
 				{
@@ -116,6 +138,8 @@ export function NavActions({
 				{
 					label: "Move to Trash",
 					icon: Trash2,
+					onClick: handleMoveToTrash,
+					disabled: !documentId,
 				},
 			],
 			[
@@ -134,6 +158,7 @@ export function NavActions({
 				{
 					label: "Show delete pages",
 					icon: Trash,
+					onClick: handleShowTrash,
 				},
 				{
 					label: "Notifications",
@@ -151,10 +176,15 @@ export function NavActions({
 				},
 			],
 		],
-		[documentId, handleCopyLink, handleDuplicate],
+		[
+			documentId,
+			handleCopyLink,
+			handleDuplicate,
+			handleMoveToTrash,
+			handleShowTrash,
+		],
 	);
 
-	// Format the date from updatedAt timestamp
 	const formattedDate = updatedAt
 		? new Date(updatedAt).toLocaleDateString("en-US", {
 				month: "short",
