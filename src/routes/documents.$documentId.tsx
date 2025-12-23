@@ -166,7 +166,7 @@ function DocumentEditor() {
 		async (newTitle: string) => {
 			await updateDocumentTitle({
 				id: documentId as Id<"documents">,
-				title: newTitle || "Untitled",
+				title: newTitle || "New page",
 			});
 
 			// Ensure the title map used by inline subpage chips refreshes immediately.
@@ -236,7 +236,7 @@ function DocumentEditor() {
 	const titlesById = useMemo(() => {
 		const map: Record<string, string> = {};
 		for (const doc of allDocuments ?? []) {
-			map[String(doc._id)] = doc.title ?? "Untitled";
+			map[String(doc._id)] = doc.title ?? "New page";
 		}
 		return map;
 	}, [allDocuments]);

@@ -18,7 +18,7 @@ const getTitleForNode = (
 	if (typeof documentId !== "string" || !documentId) {
 		return "New subpage…";
 	}
-	return state.titlesById[documentId] ?? "Untitled";
+	return state.titlesById[documentId] ?? "New page";
 };
 
 const createFileTextIcon = () => {

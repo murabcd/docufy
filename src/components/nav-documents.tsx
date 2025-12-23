@@ -585,7 +585,7 @@ export function NavDocuments() {
 				<CollapsibleContent>
 					{documents.length === 0 && (
 						<p className="text-sidebar-foreground/50 text-xs px-2 pb-2">
-							Create a document to get started
+							Create a page to get started
 						</p>
 					)}
 					<SidebarGroupContent>

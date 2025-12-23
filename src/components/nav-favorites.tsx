@@ -82,7 +82,7 @@ export function NavFavorites({
 			<SidebarGroupLabel>Starred</SidebarGroupLabel>
 			{favorites.length === 0 && (
 				<p className="text-sidebar-foreground/50 text-xs px-2 pb-2">
-					Star documents to keep them close
+					Star pages to keep them close
 				</p>
 			)}
 			<SidebarMenu>

@@ -165,10 +165,10 @@ export function Header({
 									onClick={handleCreateDocument}
 								>
 									<Plus className="h-4 w-4" />
-									<span className="sr-only">New document</span>
+									<span className="sr-only">New page</span>
 								</Button>
 							</TooltipTrigger>
-							<TooltipContent align="start">New document</TooltipContent>
+							<TooltipContent align="start">New page</TooltipContent>
 						</Tooltip>
 						<Separator
 							orientation="vertical"

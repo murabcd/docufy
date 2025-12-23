@@ -54,7 +54,7 @@ export const create = mutation({
 
 		const documentId = await ctx.db.insert("documents", {
 			userId: DEFAULT_USER_ID,
-			title: args.title || "Untitled",
+			title: args.title || "New page",
 			content: JSON.stringify(EMPTY_DOCUMENT),
 			searchableText: "",
 			parentId: args.parentId ?? undefined,
