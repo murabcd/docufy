@@ -1,24 +1,23 @@
 import "./polyfills/session-storage";
 
 import { ConvexQueryClient } from "@convex-dev/react-query";
-import { QueryClient } from "@tanstack/react-query";
+import { notifyManager, QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
-import { routerWithQueryClient } from "@tanstack/react-router-with-query";
-import { ConvexProvider } from "convex/react";
-
-// Import the generated route tree
+import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { routeTree } from "./routeTree.gen";
 
-// Create a new router instance
-export const getRouter = () => {
-	const CONVEX_URL = (import.meta as { env?: { VITE_CONVEX_URL?: string } }).env
-		?.VITE_CONVEX_URL;
-	if (!CONVEX_URL) {
-		console.error("missing envar VITE_CONVEX_URL");
-		throw new Error("VITE_CONVEX_URL is required");
+export function getRouter() {
+	if (typeof document !== "undefined") {
+		notifyManager.setScheduler(window.requestAnimationFrame);
+	}
+	const convexUrl = import.meta.env.VITE_CONVEX_URL;
+	if (!convexUrl) {
+		throw new Error("VITE_CONVEX_URL is not set");
 	}
 
-	const convexQueryClient = new ConvexQueryClient(CONVEX_URL);
+	const convexQueryClient = new ConvexQueryClient(convexUrl, {
+		expectAuth: true,
+	});
 	const queryClient: QueryClient = new QueryClient({
 		defaultOptions: {
 			queries: {
@@ -29,20 +28,20 @@ export const getRouter = () => {
 	});
 	convexQueryClient.connect(queryClient);
 
-	const router = routerWithQueryClient(
-		createRouter({
-			routeTree,
-			scrollRestoration: true,
-			defaultPreloadStaleTime: 0,
-			context: { queryClient },
-			Wrap: ({ children }) => (
-				<ConvexProvider client={convexQueryClient.convexClient}>
-					{children}
-				</ConvexProvider>
-			),
-		}),
+	const router = createRouter({
+		routeTree,
+		defaultPreload: "intent",
+
+		context: { queryClient, convexQueryClient },
+		scrollRestoration: true,
+		defaultErrorComponent: (err) => <p>{err.error.stack}</p>,
+		defaultNotFoundComponent: () => <p>not found</p>,
+	});
+
+	setupRouterSsrQueryIntegration({
+		router,
 		queryClient,
-	);
+	});
 
 	return router;
-};
+}

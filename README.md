@@ -31,6 +31,9 @@
 - [Convex](https://www.convex.dev/)
   - Collaborative editing with [ProseMirror Sync from Convex](https://www.convex.dev/components/prosemirror-sync)
   - [Full-text search](https://docs.convex.dev/search/text-search) for document content
+- [Better Auth](https://www.better-auth.com/)
+  - Secure authentication with [Better Auth for Convex](https://labs.convex.dev/better-auth)
+  - GitHub OAuth integration
 - [Shadcn/UI](https://ui.shadcn.com)
   - Styling with [Tailwind CSS](https://tailwindcss.com)
   - Component primitives from [Radix UI](https://radix-ui.com) for accessibility and flexibility
@@ -54,6 +57,11 @@ You can deploy your own version of Docufy to Vercel with one click:
 You will need to use the environment variables [defined in `.env.example`](.env.example) to run Docufy. It's recommended you use [Vercel Environment Variables](https://vercel.com/docs/projects/environment-variables) for this, but a `.env` file is all that is necessary.
 
 > Note: You should not commit your `.env` file or it will expose secrets that will allow others to control access to your various OpenAI and authentication provider accounts.
+
+### GitHub authentication
+
+- Set `BETTER_AUTH_SECRET`, `GITHUB_CLIENT_ID`, and `GITHUB_CLIENT_SECRET` in your Convex environment.
+- For local development, configure your GitHub OAuth callback URL as `${VITE_SITE_URL}/api/auth/callback/github` so the OAuth state cookie is set and read on the same origin.
 
 1. Install Vercel CLI: `npm i -g vercel`
 2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
