@@ -44,7 +44,8 @@ export function TrashBanner({ documentId }: TrashBannerProps) {
 		try {
 			await remove({ id: documentId });
 			toast.success("Document permanently deleted");
-			navigate({ to: "/trash" });
+			navigate({ to: "/" });
+			window.dispatchEvent(new Event("openTrashPopover"));
 		} catch (_error) {
 			toast.error("Failed to delete document");
 		}

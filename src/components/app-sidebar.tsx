@@ -75,7 +75,7 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 const defaultTeams: Team[] = [
 	{
-		name: "My Workspace",
+		name: "Murad's workspace",
 		logo: Command,
 		plan: "Free",
 	},
@@ -165,7 +165,10 @@ export function AppSidebar({
 		<>
 			<Sidebar className="border-r-0" {...props}>
 				<SidebarHeader>
-					<TeamSwitcher teams={teams} />
+					<TeamSwitcher
+						teams={teams}
+						onSettingsOpen={() => setSettingsOpen(true)}
+					/>
 					<NavMain
 						items={navMainWithActiveState}
 						onSearchOpen={() => setSearchOpen(true)}

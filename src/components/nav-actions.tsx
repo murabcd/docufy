@@ -114,8 +114,8 @@ export function NavActions({
 
 	const handleShowTrash = React.useCallback(() => {
 		setIsOpen(false);
-		navigate({ to: "/trash" });
-	}, [navigate]);
+		window.dispatchEvent(new Event("openTrashPopover"));
+	}, []);
 
 	const actions = React.useMemo<ActionItem[][]>(
 		() => [

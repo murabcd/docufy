@@ -9,16 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TrashRouteImport } from './routes/trash'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$documentId'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
-const TrashRoute = TrashRouteImport.update({
-  id: '/trash',
-  path: '/trash',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -34,50 +29,48 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/trash': typeof TrashRoute
   '/api/chat': typeof ApiChatRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/trash': typeof TrashRoute
   '/api/chat': typeof ApiChatRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/trash': typeof TrashRoute
   '/api/chat': typeof ApiChatRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/trash' | '/api/chat' | '/documents/$documentId'
+  fullPaths: '/' | '/api/chat' | '/documents/$documentId' | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/trash' | '/api/chat' | '/documents/$documentId'
-  id: '__root__' | '/' | '/trash' | '/api/chat' | '/documents/$documentId'
+  to: '/' | '/api/chat' | '/documents/$documentId' | '/api/auth/$'
+  id: '__root__' | '/' | '/api/chat' | '/documents/$documentId' | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  TrashRoute: typeof TrashRoute
   ApiChatRoute: typeof ApiChatRoute
   DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/trash': {
-      id: '/trash'
-      path: '/trash'
-      fullPath: '/trash'
-      preLoaderRoute: typeof TrashRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -99,14 +92,21 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  TrashRoute: TrashRoute,
   ApiChatRoute: ApiChatRoute,
   DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

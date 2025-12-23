@@ -40,6 +40,12 @@ export function NavSecondary({
 		if (pathname) setTrashOpen(false);
 	}, [pathname]);
 
+	useEffect(() => {
+		const openTrash = () => setTrashOpen(true);
+		window.addEventListener("openTrashPopover", openTrash);
+		return () => window.removeEventListener("openTrashPopover", openTrash);
+	}, []);
+
 	return (
 		<SidebarGroup {...props}>
 			<SidebarGroupContent>
