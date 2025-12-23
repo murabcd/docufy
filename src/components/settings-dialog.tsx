@@ -62,13 +62,13 @@ export function SettingsDialog({
 	const renderSettingsContent = () => {
 		switch (activePage) {
 			case "Profile":
-				return <ProfileSettings />;
+				return <ProfileSettings onClose={() => setOpen(false)} />;
 			case "Appearance":
 				return <AppearanceSettings />;
 			case "Data controls":
 				return <DataControlsSettings />;
 			default:
-				return <ProfileSettings />;
+				return <ProfileSettings onClose={() => setOpen(false)} />;
 		}
 	};
 
