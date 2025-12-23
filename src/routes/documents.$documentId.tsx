@@ -76,20 +76,26 @@ export const Route = createFileRoute("/documents/$documentId")({
 	loader: ({ context, params }) => {
 		const { queryClient } = context;
 		// Non-blocking prefetch - navigation happens immediately, data loads in background
-		queryClient.prefetchQuery(
-			convexQuery(api.documents.get, {
-				id: params.documentId as Id<"documents">,
-			}),
-		);
-		queryClient.prefetchQuery(
-			convexQuery(api.documents.getAncestors, {
-				id: params.documentId as Id<"documents">,
-			}),
-		);
-		queryClient.prefetchQuery(
-			convexQuery(api.documents.list, { parentId: null }),
-		);
-		queryClient.prefetchQuery(convexQuery(api.documents.getAll));
+		void queryClient
+			.prefetchQuery(
+				convexQuery(api.documents.get, {
+					id: params.documentId as Id<"documents">,
+				}),
+			)
+			.catch(() => {});
+		void queryClient
+			.prefetchQuery(
+				convexQuery(api.documents.getAncestors, {
+					id: params.documentId as Id<"documents">,
+				}),
+			)
+			.catch(() => {});
+		void queryClient
+			.prefetchQuery(convexQuery(api.documents.list, { parentId: null }))
+			.catch(() => {});
+		void queryClient
+			.prefetchQuery(convexQuery(api.documents.getAll))
+			.catch(() => {});
 	},
 });
 

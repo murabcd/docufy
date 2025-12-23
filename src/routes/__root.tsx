@@ -1,9 +1,8 @@
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
-import type { ConvexQueryClient } from "@convex-dev/react-query";
-import { convexQuery } from "@convex-dev/react-query";
+import { type ConvexQueryClient, convexQuery } from "@convex-dev/react-query";
 import { HeroUIProvider, ToastProvider } from "@heroui/react";
 import { TanStackDevtools } from "@tanstack/react-devtools";
-import type { QueryClient } from "@tanstack/react-query";
+import { type QueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import {
 	createRootRouteWithContext,
 	HeadContent,
@@ -13,14 +12,14 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
+import { useMutation } from "convex/react";
+import * as React from "react";
 import { NotFound } from "@/components/not-found";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
-
 import { authClient } from "@/lib/auth-client";
 import { getToken } from "@/lib/auth-server";
-
 import appCss from "@/styles.css?url";
 import { api } from "../../convex/_generated/api";
 
@@ -92,9 +91,80 @@ function RootComponent() {
 			authClient={authClient}
 			initialToken={context.token}
 		>
-			<Outlet />
+			<EnsureGuestSession />
+			<MigrateAnonymousData />
+			{context.isAuthenticated ? (
+				<Outlet />
+			) : (
+				<div className="min-h-[60vh] flex items-center justify-center">
+					<div className="text-sm text-muted-foreground">Signing you in…</div>
+				</div>
+			)}
 		</ConvexBetterAuthProvider>
 	);
+}
+
+function EnsureGuestSession() {
+	const { data: session, isPending } = authClient.useSession();
+
+	React.useEffect(() => {
+		if (typeof window === "undefined") return;
+		if (isPending) return;
+		if (session?.user) {
+			sessionStorage.removeItem("docufy:anonSignInAttemptedAt");
+			return;
+		}
+
+		const key = "docufy:anonSignInAttemptedAt";
+		const lastAttemptAt = Number(sessionStorage.getItem(key) || "0");
+		if (lastAttemptAt && Date.now() - lastAttemptAt < 5_000) return;
+		sessionStorage.setItem(key, String(Date.now()));
+
+		authClient.signIn
+			.anonymous()
+			.then(() => {
+				location.reload();
+			})
+			.catch((error) => {
+				console.error(error);
+				sessionStorage.removeItem(key);
+			});
+	}, [isPending, session]);
+
+	return null;
+}
+
+function MigrateAnonymousData() {
+	const { data: currentUser } = useSuspenseQuery(
+		convexQuery(api.auth.getCurrentUser, {}),
+	);
+	const migrateAnonymousData = useMutation(api.auth.migrateAnonymousData);
+
+	React.useEffect(() => {
+		if (typeof window === "undefined") return;
+		if (!currentUser) return;
+
+		const key = "docufy:migrateFromUserId";
+		const fromUserId = localStorage.getItem(key);
+		if (!fromUserId) return;
+
+		const toUserId = String((currentUser as { _id?: unknown })._id);
+		if (!toUserId || fromUserId === toUserId) {
+			localStorage.removeItem(key);
+			return;
+		}
+
+		migrateAnonymousData({ fromUserId })
+			.then(() => {
+				localStorage.removeItem(key);
+				location.reload();
+			})
+			.catch((error) => {
+				console.error(error);
+			});
+	}, [currentUser, migrateAnonymousData]);
+
+	return null;
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {

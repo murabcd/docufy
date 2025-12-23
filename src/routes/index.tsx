@@ -1,4 +1,5 @@
 import { convexQuery } from "@convex-dev/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Clock } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -23,6 +24,12 @@ export const Route = createFileRoute("/")({
 
 function EditorHome() {
 	const [greeting, setGreeting] = useState<string | null>(null);
+	const { data: currentUser } = useSuspenseQuery(
+		convexQuery(api.auth.getCurrentUser, {}),
+	);
+	const name = (currentUser as { isAnonymous?: boolean } | null)?.isAnonymous
+		? "Guest"
+		: currentUser?.name || "Guest";
 
 	useEffect(() => {
 		let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -67,7 +74,11 @@ function EditorHome() {
 				<div className="flex flex-1 flex-col px-8 py-10">
 					<div className="flex flex-col gap-8 max-w-6xl mx-auto w-full">
 						{greeting ? (
-							<h1 className="text-4xl font-semibold">{greeting}</h1>
+							<h1 className="text-4xl font-semibold">
+								<span className="text-muted-foreground">{greeting}</span>
+								{", "}
+								{name}
+							</h1>
 						) : (
 							<Skeleton className="h-10 w-64" />
 						)}

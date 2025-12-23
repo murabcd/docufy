@@ -5,6 +5,7 @@ import authConfig from './auth.config'
 import { components } from './_generated/api'
 import { mutation, query } from './_generated/server'
 import { ConvexError, v } from 'convex/values'
+import { anonymous } from 'better-auth/plugins'
 import type { GenericCtx } from '@convex-dev/better-auth'
 import type { DataModel } from './_generated/dataModel'
 
@@ -40,6 +41,13 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
         enabled: true,
       },
     },
+    plugins: [
+      anonymous({
+        disableDeleteAnonymousUser: true,
+      }),
+      // The Convex plugin is required for Convex compatibility
+      convex({ authConfig }),
+    ],
     socialProviders: {
       github: {
         clientId: githubClientId,
@@ -47,10 +55,6 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
         scope: ['read:user', 'user:email'],
       },
     },
-    plugins: [
-      // The Convex plugin is required for Convex compatibility
-      convex({ authConfig }),
-    ],
   })
 }
 
@@ -86,5 +90,35 @@ export const getStorageUrl = query({
   args: { storageId: v.id('_storage') },
   handler: async (ctx, args) => {
     return await ctx.storage.getUrl(args.storageId)
+  },
+})
+
+export const migrateAnonymousData = mutation({
+  args: { fromUserId: v.string() },
+  handler: async (ctx, args) => {
+    const authUser = await authComponent.safeGetAuthUser(ctx)
+    if (!authUser) throw new ConvexError('Unauthenticated')
+
+    const toUserId = String(authUser._id)
+    const fromUserId = args.fromUserId
+    if (!fromUserId || fromUserId === toUserId) return null
+
+    const docs = await ctx.db
+      .query('documents')
+      .withIndex('by_user', (q) => q.eq('userId', fromUserId))
+      .collect()
+    for (const doc of docs) {
+      await ctx.db.patch(doc._id, { userId: toUserId })
+    }
+
+    const favorites = await ctx.db
+      .query('favorites')
+      .withIndex('by_user', (q) => q.eq('userId', fromUserId))
+      .collect()
+    for (const favorite of favorites) {
+      await ctx.db.patch(favorite._id, { userId: toUserId })
+    }
+
+    return null
   },
 })

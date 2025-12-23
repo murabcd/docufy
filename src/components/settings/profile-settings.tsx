@@ -156,7 +156,16 @@ export function ProfileSettings({ onClose }: { onClose?: () => void }) {
 		if (currentUser) {
 			setName(currentUser?.name ?? "");
 			setEmail(currentUser?.email ?? "");
-			setAvatarPreview(currentUser?.image ?? null);
+			const isAnonymousUser = Boolean(
+				(currentUser as { isAnonymous?: boolean } | null)?.isAnonymous,
+			);
+			const guestAvatarUrl =
+				isAnonymousUser && (currentUser as { _id?: unknown })?._id
+					? `https://avatar.vercel.sh/${encodeURIComponent(
+							String((currentUser as { _id?: unknown })._id),
+						)}.svg`
+					: null;
+			setAvatarPreview(currentUser?.image ?? guestAvatarUrl ?? null);
 			return;
 		}
 

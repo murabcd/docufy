@@ -109,8 +109,21 @@ export function TeamSwitcher({
 		onSettingsOpen?.();
 	};
 
-	const displayName = currentUser?.name || currentUser?.email || "Guest";
-	const userAvatar = currentUser?.image ?? null;
+	const isAnonymousUser = Boolean(
+		(currentUser as { isAnonymous?: boolean } | null)?.isAnonymous,
+	);
+	const guestAvatarUrl =
+		isAnonymousUser && currentUser?._id
+			? `https://avatar.vercel.sh/${encodeURIComponent(
+					String(currentUser._id),
+				)}.svg`
+			: null;
+	const displayName = isAnonymousUser
+		? "Guest"
+		: currentUser?.name || currentUser?.email || "Guest";
+	const userAvatar = isAnonymousUser
+		? guestAvatarUrl
+		: (currentUser?.image ?? null);
 	const initials = displayName
 		.split(" ")
 		.map((n) => n[0])
@@ -210,14 +223,14 @@ export function TeamSwitcher({
 									</div>
 								</DropdownMenuItem>
 								<DropdownMenuSeparator />
-								{currentUser ? (
+								{currentUser && !isAnonymousUser ? (
 									<DropdownMenuItem
 										className="gap-2"
 										onClick={handleLogOut}
 										disabled={logOutPending}
 									>
 										<LogOut className="size-4" />
-										Log out
+										Sign out
 									</DropdownMenuItem>
 								) : (
 									<DropdownMenuItem className="gap-2" onClick={handleLogin}>

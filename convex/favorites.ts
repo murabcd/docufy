@@ -1,7 +1,18 @@
 import { mutation, query } from "./_generated/server";
-import { v } from "convex/values";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { ConvexError, v } from "convex/values";
+import { authComponent } from "./auth";
 
-const DEFAULT_USER_ID = "demo-user";
+const getUserId = async (ctx: QueryCtx | MutationCtx) => {
+	const user = await authComponent.safeGetAuthUser(ctx);
+	return user ? String(user._id) : null;
+};
+
+const requireUserId = async (ctx: QueryCtx | MutationCtx) => {
+	const userId = await getUserId(ctx);
+	if (!userId) throw new ConvexError("Unauthenticated");
+	return userId;
+};
 
 export const toggle = mutation({
 	args: {
@@ -9,10 +20,11 @@ export const toggle = mutation({
 	},
 	returns: v.boolean(),
 	handler: async (ctx, args) => {
+		const userId = await requireUserId(ctx);
 		const existing = await ctx.db
 			.query("favorites")
 			.withIndex("by_user_document", (q) =>
-				q.eq("userId", DEFAULT_USER_ID).eq("documentId", args.documentId),
+				q.eq("userId", userId).eq("documentId", args.documentId),
 			)
 			.unique();
 
@@ -21,7 +33,7 @@ export const toggle = mutation({
 			return false;
 		} else {
 			await ctx.db.insert("favorites", {
-				userId: DEFAULT_USER_ID,
+				userId,
 				documentId: args.documentId,
 				createdAt: Date.now(),
 			});
@@ -41,9 +53,11 @@ export const list = query({
 		}),
 	),
 	handler: async (ctx) => {
+		const userId = await getUserId(ctx);
+		if (!userId) return [];
 		const favorites = await ctx.db
 			.query("favorites")
-			.withIndex("by_user", (q) => q.eq("userId", DEFAULT_USER_ID))
+			.withIndex("by_user", (q) => q.eq("userId", userId))
 			.collect();
 		return favorites.sort((a, b) => b.createdAt - a.createdAt);
 	},
@@ -74,6 +88,8 @@ export const listWithDocuments = query({
 		}),
 	),
 	handler: async (ctx) => {
+		const userId = await getUserId(ctx);
+		if (!userId) return [];
 		const toFavoriteDocument = (document: {
 			_id: any;
 			_creationTime: number;
@@ -98,7 +114,7 @@ export const listWithDocuments = query({
 
 		const favorites = await ctx.db
 			.query("favorites")
-			.withIndex("by_user", (q) => q.eq("userId", DEFAULT_USER_ID))
+			.withIndex("by_user", (q) => q.eq("userId", userId))
 			.collect();
 		const sortedFavorites = favorites.sort((a, b) => b.createdAt - a.createdAt);
 
@@ -129,10 +145,12 @@ export const isFavorite = query({
 	},
 	returns: v.boolean(),
 	handler: async (ctx, args) => {
+		const userId = await getUserId(ctx);
+		if (!userId) return false;
 		const favorite = await ctx.db
 			.query("favorites")
 			.withIndex("by_user_document", (q) =>
-				q.eq("userId", DEFAULT_USER_ID).eq("documentId", args.documentId),
+				q.eq("userId", userId).eq("documentId", args.documentId),
 			)
 			.unique();
 		return favorite !== null;
@@ -145,10 +163,11 @@ export const remove = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
+		const userId = await requireUserId(ctx);
 		const favorite = await ctx.db
 			.query("favorites")
 			.withIndex("by_user_document", (q) =>
-				q.eq("userId", DEFAULT_USER_ID).eq("documentId", args.documentId),
+				q.eq("userId", userId).eq("documentId", args.documentId),
 			)
 			.unique();
 		if (favorite) {
