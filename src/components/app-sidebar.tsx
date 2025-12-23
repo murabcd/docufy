@@ -73,14 +73,6 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 	workspaces?: Workspace[];
 }
 
-const defaultTeams: Team[] = [
-	{
-		name: "Guest's workspace",
-		logo: Command,
-		plan: "Free",
-	},
-];
-
 const defaultNavMain: NavMainItem[] = [
 	{
 		title: "Search",
@@ -107,7 +99,7 @@ const defaultNavSecondary: NavSecondaryItem[] = [
 ];
 
 export function AppSidebar({
-	teams = defaultTeams,
+	teams: teamsProp,
 	navMain = defaultNavMain,
 	navSecondary = defaultNavSecondary,
 	favorites: propFavorites,
@@ -118,9 +110,33 @@ export function AppSidebar({
 	const location = useLocation();
 	const [settingsOpen, setSettingsOpen] = React.useState(false);
 	const [searchOpen, setSearchOpen] = React.useState(false);
+	const { data: currentUser } = useSuspenseQuery(
+		convexQuery(api.auth.getCurrentUser, {}),
+	);
 	const { data: favoritesData } = useSuspenseQuery(
 		convexQuery(api.favorites.listWithDocuments),
 	);
+
+	const fullName = (currentUser as { isAnonymous?: boolean } | null)
+		?.isAnonymous
+		? "Guest"
+		: currentUser?.name || "Guest";
+	const firstName = fullName.trim().split(/\s+/)[0] || "Guest";
+	const possessiveFirstName = /s$/i.test(firstName)
+		? `${firstName}'`
+		: `${firstName}'s`;
+
+	const teams = React.useMemo((): Team[] => {
+		return (
+			teamsProp ?? [
+				{
+					name: `${possessiveFirstName} workspace`,
+					logo: Command,
+					plan: "Free",
+				},
+			]
+		);
+	}, [possessiveFirstName, teamsProp]);
 
 	const pathname = location.pathname;
 	const isHomeActive = pathname === "/";

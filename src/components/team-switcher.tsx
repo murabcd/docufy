@@ -230,7 +230,7 @@ export function TeamSwitcher({
 										disabled={logOutPending}
 									>
 										<LogOut className="size-4" />
-										Sign out
+										Log out
 									</DropdownMenuItem>
 								) : (
 									<DropdownMenuItem className="gap-2" onClick={handleLogin}>
