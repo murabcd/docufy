@@ -93,13 +93,7 @@ function RootComponent() {
 		>
 			<EnsureGuestSession />
 			<MigrateAnonymousData />
-			{context.isAuthenticated ? (
-				<Outlet />
-			) : (
-				<div className="min-h-[60vh] flex items-center justify-center">
-					<div className="text-sm text-muted-foreground">Signing you in…</div>
-				</div>
-			)}
+			{context.isAuthenticated ? <Outlet /> : null}
 		</ConvexBetterAuthProvider>
 	);
 }
