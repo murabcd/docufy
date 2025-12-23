@@ -20,7 +20,7 @@ export function NotFound() {
 			<AppSidebar />
 			<SidebarInset>
 				<Header title="Page Not Found" />
-				<div className="flex flex-1 flex-col items-center justify-center px-4 py-10">
+				<div className="flex flex-1 flex-col items-center justify-center px-8 py-10">
 					<Empty>
 						<EmptyHeader>
 							<EmptyTitle>404 - Not Found</EmptyTitle>

@@ -75,7 +75,7 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 const defaultTeams: Team[] = [
 	{
-		name: "Murad's workspace",
+		name: "Guest's workspace",
 		logo: Command,
 		plan: "Free",
 	},
