@@ -140,7 +140,7 @@ export function TeamSwitcher({
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
 								<SidebarMenuButton className="w-full px-1.5">
-									<div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-5 items-center justify-center rounded-md shrink-0">
+									<div className="bg-sidebar-primary dark:bg-sidebar-primary-foreground text-sidebar-primary-foreground dark:text-sidebar-primary flex aspect-square size-5 items-center justify-center rounded-md shrink-0">
 										<activeTeam.logo className="size-3" />
 									</div>
 									<span className="truncate font-medium flex-1">
