@@ -4,7 +4,7 @@
 </a>
 
 <p align="center">
-  AI Document Management Platform Built with TanStack Start, TanStack AI and Convex.
+  Notion-like Platform Built with TanStack Start, TanStack AI and Convex.
 </p>
 
 > **⚠️ WARNING: This project is currently in early development.**  
