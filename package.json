@@ -101,6 +101,7 @@
     "prosemirror-view": "^1.41.4",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-hotkeys-hook": "^5.2.1",
     "react-resizable-panels": "^3.0.6",
     "react-scan": "^0.4.3",
     "sonner": "^2.0.7",

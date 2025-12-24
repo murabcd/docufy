@@ -2,6 +2,7 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
 import * as React from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -30,7 +31,6 @@ const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_RIGHT_WIDTH = "16rem";
 const SIDEBAR_RIGHT_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
-const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
 function getCookie(name: string): string | null {
 	if (typeof document === "undefined") {
@@ -72,6 +72,26 @@ const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 function useSidebar() {
 	const context = React.useContext(SidebarContext);
 	if (!context) {
+		if (import.meta.env.DEV) {
+			console.warn(
+				"useSidebar must be used within a SidebarProvider. This can happen transiently during HMR; a full page reload should fix it.",
+			);
+			return {
+				state: "expanded",
+				open: true,
+				setOpen: () => {},
+				openMobile: false,
+				setOpenMobile: () => {},
+				isMobile: false,
+				toggleSidebar: () => {},
+				rightOpen: false,
+				setRightOpen: () => {},
+				rightOpenMobile: false,
+				setRightOpenMobile: () => {},
+				toggleRightSidebar: () => {},
+			} satisfies SidebarContextProps;
+		}
+
 		throw new Error("useSidebar must be used within a SidebarProvider.");
 	}
 
@@ -153,20 +173,35 @@ function SidebarProvider({
 			: setRightOpenWithCookie((open) => !open);
 	}, [isMobile, setRightOpenWithCookie]);
 
-	React.useEffect(() => {
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (
-				event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-				(event.metaKey || event.ctrlKey)
-			) {
-				event.preventDefault();
-				toggleSidebar();
-			}
-		};
+	useHotkeys(
+		"mod+b",
+		(event) => {
+			event.preventDefault();
+			toggleSidebar();
+		},
+		{
+			enabled: typeof window !== "undefined" && !isMobile,
+			preventDefault: true,
+			enableOnContentEditable: false,
+			enableOnFormTags: false,
+		},
+		[toggleSidebar, isMobile],
+	);
 
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [toggleSidebar]);
+	useHotkeys(
+		"mod+alt+b",
+		(event) => {
+			event.preventDefault();
+			toggleRightSidebar();
+		},
+		{
+			enabled: typeof window !== "undefined" && !isMobile,
+			preventDefault: true,
+			enableOnContentEditable: false,
+			enableOnFormTags: false,
+		},
+		[toggleRightSidebar, isMobile],
+	);
 
 	const state = open ? "expanded" : "collapsed";
 
