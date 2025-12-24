@@ -1,7 +1,5 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
 import {
 	Check,
 	ChevronDown,
@@ -12,7 +10,6 @@ import {
 	UserPlus,
 } from "lucide-react";
 import * as React from "react";
-import { useTransition } from "react";
 import { toast } from "sonner";
 import { LoginDialog } from "@/components/login-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -37,6 +34,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useCreateDocumentNavigation } from "@/hooks/use-create-document-navigation";
 import { authClient } from "@/lib/auth-client";
 import { api } from "../../convex/_generated/api";
 
@@ -52,10 +50,8 @@ export function TeamSwitcher({
 	onSettingsOpen?: () => void;
 }) {
 	const [activeTeam, setActiveTeam] = React.useState(teams[0]);
-	const navigate = useNavigate();
-	const createDocument = useMutation(api.documents.create);
-	const [, startTransition] = useTransition();
 	const { state, isMobile } = useSidebar();
+	const { createAndNavigate, isCreating } = useCreateDocumentNavigation();
 
 	const [loginOpen, setLoginOpen] = React.useState(false);
 	const [logOutPending, setLogOutPending] = React.useState(false);
@@ -71,17 +67,7 @@ export function TeamSwitcher({
 	const showPlusButton = state === "expanded" && !isMobile;
 
 	const handleCreateDocument = async () => {
-		startTransition(async () => {
-			try {
-				const documentId = await createDocument({});
-				navigate({
-					to: "/documents/$documentId",
-					params: { documentId },
-				});
-			} catch (error) {
-				console.error("Failed to create document:", error);
-			}
-		});
+		await createAndNavigate();
 	};
 
 	const handleLogin = () => {
@@ -249,6 +235,7 @@ export function TeamSwitcher({
 											handleCreateDocument();
 										}}
 										className="shrink-0 opacity-100"
+										disabled={isCreating}
 									>
 										<Plus className="size-4" />
 										<span className="sr-only">New page</span>

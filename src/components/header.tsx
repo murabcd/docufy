@@ -1,14 +1,6 @@
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
+import { Link } from "@tanstack/react-router";
 import { Plus, WandSparkles } from "lucide-react";
-import {
-	Fragment,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-	useTransition,
-} from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { NavActions } from "@/components/nav-actions";
 import {
 	Breadcrumb,
@@ -27,7 +19,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { api } from "../../convex/_generated/api";
+import { useCreateDocumentNavigation } from "@/hooks/use-create-document-navigation";
 import type { Id } from "../../convex/_generated/dataModel";
 
 type HeaderProps = {
@@ -48,9 +40,7 @@ export function Header({
 	updatedAt,
 }: HeaderProps) {
 	const { toggleRightSidebar, state, isMobile } = useSidebar();
-	const navigate = useNavigate();
-	const createDocument = useMutation(api.documents.create);
-	const [, startTransition] = useTransition();
+	const { createAndNavigate, isCreating } = useCreateDocumentNavigation();
 	const titleInputRef = useRef<HTMLInputElement>(null);
 	const [isEditingTitle, setIsEditingTitle] = useState(false);
 	const [titleValue, setTitleValue] = useState(
@@ -62,18 +52,8 @@ export function Header({
 	const showPlusButton = state === "collapsed" || isMobile;
 
 	const handleCreateDocument = useCallback(async () => {
-		startTransition(async () => {
-			try {
-				const documentId = await createDocument({});
-				navigate({
-					to: "/documents/$documentId",
-					params: { documentId },
-				});
-			} catch (error) {
-				console.error("Failed to create document:", error);
-			}
-		});
-	}, [createDocument, navigate]);
+		await createAndNavigate();
+	}, [createAndNavigate]);
 
 	// Sync title with document when it changes externally
 	useEffect(() => {
@@ -152,7 +132,14 @@ export function Header({
 					<TooltipTrigger asChild>
 						<SidebarTrigger />
 					</TooltipTrigger>
-					<TooltipContent align="start">Toggle sidebar</TooltipContent>
+					<TooltipContent align="start">
+						<div className="flex items-center gap-2">
+							<span>Toggle sidebar</span>
+							<kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+								<span className="text-xs">⌘</span>B
+							</kbd>
+						</div>
+					</TooltipContent>
 				</Tooltip>
 				{showPlusButton && (
 					<>
@@ -163,6 +150,7 @@ export function Header({
 									size="icon"
 									className="h-8 w-8"
 									onClick={handleCreateDocument}
+									disabled={isCreating}
 								>
 									<Plus className="h-4 w-4" />
 									<span className="sr-only">New page</span>
@@ -268,7 +256,15 @@ export function Header({
 							Ask AI
 						</Button>
 					</TooltipTrigger>
-					<TooltipContent align="end">AI assistant</TooltipContent>
+					<TooltipContent align="end">
+						<div className="flex items-center gap-2">
+							<span>AI assistant</span>
+							<kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+								<span className="text-xs">⌥</span>
+								<span className="text-xs">⌘</span>B
+							</kbd>
+						</div>
+					</TooltipContent>
 				</Tooltip>
 				{documentId && (
 					<NavActions documentId={documentId} updatedAt={updatedAt} />

@@ -1,11 +1,11 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMutation } from "convex/react";
+import { createFileRoute } from "@tanstack/react-router";
 import { Clock, FileText, Plus } from "lucide-react";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AISidebar } from "@/components/ai-sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { DocumentSkeleton } from "@/components/document-skeleton";
 import { Header } from "@/components/header";
 import { RecentlyUpdatedCards } from "@/components/recently-updated-cards";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/empty";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCreateDocumentNavigation } from "@/hooks/use-create-document-navigation";
 import { getGreeting } from "@/lib/utils";
 import { api } from "../../convex/_generated/api";
 
@@ -34,9 +35,7 @@ export const Route = createFileRoute("/")({
 
 function EditorHome() {
 	const [greeting, setGreeting] = useState<string | null>(null);
-	const navigate = useNavigate();
-	const createDocument = useMutation(api.documents.create);
-	const [, startTransition] = useTransition();
+	const { createAndNavigate, isCreating } = useCreateDocumentNavigation();
 	const { data: currentUser } = useSuspenseQuery(
 		convexQuery(api.auth.getCurrentUser, {}),
 	);
@@ -50,18 +49,8 @@ function EditorHome() {
 	const firstName = fullName.trim().split(/\s+/)[0] || "Guest";
 
 	const handleCreateDocument = useCallback(async () => {
-		startTransition(async () => {
-			try {
-				const documentId = await createDocument({});
-				navigate({
-					to: "/documents/$documentId",
-					params: { documentId },
-				});
-			} catch (error) {
-				console.error("Failed to create document:", error);
-			}
-		});
-	}, [createDocument, navigate]);
+		await createAndNavigate();
+	}, [createAndNavigate]);
 
 	useEffect(() => {
 		let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -98,6 +87,10 @@ function EditorHome() {
 		};
 	}, []);
 
+	if (isCreating) {
+		return <DocumentSkeleton />;
+	}
+
 	return (
 		<>
 			<AppSidebar />
@@ -128,7 +121,10 @@ function EditorHome() {
 										</EmptyDescription>
 									</EmptyHeader>
 									<EmptyContent>
-										<Button onClick={handleCreateDocument}>
+										<Button
+											onClick={handleCreateDocument}
+											disabled={isCreating}
+										>
 											<Plus className="size-4" />
 											Create page
 										</Button>
