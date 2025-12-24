@@ -40,6 +40,31 @@ type TrashBoxContentProps = {
 	isOpen?: boolean;
 };
 
+function TrashBoxPopoverSkeleton() {
+	return (
+		<div className="text-sm min-h-[240px]">
+			<div className="p-2 pb-1">
+				<Skeleton className="h-8 w-full" />
+			</div>
+			<div className="max-h-[62vh] overflow-y-auto px-1 pb-1 space-y-1">
+				{Array.from({ length: 7 }).map((_, index) => (
+					<div
+						// biome-ignore lint/suspicious/noArrayIndexKey: static placeholder list
+						key={index}
+						className="rounded-md w-full flex items-center gap-2 px-2 py-2"
+					>
+						<Skeleton className="h-4 w-4 rounded" />
+						<Skeleton className="h-4 w-40 max-w-[70%]" />
+					</div>
+				))}
+			</div>
+			<div className="px-3 py-2 border-t">
+				<Skeleton className="h-4 w-full" />
+			</div>
+		</div>
+	);
+}
+
 function TrashBoxContent({
 	onRequestClose,
 	variant,
@@ -283,7 +308,8 @@ export function TrashBoxPopover({
 	const { data: documents, isLoading } = useQuery({
 		...convexQuery(api.documents.getTrash),
 		enabled: open,
-		gcTime: 10_000,
+		gcTime: 2 * 60_000,
+		placeholderData: (previousData) => previousData,
 	});
 
 	if (!open) {
@@ -291,11 +317,7 @@ export function TrashBoxPopover({
 	}
 
 	if (isLoading || documents === undefined) {
-		return (
-			<div className="h-full flex items-center justify-center p-4">
-				<Skeleton className="h-8 w-8" />
-			</div>
-		);
+		return <TrashBoxPopoverSkeleton />;
 	}
 
 	return (

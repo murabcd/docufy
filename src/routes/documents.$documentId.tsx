@@ -1,6 +1,10 @@
 import { useTiptapSync } from "@convex-dev/prosemirror-sync/tiptap";
 import { convexQuery } from "@convex-dev/react-query";
-import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import {
+	useQuery,
+	useQueryClient,
+	useSuspenseQuery,
+} from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { AnyExtension, JSONContent } from "@tiptap/core";
 import type { Editor } from "@tiptap/react";
@@ -19,6 +23,7 @@ import { AISidebar } from "@/components/ai-sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CoverImage } from "@/components/cover-image";
 import { CoverImageModal } from "@/components/cover-image-modal";
+import { DocumentSkeleton } from "@/components/document-skeleton";
 import { DocumentTitle } from "@/components/document-title";
 import { Header } from "@/components/header";
 import { IconPicker } from "@/components/icon-picker";
@@ -28,47 +33,11 @@ import TiptapEditor, {
 import { TrashBanner } from "@/components/trash-banner";
 import { Button } from "@/components/ui/button";
 import { SidebarInset } from "@/components/ui/sidebar";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useCoverImage } from "@/hooks/use-cover-image";
 import { nestedPagePluginKey } from "@/tiptap/extensions/nested-page/nested-page";
 import { EMPTY_DOCUMENT } from "@/tiptap/types";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-
-function DocumentSkeleton() {
-	return (
-		<>
-			<AppSidebar />
-			<SidebarInset>
-				<header className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-2 bg-background/95 backdrop-blur">
-					<div className="flex flex-1 items-center gap-2 px-3">
-						<Skeleton className="h-6 w-6 rounded" />
-						<Skeleton className="h-4 w-px" />
-						<Skeleton className="h-4 w-32" />
-					</div>
-					<div className="flex items-center gap-2 px-3">
-						<Skeleton className="h-8 w-20 rounded" />
-					</div>
-				</header>
-				<div className="flex flex-1 flex-col px-4 py-10">
-					<div className="mx-auto w-full max-w-3xl space-y-4">
-						<Skeleton className="h-8 w-3/4" />
-						<div className="space-y-2">
-							<Skeleton className="h-4 w-full" />
-							<Skeleton className="h-4 w-full" />
-							<Skeleton className="h-4 w-2/3" />
-						</div>
-						<div className="space-y-2 pt-4">
-							<Skeleton className="h-4 w-full" />
-							<Skeleton className="h-4 w-5/6" />
-						</div>
-					</div>
-				</div>
-			</SidebarInset>
-			<AISidebar />
-		</>
-	);
-}
 
 export const Route = createFileRoute("/documents/$documentId")({
 	component: DocumentEditor,
@@ -120,9 +89,10 @@ function DocumentEditor() {
 	const { data: rootDocuments = [] } = useSuspenseQuery(
 		convexQuery(api.documents.list, { parentId: null }),
 	);
-	const { data: allDocuments } = useSuspenseQuery(
-		convexQuery(api.documents.getAll),
-	);
+	const { data: allDocuments = [] } = useQuery({
+		...convexQuery(api.documents.getAll),
+		placeholderData: [],
+	});
 	const sync = useTiptapSync(api.prosemirrorSync, documentId);
 
 	const legacyContent = useMemo<JSONContent>(() => {
@@ -241,7 +211,7 @@ function DocumentEditor() {
 
 	const titlesById = useMemo(() => {
 		const map: Record<string, string> = {};
-		for (const doc of allDocuments ?? []) {
+		for (const doc of allDocuments) {
 			map[String(doc._id)] = doc.title ?? "New page";
 		}
 		return map;
