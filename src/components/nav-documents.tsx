@@ -159,14 +159,17 @@ function DocumentItem({
 	};
 
 	const handleDelete = async () => {
-		startTransition(async () => {
+		setShowDeleteDialog(false);
+		const isCurrent = currentDocumentId === document._id;
+		if (isCurrent) {
+			navigate({ to: "/", replace: true });
+		}
+		try {
 			await archiveDocument({ id: document._id });
-			setShowDeleteDialog(false);
 			toast.success("Document moved to trash");
-			if (currentDocumentId === document._id) {
-				navigate({ to: "/" });
-			}
-		});
+		} catch (_error) {
+			toast.error("Failed to move document to trash");
+		}
 	};
 
 	const handleDuplicate = async () => {

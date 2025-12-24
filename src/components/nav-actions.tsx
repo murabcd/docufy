@@ -106,10 +106,14 @@ export function NavActions({
 
 	const handleMoveToTrash = React.useCallback(async () => {
 		if (!documentId) return;
-		await archiveDocument({ id: documentId });
-		toast.success("Document moved to trash");
 		setIsOpen(false);
-		navigate({ to: "/" });
+		navigate({ to: "/", replace: true });
+		try {
+			await archiveDocument({ id: documentId });
+			toast.success("Document moved to trash");
+		} catch (_error) {
+			toast.error("Failed to move document to trash");
+		}
 	}, [archiveDocument, documentId, navigate]);
 
 	const handleShowTrash = React.useCallback(() => {
