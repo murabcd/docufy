@@ -1,7 +1,9 @@
+import { convexQuery } from "@convex-dev/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TrashBoxPopover } from "@/components/trash-box";
 import {
 	Popover,
@@ -17,6 +19,7 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
+import { api } from "../../convex/_generated/api";
 
 export function NavSecondary({
 	items,
@@ -34,17 +37,27 @@ export function NavSecondary({
 	const { isMobile } = useSidebar();
 	const location = useLocation();
 	const pathname = location.pathname;
+	const queryClient = useQueryClient();
 	const [trashOpen, setTrashOpen] = useState(false);
 
 	useEffect(() => {
 		if (pathname) setTrashOpen(false);
 	}, [pathname]);
 
+	const prefetchTrash = useCallback(() => {
+		void queryClient
+			.prefetchQuery(convexQuery(api.documents.getTrash))
+			.catch(() => {});
+	}, [queryClient]);
+
 	useEffect(() => {
-		const openTrash = () => setTrashOpen(true);
+		const openTrash = () => {
+			prefetchTrash();
+			setTrashOpen(true);
+		};
 		window.addEventListener("openTrashPopover", openTrash);
 		return () => window.removeEventListener("openTrashPopover", openTrash);
-	}, []);
+	}, [prefetchTrash]);
 
 	return (
 		<SidebarGroup {...props}>
@@ -78,7 +91,10 @@ export function NavSecondary({
 								<SidebarMenuItem key={item.title}>
 									<Popover open={trashOpen} onOpenChange={setTrashOpen}>
 										<PopoverTrigger asChild>
-											<SidebarMenuButton>
+											<SidebarMenuButton
+												onPointerEnter={prefetchTrash}
+												onFocus={prefetchTrash}
+											>
 												<item.icon />
 												<span>{item.title}</span>
 											</SidebarMenuButton>
