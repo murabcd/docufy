@@ -18,10 +18,10 @@ import {
 	SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 
-export function NavWorkspaces({
-	workspaces,
+export function NavTeamspaces({
+	teamspaces,
 }: {
-	workspaces: {
+	teamspaces: {
 		name: string;
 		emoji: string;
 		pages: {
@@ -32,16 +32,21 @@ export function NavWorkspaces({
 	}[];
 }) {
 	return (
-		<SidebarGroup>
-			<SidebarGroupLabel>Workspaces</SidebarGroupLabel>
+		<SidebarGroup className="group-data-[collapsible=icon]:hidden">
+			<SidebarGroupLabel>Teamspaces</SidebarGroupLabel>
+			{teamspaces.length === 0 && (
+				<p className="text-sidebar-foreground/50 text-xs px-2 pb-2">
+					Create space to organize information
+				</p>
+			)}
 			<SidebarGroupContent>
 				<SidebarMenu>
-					{workspaces.map((workspace) => (
-						<Collapsible key={workspace.name}>
+					{teamspaces.map((teamspace) => (
+						<Collapsible key={teamspace.name}>
 							<SidebarMenuItem>
 								<SidebarMenuButton>
-									<span>{workspace.emoji}</span>
-									<span>{workspace.name}</span>
+									<span>{teamspace.emoji}</span>
+									<span>{teamspace.name}</span>
 								</SidebarMenuButton>
 								<CollapsibleTrigger asChild>
 									<SidebarMenuAction
@@ -56,7 +61,7 @@ export function NavWorkspaces({
 								</SidebarMenuAction>
 								<CollapsibleContent>
 									<SidebarMenuSub>
-										{workspace.pages.map((page) => (
+										{teamspace.pages.map((page) => (
 											<SidebarMenuSubItem key={page.name}>
 												<SidebarMenuSubButton asChild>
 													<Link to={page.url}>
@@ -71,12 +76,14 @@ export function NavWorkspaces({
 							</SidebarMenuItem>
 						</Collapsible>
 					))}
-					<SidebarMenuItem>
-						<SidebarMenuButton className="text-sidebar-foreground/70">
-							<MoreHorizontal />
-							<span>More</span>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
+					{teamspaces.length > 0 && (
+						<SidebarMenuItem>
+							<SidebarMenuButton className="text-sidebar-foreground/70">
+								<MoreHorizontal />
+								<span>More</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+					)}
 				</SidebarMenu>
 			</SidebarGroupContent>
 		</SidebarGroup>

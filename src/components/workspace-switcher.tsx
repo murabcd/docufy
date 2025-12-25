@@ -38,7 +38,7 @@ import { useCreateDocumentNavigation } from "@/hooks/use-create-document-navigat
 import { authClient } from "@/lib/auth-client";
 import { api } from "../../convex/_generated/api";
 
-export function TeamSwitcher({
+export function WorkspaceSwitcher({
 	teams,
 	onSettingsOpen,
 }: {
@@ -183,7 +183,7 @@ export function TeamSwitcher({
 								</div>
 								<DropdownMenuSeparator />
 								<DropdownMenuLabel className="text-muted-foreground text-xs px-2">
-									Teams
+									Workspaces
 								</DropdownMenuLabel>
 								{teams.map((team) => (
 									<DropdownMenuItem

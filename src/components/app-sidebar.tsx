@@ -15,15 +15,16 @@ import { NavDocuments } from "@/components/nav-documents";
 import { NavFavorites } from "@/components/nav-favorites";
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
-import { NavWorkspaces } from "@/components/nav-workspaces";
+import { NavShared } from "@/components/nav-shared";
+import { NavTeamspaces } from "@/components/nav-teamspaces";
 import { SearchCommand } from "@/components/search-command";
 import { SettingsDialog } from "@/components/settings-dialog";
-import { TeamSwitcher } from "@/components/team-switcher";
 import {
 	Sidebar,
 	SidebarContent,
 	SidebarHeader,
 } from "@/components/ui/sidebar";
+import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -53,16 +54,16 @@ export interface Favorite {
 	icon: LucideIcon | string;
 }
 
-export interface WorkspacePage {
+export interface TeamspacePage {
 	name: string;
 	url: string;
 	emoji: string;
 }
 
-export interface Workspace {
+export interface Teamspace {
 	name: string;
 	emoji: string;
-	pages: WorkspacePage[];
+	pages: TeamspacePage[];
 }
 
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -70,7 +71,7 @@ export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 	navMain?: NavMainItem[];
 	navSecondary?: NavSecondaryItem[];
 	favorites?: Favorite[];
-	workspaces?: Workspace[];
+	teamspaces?: Teamspace[];
 }
 
 const defaultNavMain: NavMainItem[] = [
@@ -103,7 +104,7 @@ export function AppSidebar({
 	navMain = defaultNavMain,
 	navSecondary = defaultNavSecondary,
 	favorites: propFavorites,
-	workspaces = [],
+	teamspaces = [],
 	...props
 }: AppSidebarProps) {
 	const navigate = useNavigate();
@@ -181,7 +182,7 @@ export function AppSidebar({
 		<>
 			<Sidebar className="border-r-0" {...props}>
 				<SidebarHeader>
-					<TeamSwitcher
+					<WorkspaceSwitcher
 						teams={teams}
 						onSettingsOpen={() => setSettingsOpen(true)}
 					/>
@@ -192,8 +193,9 @@ export function AppSidebar({
 				</SidebarHeader>
 				<SidebarContent>
 					<NavFavorites favorites={favorites} />
-					{workspaces.length > 0 && <NavWorkspaces workspaces={workspaces} />}
+					<NavTeamspaces teamspaces={teamspaces} />
 					<NavDocuments />
+					<NavShared />
 					<NavSecondary
 						items={navSecondary}
 						className="mt-auto"
