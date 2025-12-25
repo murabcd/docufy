@@ -25,12 +25,15 @@ import { cn } from "@/lib/utils";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_RIGHT_COOKIE_NAME = "sidebar_right_state";
+const SIDEBAR_RIGHT_MODE_COOKIE_NAME = "sidebar_right_mode";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_RIGHT_WIDTH = "16rem";
 const SIDEBAR_RIGHT_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
+
+export type RightSidebarMode = "sidebar" | "floating";
 
 function getCookie(name: string): string | null {
 	if (typeof document === "undefined") {
@@ -65,6 +68,8 @@ type SidebarContextProps = {
 	rightOpenMobile: boolean;
 	setRightOpenMobile: (open: boolean) => void;
 	toggleRightSidebar: () => void;
+	rightMode: RightSidebarMode;
+	setRightMode: (mode: RightSidebarMode) => void;
 };
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -89,6 +94,8 @@ function useSidebar() {
 				rightOpenMobile: false,
 				setRightOpenMobile: () => {},
 				toggleRightSidebar: () => {},
+				rightMode: "sidebar",
+				setRightMode: () => {},
 			} satisfies SidebarContextProps;
 		}
 
@@ -116,6 +123,8 @@ function SidebarProvider({
 
 	const [rightOpen, setRightOpen] = React.useState(false);
 	const [rightOpenMobile, setRightOpenMobile] = React.useState(false);
+	const [rightMode, setRightModeState] =
+		React.useState<RightSidebarMode>("sidebar");
 
 	const [_open, _setOpen] = React.useState(defaultOpen);
 	const open = openProp ?? _open;
@@ -151,6 +160,11 @@ function SidebarProvider({
 
 		const savedRightState = getCookieBoolean(SIDEBAR_RIGHT_COOKIE_NAME, false);
 		setRightOpen(savedRightState);
+
+		const savedRightMode = getCookie(SIDEBAR_RIGHT_MODE_COOKIE_NAME);
+		if (savedRightMode === "floating" || savedRightMode === "sidebar") {
+			setRightModeState(savedRightMode);
+		}
 	}, []);
 
 	const setRightOpenWithCookie = React.useCallback(
@@ -162,6 +176,12 @@ function SidebarProvider({
 		},
 		[rightOpen],
 	);
+
+	const setRightMode = React.useCallback((mode: RightSidebarMode) => {
+		setRightModeState(mode);
+		// biome-ignore lint/suspicious/noDocumentCookie: Cookie Store API not widely supported yet
+		document.cookie = `${SIDEBAR_RIGHT_MODE_COOKIE_NAME}=${mode}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+	}, []);
 
 	const toggleSidebar = React.useCallback(() => {
 		return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
@@ -219,6 +239,8 @@ function SidebarProvider({
 			rightOpenMobile,
 			setRightOpenMobile,
 			toggleRightSidebar,
+			rightMode,
+			setRightMode,
 		}),
 		[
 			state,
@@ -231,6 +253,8 @@ function SidebarProvider({
 			setRightOpenWithCookie,
 			rightOpenMobile,
 			toggleRightSidebar,
+			rightMode,
+			setRightMode,
 		],
 	);
 
@@ -475,7 +499,7 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
 }
 
 function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
-	const { rightOpen } = useSidebar();
+	const { rightOpen, rightMode } = useSidebar();
 	const isMobile = useIsMobile();
 
 	return (
@@ -488,7 +512,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
 				className,
 			)}
 			style={
-				rightOpen && !isMobile
+				rightOpen && !isMobile && rightMode === "sidebar"
 					? ({
 							marginRight: SIDEBAR_RIGHT_WIDTH,
 						} as React.CSSProperties)
