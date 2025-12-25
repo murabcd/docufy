@@ -34,8 +34,18 @@ export interface TiptapEditorHandle {
 	getEditor: () => ReturnType<typeof useEditorState> | null;
 }
 
+const EMPTY_EXTENSIONS: AnyExtension[] = [];
+
 const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
-	({ editorOptions = {}, onChange, extraExtensions = [], ...rest }, ref) => {
+	(
+		{
+			editorOptions = {},
+			onChange,
+			extraExtensions = EMPTY_EXTENSIONS,
+			...rest
+		},
+		ref,
+	) => {
 		const allExtensions = useMemo(() => {
 			return [
 				StarterKit.configure({
@@ -164,7 +174,7 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
 
 		return (
 			<div className="w-full overflow-visible">
-				{editor && (
+				{editor?.isEditable && (
 					<>
 						<TiptapDragHandle editor={editor} />
 						<TextSelectionMenu editor={editor} />

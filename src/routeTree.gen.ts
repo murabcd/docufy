@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ShareDocumentIdRouteImport } from './routes/share.$documentId'
 import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$documentId'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -17,6 +18,11 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShareDocumentIdRoute = ShareDocumentIdRouteImport.update({
+  id: '/share/$documentId',
+  path: '/share/$documentId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocumentsDocumentIdRoute = DocumentsDocumentIdRouteImport.update({
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/share/$documentId': typeof ShareDocumentIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/share/$documentId': typeof ShareDocumentIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,38 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/api/chat': typeof ApiChatRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/share/$documentId': typeof ShareDocumentIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/chat' | '/documents/$documentId' | '/api/auth/$'
+  fullPaths:
+    | '/'
+    | '/api/chat'
+    | '/documents/$documentId'
+    | '/share/$documentId'
+    | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/chat' | '/documents/$documentId' | '/api/auth/$'
-  id: '__root__' | '/' | '/api/chat' | '/documents/$documentId' | '/api/auth/$'
+  to:
+    | '/'
+    | '/api/chat'
+    | '/documents/$documentId'
+    | '/share/$documentId'
+    | '/api/auth/$'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/chat'
+    | '/documents/$documentId'
+    | '/share/$documentId'
+    | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiChatRoute: typeof ApiChatRoute
   DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
+  ShareDocumentIdRoute: typeof ShareDocumentIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -76,6 +102,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/share/$documentId': {
+      id: '/share/$documentId'
+      path: '/share/$documentId'
+      fullPath: '/share/$documentId'
+      preLoaderRoute: typeof ShareDocumentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/documents/$documentId': {
@@ -106,6 +139,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiChatRoute: ApiChatRoute,
   DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
+  ShareDocumentIdRoute: ShareDocumentIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
