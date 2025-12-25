@@ -80,7 +80,7 @@ export function DataControlsSettings() {
 							<AlertDialogDescription>
 								This action cannot be undone. This will permanently delete your
 								{currentUser
-									? " account and sign you out."
+									? " account and log you out."
 									: " local profile data stored in this browser."}
 							</AlertDialogDescription>
 						</AlertDialogHeader>

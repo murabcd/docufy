@@ -1,9 +1,23 @@
-import { Paintbrush, Trash2, User } from "lucide-react";
+import {
+	Database,
+	Download,
+	FolderKanban,
+	Link2,
+	Paintbrush,
+	User,
+	Users,
+	Wand2,
+} from "lucide-react";
 import * as React from "react";
 import {
 	AppearanceSettings,
+	ConnectionsSettings,
 	DataControlsSettings,
+	DocAISettings,
+	ImportSettings,
 	ProfileSettings,
+	TeamspacesSettings,
+	WorkspacesSettings,
 } from "@/components/settings";
 import {
 	Breadcrumb,
@@ -30,12 +44,25 @@ import {
 	SidebarProvider,
 } from "@/components/ui/sidebar";
 
-type SettingsPage = "Profile" | "Appearance" | "Data controls";
+type SettingsPage =
+	| "Profile"
+	| "Connections"
+	| "Appearance"
+	| "Workspaces"
+	| "Teamspaces"
+	| "Doc AI"
+	| "Import"
+	| "Data controls";
 
 const settingsNav: { name: SettingsPage; icon: React.ElementType }[] = [
 	{ name: "Profile", icon: User },
+	{ name: "Connections", icon: Link2 },
 	{ name: "Appearance", icon: Paintbrush },
-	{ name: "Data controls", icon: Trash2 },
+	{ name: "Workspaces", icon: FolderKanban },
+	{ name: "Teamspaces", icon: Users },
+	{ name: "Doc AI", icon: Wand2 },
+	{ name: "Import", icon: Download },
+	{ name: "Data controls", icon: Database },
 ];
 
 interface SettingsDialogProps {
@@ -63,8 +90,18 @@ export function SettingsDialog({
 		switch (activePage) {
 			case "Profile":
 				return <ProfileSettings onClose={() => setOpen(false)} />;
+			case "Connections":
+				return <ConnectionsSettings />;
 			case "Appearance":
 				return <AppearanceSettings />;
+			case "Workspaces":
+				return <WorkspacesSettings />;
+			case "Teamspaces":
+				return <TeamspacesSettings />;
+			case "Doc AI":
+				return <DocAISettings />;
+			case "Import":
+				return <ImportSettings />;
 			case "Data controls":
 				return <DataControlsSettings />;
 			default:

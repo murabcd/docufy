@@ -1,3 +1,8 @@
 export { AppearanceSettings } from "@/components/settings/appearance-settings";
+export { ConnectionsSettings } from "@/components/settings/connections-settings";
 export { DataControlsSettings } from "@/components/settings/data-controls-settings";
+export { DocAISettings } from "@/components/settings/doc-ai-settings";
+export { ImportSettings } from "@/components/settings/import-settings";
 export { ProfileSettings } from "@/components/settings/profile-settings";
+export { TeamspacesSettings } from "@/components/settings/teamspaces-settings";
+export { WorkspacesSettings } from "@/components/settings/workspaces-settings";
