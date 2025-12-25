@@ -104,6 +104,23 @@ export const get = query({
 	},
 });
 
+export const getPublished = query({
+	args: {
+		id: v.id("documents"),
+	},
+	returns: v.union(
+		v.object(documentFields),
+		v.null(),
+	),
+	handler: async (ctx, args) => {
+		const doc = await ctx.db.get(args.id);
+		if (!doc || doc.isArchived || !doc.isPublished) {
+			return null;
+		}
+		return doc;
+	},
+});
+
 export const update = mutation({
 	args: {
 		id: v.id("documents"),
@@ -721,5 +738,41 @@ export const search = query({
 			)
 			.take(limit);
 		return results;
+	},
+});
+
+export const listShared = query({
+	args: {
+		parentId: v.optional(v.union(v.id("documents"), v.null())),
+	},
+	returns: v.array(
+		v.object(documentFields),
+	),
+	handler: async (ctx, args) => {
+		const userId = await getUserId(ctx);
+		if (!userId) return [];
+		const parentId = args.parentId === null ? undefined : args.parentId;
+
+		const docs = await ctx.db
+			.query("documents")
+			.withIndex("by_user_parent", (q) =>
+				q.eq("userId", userId).eq("parentId", parentId),
+			)
+			.filter((q) =>
+				q.and(
+					q.eq(q.field("isArchived"), false),
+					q.eq(q.field("isPublished"), true),
+				),
+			)
+			.collect();
+
+		return docs.sort((a, b) => {
+			const orderA = a.order ?? 0;
+			const orderB = b.order ?? 0;
+			if (orderA !== orderB) {
+				return orderA - orderB;
+			}
+			return a.createdAt - b.createdAt;
+		});
 	},
 });

@@ -2,7 +2,6 @@ import { convexQuery } from "@convex-dev/react-query";
 import {
 	closestCenter,
 	DndContext,
-	type DragEndEvent,
 	KeyboardSensor,
 	PointerSensor,
 	useDroppable,
@@ -34,20 +33,9 @@ import {
 	MoreHorizontal,
 	Share2,
 	Star,
-	Trash2,
 } from "lucide-react";
 import { useEffect, useEffectEvent, useState, useTransition } from "react";
 import { toast } from "sonner";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -108,18 +96,15 @@ function DocumentItem({
 	const navigate = useNavigate();
 	const { isMobile } = useSidebar();
 	const [isExpanded, setIsExpanded] = useState(false);
-	const [isMounted, setIsMounted] = useState(false);
-	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
 	const queryClient = useQueryClient();
-	const archiveDocument = useMutation(api.documents.archive);
 	const duplicateDocument = useMutation(api.documents.duplicate);
 	const toggleFavorite = useMutation(api.favorites.toggle);
 	const updateDocument = useMutation(api.documents.update);
 	const [, startTransition] = useTransition();
 
 	const { data: children = [] } = useSuspenseQuery(
-		convexQuery(api.documents.list, { parentId: document._id }),
+		convexQuery(api.documents.listShared, { parentId: document._id }),
 	);
 
 	const { data: isFavorite } = useQuery({
@@ -128,26 +113,15 @@ function DocumentItem({
 
 	const hasChildren = children.length > 0;
 
-	const {
-		attributes,
-		listeners,
-		setNodeRef,
-		transform,
-		transition,
-		isDragging,
-	} = useSortable({
+	const { setNodeRef, transform, transition, isDragging } = useSortable({
 		id: document._id,
-		disabled: false,
+		disabled: true,
 	});
 
 	const { setNodeRef: setDroppableRef, isOver } = useDroppable({
 		id: `drop-${document._id}`,
 		disabled: isDragging,
 	});
-
-	useEffect(() => {
-		setIsMounted(true);
-	}, []);
 
 	const onDragOverEvent = useEffectEvent((documentId: Id<"documents">) => {
 		onDragOver?.(documentId);
@@ -158,7 +132,7 @@ function DocumentItem({
 			setIsExpanded(true);
 			onDragOverEvent(document._id);
 		}
-	}, [isOver, isExpanded, hasChildren, document._id, onDragOver]); // onDragOverEvent is an Effect Event, doesn't need to be in dependencies
+	}, [isOver, isExpanded, hasChildren, document._id, onDragOver]);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -167,24 +141,10 @@ function DocumentItem({
 		backgroundColor: isOver ? "var(--sidebar-accent)" : undefined,
 	};
 
-	const handleDelete = async () => {
-		setShowDeleteDialog(false);
-		const isCurrent = currentDocumentId === document._id;
-		if (isCurrent) {
-			navigate({ to: "/", replace: true });
-		}
-		try {
-			await archiveDocument({ id: document._id });
-			toast.success("Document moved to trash");
-		} catch (_error) {
-			toast.error("Failed to move document to trash");
-		}
-	};
-
 	const handleDuplicate = async () => {
 		startTransition(async () => {
 			const newId = await duplicateDocument({ id: document._id });
-			toast.success("Document duplicated");
+			toast.success("Page duplicated");
 			navigate({
 				to: "/documents/$documentId",
 				params: { documentId: newId },
@@ -209,10 +169,9 @@ function DocumentItem({
 	};
 
 	const handleCopyLink = () => {
-		const path = document.isPublished ? "share" : "documents";
-		const url = `${window.location.origin}/${path}/${document._id}`;
+		const url = `${window.location.origin}/share/${document._id}`;
 		navigator.clipboard.writeText(url);
-		toast.success(document.isPublished ? "Share link copied" : "Link copied");
+		toast.success("Share link copied");
 	};
 
 	const handleSetVisibility = async (isPublished: boolean) => {
@@ -222,9 +181,6 @@ function DocumentItem({
 				isPublished,
 			});
 			toast.success(isPublished ? "Page is now public" : "Page is now private");
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.list).queryKey.slice(0, 2),
-			});
 			await queryClient.invalidateQueries({
 				queryKey: convexQuery(api.documents.listShared).queryKey.slice(0, 2),
 			});
@@ -250,12 +206,7 @@ function DocumentItem({
 					style={style}
 					className="group"
 				>
-					<div
-						className="flex w-full min-w-0 items-center gap-1 cursor-grab active:cursor-grabbing"
-						{...(isMounted ? attributes : {})}
-						{...(isMounted ? listeners : {})}
-						suppressHydrationWarning
-					>
+					<div className="flex w-full min-w-0 items-center gap-1">
 						<Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
 							<CollapsibleTrigger asChild>
 								<button
@@ -343,36 +294,8 @@ function DocumentItem({
 									<Star className="text-muted-foreground" />
 									<span>{isFavorite ? "Unstar" : "Star"}</span>
 								</DropdownMenuItem>
-								<DropdownMenuSeparator />
-								<DropdownMenuItem
-									onClick={() => setShowDeleteDialog(true)}
-									className="text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"
-								>
-									<Trash2 className="text-destructive dark:text-red-500" />
-									<span>Delete</span>
-								</DropdownMenuItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
-						<AlertDialog
-							open={showDeleteDialog}
-							onOpenChange={setShowDeleteDialog}
-						>
-							<AlertDialogContent>
-								<AlertDialogHeader>
-									<AlertDialogTitle>Move to trash?</AlertDialogTitle>
-									<AlertDialogDescription>
-										This will move the document to trash. You can restore it
-										later from the trash.
-									</AlertDialogDescription>
-								</AlertDialogHeader>
-								<AlertDialogFooter>
-									<AlertDialogCancel>Cancel</AlertDialogCancel>
-									<AlertDialogAction onClick={handleDelete}>
-										Move to trash
-									</AlertDialogAction>
-								</AlertDialogFooter>
-							</AlertDialogContent>
-						</AlertDialog>
 					</div>
 				</SidebarMenuSubItem>
 				{isExpanded && (
@@ -416,12 +339,7 @@ function DocumentItem({
 				}}
 				style={style}
 			>
-				<div
-					className="flex items-center gap-1 cursor-grab active:cursor-grabbing"
-					{...(isMounted ? attributes : {})}
-					{...(isMounted ? listeners : {})}
-					suppressHydrationWarning
-				>
+				<div className="flex items-center gap-1">
 					<Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
 						<CollapsibleTrigger asChild>
 							<button
@@ -502,36 +420,8 @@ function DocumentItem({
 								<Star className="text-muted-foreground" />
 								<span>{isFavorite ? "Unstar" : "Star"}</span>
 							</DropdownMenuItem>
-							<DropdownMenuSeparator />
-							<DropdownMenuItem
-								onClick={() => setShowDeleteDialog(true)}
-								className="text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"
-							>
-								<Trash2 className="text-destructive dark:text-red-500" />
-								<span>Delete</span>
-							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
-					<AlertDialog
-						open={showDeleteDialog}
-						onOpenChange={setShowDeleteDialog}
-					>
-						<AlertDialogContent>
-							<AlertDialogHeader>
-								<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-								<AlertDialogDescription>
-									This action cannot be undone. This will permanently delete
-									your document and all associated data.
-								</AlertDialogDescription>
-							</AlertDialogHeader>
-							<AlertDialogFooter>
-								<AlertDialogCancel>Cancel</AlertDialogCancel>
-								<AlertDialogAction onClick={handleDelete}>
-									Delete
-								</AlertDialogAction>
-							</AlertDialogFooter>
-						</AlertDialogContent>
-					</AlertDialog>
 				</div>
 			</SidebarMenuItem>
 			{isExpanded && (
@@ -566,7 +456,7 @@ function DocumentItem({
 	);
 }
 
-export function NavDocuments() {
+export function NavShared() {
 	const location = useLocation();
 	const pathname = location.pathname;
 	const currentDocumentId = pathname.startsWith("/documents/")
@@ -575,11 +465,9 @@ export function NavDocuments() {
 
 	const [isCollapsed, setIsCollapsed] = useState(false);
 	const [isExpanded, setIsExpanded] = useState(false);
-	const reorderDocument = useMutation(api.documents.reorder);
-	const [, startTransition] = useTransition();
 
 	const { data: documents = [] } = useSuspenseQuery(
-		convexQuery(api.documents.list, { parentId: null }),
+		convexQuery(api.documents.listShared, { parentId: null }),
 	);
 
 	const MAX_VISIBLE = 5;
@@ -601,53 +489,6 @@ export function NavDocuments() {
 
 	const handleDragOver = (_documentId: Id<"documents">) => {};
 
-	const handleDragEnd = async (event: DragEndEvent) => {
-		const { active, over } = event;
-
-		if (!over) {
-			return;
-		}
-
-		const activeId = active.id as Id<"documents">;
-		const overId = over.id as Id<"documents">;
-
-		if (typeof overId === "string" && overId.startsWith("drop-")) {
-			const targetId = overId.replace("drop-", "") as Id<"documents">;
-
-			if (activeId === targetId) {
-				return;
-			}
-
-			const newOrder = 999999;
-
-			startTransition(async () => {
-				await reorderDocument({
-					id: activeId,
-					newOrder,
-					newParentId: targetId,
-				});
-			});
-			return;
-		}
-
-		if (activeId === overId) {
-			return;
-		}
-
-		const oldIndex = documents.findIndex((d) => d._id === activeId);
-		const newIndex = documents.findIndex((d) => d._id === overId);
-
-		if (oldIndex !== -1 && newIndex !== -1) {
-			startTransition(async () => {
-				await reorderDocument({
-					id: activeId,
-					newOrder: newIndex,
-					newParentId: null,
-				});
-			});
-		}
-	};
-
 	return (
 		<SidebarGroup>
 			<Collapsible
@@ -656,21 +497,17 @@ export function NavDocuments() {
 			>
 				<CollapsibleTrigger asChild>
 					<SidebarGroupLabel className="cursor-pointer select-none">
-						Private
+						Shared
 					</SidebarGroupLabel>
 				</CollapsibleTrigger>
 				<CollapsibleContent>
 					{documents.length === 0 && (
 						<p className="text-sidebar-foreground/50 text-xs px-2 pb-2">
-							Create a page to get started
+							No shared pages
 						</p>
 					)}
 					<SidebarGroupContent>
-						<DndContext
-							sensors={sensors}
-							collisionDetection={closestCenter}
-							onDragEnd={handleDragEnd}
-						>
+						<DndContext sensors={sensors} collisionDetection={closestCenter}>
 							<SortableContext
 								items={documents.map((d) => d._id)}
 								strategy={verticalListSortingStrategy}
