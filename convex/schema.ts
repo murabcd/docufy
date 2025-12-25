@@ -60,4 +60,26 @@ export default defineSchema({
 		.index("by_documentId", ["documentId"])
 		.index("by_user", ["userId"])
 		.index("by_user_document", ["userId", "documentId"]),
+	chats: defineTable({
+		userId: v.string(),
+		title: v.string(),
+		documentId: v.optional(v.id("documents")),
+		model: v.optional(v.string()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+		lastMessageAt: v.optional(v.number()),
+	})
+		.index("by_user_updatedAt", ["userId", "updatedAt"])
+		.index("by_user_document_updatedAt", ["userId", "documentId", "updatedAt"]),
+	messages: defineTable({
+		chatId: v.id("chats"),
+		userId: v.string(),
+		messageId: v.string(),
+		role: v.union(v.literal("user"), v.literal("assistant"), v.literal("tool")),
+		message: v.any(),
+		previewText: v.optional(v.string()),
+		createdAt: v.number(),
+	})
+		.index("by_chat_createdAt", ["chatId", "createdAt"])
+		.index("by_chat_messageId", ["chatId", "messageId"]),
 });

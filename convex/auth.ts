@@ -119,6 +119,22 @@ export const migrateAnonymousData = mutation({
       await ctx.db.patch(favorite._id, { userId: toUserId })
     }
 
+    const chats = await ctx.db
+      .query('chats')
+      .withIndex('by_user_updatedAt', (q) => q.eq('userId', fromUserId))
+      .collect()
+    for (const chat of chats) {
+      await ctx.db.patch(chat._id, { userId: toUserId })
+    }
+
+    const messages = await ctx.db
+      .query('messages')
+      .filter((q) => q.eq(q.field('userId'), fromUserId))
+      .collect()
+    for (const message of messages) {
+      await ctx.db.patch(message._id, { userId: toUserId })
+    }
+
     return null
   },
 })

@@ -179,7 +179,6 @@ export function ChatInput({
 						onChange={handleInputChange}
 						onKeyDown={handleKeyDown}
 						placeholder={placeholder}
-						disabled={disabled}
 					/>
 
 					<InputGroupAddon align="block-start">
