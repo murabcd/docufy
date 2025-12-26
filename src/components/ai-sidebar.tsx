@@ -255,7 +255,7 @@ export function AISidebar({
 			className={cn(
 				"flex flex-col",
 				isFloating
-					? "md:right-4 md:top-auto md:bottom-4 md:h-[min(42rem,calc(100svh-2rem))]"
+					? "md:right-2 md:top-auto md:bottom-2 md:h-[min(32rem,calc(100svh-2rem))]"
 					: "border-l",
 			)}
 		>

@@ -194,7 +194,7 @@ function DocumentItem({
 
 	const handleToggleFavorite = async () => {
 		const added = await toggleFavorite({ documentId: document._id });
-		toast.success(added ? "Starred" : "Unstarred");
+		toast.success(added ? "Page starred" : "Page unstarred");
 		await queryClient.invalidateQueries({
 			queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
 				0,
@@ -221,7 +221,7 @@ function DocumentItem({
 				id: document._id,
 				isPublished,
 			});
-			toast.success(isPublished ? "Page is now public" : "Page is now private");
+			toast.success(isPublished ? "Page shared" : "Page unshared");
 			await queryClient.invalidateQueries({
 				queryKey: convexQuery(api.documents.list).queryKey.slice(0, 2),
 			});

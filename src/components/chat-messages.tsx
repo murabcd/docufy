@@ -40,6 +40,7 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
 	return (
 		<div className="flex flex-col gap-6">
 			{messages.map((message) => {
+				const isUser = message.role === "user";
 				const isLastMessage = message.id === lastMessage?.id;
 				const isStreaming =
 					isLastMessage && isLastMessageAssistant && isLoading;
@@ -48,12 +49,16 @@ export function ChatMessages({ messages, isLoading }: ChatMessagesProps) {
 				return (
 					<div
 						key={message.id}
-						className={`flex gap-4 w-full ${
-							message.role === "user" ? "ml-auto max-w-2xl" : ""
+						className={`flex w-full ${
+							isUser ? "justify-end" : "justify-start"
 						}`}
 					>
-						<div className="flex flex-col gap-2 w-full overflow-hidden">
-							{message.role === "user" ? (
+						<div
+							className={`flex flex-col gap-2 overflow-hidden ${
+								isUser ? "max-w-[min(36rem,85%)] items-end" : "w-full"
+							}`}
+						>
+							{isUser ? (
 								<div className="bg-primary text-primary-foreground px-3 py-2 rounded-xl text-sm whitespace-pre-wrap">
 									{message.parts.map((part, index) => {
 										if (part.type === "text") {

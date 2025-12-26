@@ -28,9 +28,9 @@ export function RecentlyUpdatedCards() {
 					params={{ documentId: document._id }}
 					className="shrink-0 w-48"
 				>
-					<Card className="h-32 hover:bg-muted transition-colors cursor-pointer">
+					<Card className="h-32 bg-sidebar text-sidebar-foreground transition-all cursor-pointer hover:border-muted-foreground/20">
 						<CardContent className="p-4 flex flex-col gap-3 h-full">
-							<div className="flex items-center justify-center h-10 w-10 rounded">
+							<div className="flex items-center justify-start h-10 w-10 rounded">
 								{document.icon ? (
 									<span className="text-2xl leading-none">{document.icon}</span>
 								) : (

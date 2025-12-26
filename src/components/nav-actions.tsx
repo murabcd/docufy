@@ -71,7 +71,7 @@ export function NavActions({
 	const handleStarClick = async () => {
 		if (documentId) {
 			const added = await toggleFavorite({ documentId });
-			toast.success(added ? "Starred" : "Unstarred");
+			toast.success(added ? "Page starred" : "Page unstarred");
 			await queryClient.invalidateQueries({
 				queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
 					0,

@@ -1,8 +1,9 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Github, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
+import { Icons } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -78,7 +79,7 @@ export function LoginDialog({
 							</>
 						) : (
 							<>
-								<Github className="mr-2 size-4" />
+								<Icons.github className="mr-2 size-4" />
 								Log in with GitHub
 							</>
 						)}
