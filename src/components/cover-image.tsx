@@ -1,7 +1,17 @@
 import { useMutation } from "convex/react";
-import { ImageIcon, X } from "lucide-react";
+import { useState } from "react";
+import { CoverImageModal } from "@/components/cover-image-modal";
 import { Button } from "@/components/ui/button";
-import { useCoverImage } from "@/hooks/use-cover-image";
+import {
+	ButtonGroup,
+	ButtonGroupSeparator,
+} from "@/components/ui/button-group";
+import {
+	Popover,
+	PopoverAnchor,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -13,7 +23,7 @@ type CoverImageProps = {
 };
 
 export function CoverImage({ url, preview, documentId }: CoverImageProps) {
-	const coverImage = useCoverImage();
+	const [isPickerOpen, setIsPickerOpen] = useState(false);
 	const removeCoverImage = useMutation(api.documents.update);
 
 	const onRemove = async () => {
@@ -26,7 +36,7 @@ export function CoverImage({ url, preview, documentId }: CoverImageProps) {
 	return (
 		<div
 			className={cn(
-				"relative w-full h-[35vh] group",
+				"relative w-full h-[30vh] max-h-[280px] group",
 				!url && "h-[12vh]",
 				url && "bg-muted",
 			)}
@@ -35,18 +45,45 @@ export function CoverImage({ url, preview, documentId }: CoverImageProps) {
 				<img src={url} alt="Cover" className="w-full h-full object-cover" />
 			)}
 			{url && !preview && (
-				<div className="opacity-0 group-hover:opacity-100 absolute bottom-5 right-5 flex items-center gap-x-2">
-					<Button
-						onClick={() => coverImage.onReplace(url)}
-						variant="outline"
-						size="sm"
-					>
-						<ImageIcon className="h-4 w-4 mr-2" /> Change cover
-					</Button>
-					<Button onClick={onRemove} variant="outline" size="sm">
-						<X className="h-4 w-4 mr-2" />
-						Remove
-					</Button>
+				<div className="absolute top-4 right-4">
+					<Popover open={isPickerOpen} onOpenChange={setIsPickerOpen}>
+						<PopoverAnchor asChild>
+							<ButtonGroup className="overflow-hidden rounded-md border border-border bg-background/70 backdrop-blur-sm shadow-xs">
+								<PopoverTrigger asChild>
+									<Button
+										variant="ghost"
+										size="sm"
+										className="h-7 rounded-none border-0 shadow-none px-2.5 text-xs"
+									>
+										Change cover
+									</Button>
+								</PopoverTrigger>
+								<ButtonGroupSeparator />
+								<Button
+									onClick={onRemove}
+									variant="ghost"
+									size="sm"
+									className="h-7 rounded-none border-0 shadow-none px-2.5 text-xs"
+								>
+									Remove
+								</Button>
+							</ButtonGroup>
+						</PopoverAnchor>
+						<PopoverContent
+							align="end"
+							side="bottom"
+							sideOffset={8}
+							collisionPadding={8}
+							className="w-[520px] px-2 pt-0 pb-2"
+						>
+							<CoverImageModal
+								documentId={documentId}
+								open={isPickerOpen}
+								coverUrl={url}
+								onClose={() => setIsPickerOpen(false)}
+							/>
+						</PopoverContent>
+					</Popover>
 				</div>
 			)}
 		</div>
