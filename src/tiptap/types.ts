@@ -5,7 +5,7 @@ import type {
 	Range,
 	UseEditorOptions,
 } from "@tiptap/react";
-import type { icons } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 // Keep in sync with convex/documents.ts
 export const EMPTY_DOCUMENT: JSONContent = {
@@ -21,30 +21,23 @@ export interface EditorButtonProps {
 	buttonKey: string | object;
 	text?: string;
 	editor: Editor;
+	className?: string;
 	iconClass?: string;
-	icon?: keyof typeof icons;
+	icon?: LucideIcon;
 	variant?:
-		| "flat"
-		| "shadow"
-		| "solid"
-		| "bordered"
-		| "light"
-		| "faded"
-		| "ghost";
-	color?:
 		| "default"
-		| "primary"
+		| "destructive"
+		| "outline"
 		| "secondary"
-		| "success"
-		| "warning"
-		| "danger";
+		| "ghost"
+		| "link";
 	onPressed?: () => void;
 }
 
 export interface SlashCommandGroupCommandsProps {
 	key: string;
 	title: string;
-	icon: string;
+	icon: LucideIcon;
 	description?: string;
 	command: ({ editor, range }: { editor: Editor; range: Range }) => void;
 }

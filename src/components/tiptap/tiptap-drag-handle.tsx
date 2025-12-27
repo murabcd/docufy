@@ -1,38 +1,43 @@
-import {
-	Dropdown,
-	DropdownItem,
-	DropdownMenu,
-	DropdownSection,
-	DropdownTrigger,
-	Kbd,
-	Listbox,
-	ListboxItem,
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@heroui/react";
 import DragHandle from "@tiptap/extension-drag-handle-react";
 import type { Node } from "@tiptap/pm/model";
 import { NodeSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
-import type { icons } from "lucide-react";
-import { memo, useCallback, useMemo, useState } from "react";
-import { commandGroups } from "@/tiptap/constants";
 import {
+	Clipboard,
+	Copy,
+	GripVertical,
+	PaintBucket,
+	Plus,
+	Replace,
+	RotateCcw,
+	Trash,
+} from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { colorSections, commandGroups } from "@/tiptap/constants";
+import {
+	canResetFormatting,
 	canShowColorTransform,
 	canShowNodeTransform,
 	copyNodeTextContent,
 	deleteNode,
 	duplicateNode,
-	hasAtLeastOneMark,
 	isUploadingImage,
 	nodeHasTextContent,
 	removeAllFormatting,
 	transformNodeToAlternative,
 } from "@/tiptap/helpers";
-import DragHandleColorList from "./drag-handle-color-list";
-import Icon from "./icon";
-import TransformIntoIcon from "./transform-into-icon";
+import ColorIcon from "./color-icon";
 
 const excludedCommands = ["imageUploader"];
 
@@ -42,22 +47,23 @@ const formattedTransformOptions = commandGroups
 
 const DRAG_HANDLE_POSITION_CONFIG = { placement: "left" as const };
 
+const iconProps = { className: "w-4 h-4", strokeWidth: 2.5 } as const;
+
 const TiptapDragHandle = memo(({ editor }: { editor: Editor }) => {
 	const [currentNodePos, setCurrentNodePos] = useState<number>(-1);
 	const [dropdownOpened, setDropdownOpened] = useState<boolean>(false);
-	const [isOpenColorMenu, setIsOpenColorMenu] = useState<boolean>(false);
-	const [isOpenTransformMenu, setIsOpenTransformMenu] =
-		useState<boolean>(false);
+	const [editorVersion, setEditorVersion] = useState(0);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: avoid re-render on every transaction
-	const dragHandleDisabledKeys = useMemo(() => {
-		const isUploading = isUploadingImage(editor.state);
+	useEffect(() => {
+		const onUpdate = () => setEditorVersion((v) => v + 1);
+		editor.on("selectionUpdate", onUpdate);
+		editor.on("transaction", onUpdate);
 
-		if (isUploading) {
-			return ["duplicate_node"];
-		}
-		return [];
-	}, [dropdownOpened]);
+		return () => {
+			editor.off("selectionUpdate", onUpdate);
+			editor.off("transaction", onUpdate);
+		};
+	}, [editor]);
 
 	const handleNodeChange = useCallback(
 		({ pos }: { editor: Editor; node: Node | null; pos: number }) => {
@@ -67,12 +73,9 @@ const TiptapDragHandle = memo(({ editor }: { editor: Editor }) => {
 	);
 
 	const selectCurrentNode = useCallback(() => {
-		setDropdownOpened(!dropdownOpened);
-
 		const { state, view } = editor;
 
 		const selection = window.getSelection();
-
 		if (selection && !selection.isCollapsed) {
 			selection.removeAllRanges();
 		}
@@ -82,18 +85,13 @@ const TiptapDragHandle = memo(({ editor }: { editor: Editor }) => {
 		);
 
 		view.dispatch(transaction);
-	}, [dropdownOpened, editor, currentNodePos]);
+	}, [editor, currentNodePos]);
 
 	const addSlashParagraphAfterCurrentBlock = useCallback(
 		(editor: Editor, currentNodePos: number) => {
-			if (currentNodePos === null) {
-				/* empty */
-			}
-
 			const resolvedPos = editor.state.doc.resolve(currentNodePos);
 			const blockNode = resolvedPos.nodeAfter || resolvedPos.parent;
 
-			// Calculate the end of the current block
 			const blockEnd = currentNodePos + blockNode.nodeSize;
 
 			editor
@@ -109,6 +107,32 @@ const TiptapDragHandle = memo(({ editor }: { editor: Editor }) => {
 		[],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: recompute based on editor state
+	const canShowColor = useMemo(
+		() => canShowColorTransform(editor),
+		[dropdownOpened, editorVersion],
+	);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: recompute based on editor state
+	const canShowTransform = useMemo(
+		() => canShowNodeTransform(editor),
+		[dropdownOpened, editorVersion],
+	);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: recompute based on editor state
+	const canShowResetFormatting = useMemo(
+		() => canResetFormatting(editor),
+		[dropdownOpened, editorVersion],
+	);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: recompute based on editor state
+	const canCopyToClipboard = useMemo(
+		() => nodeHasTextContent(editor),
+		[dropdownOpened, editorVersion],
+	);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: recompute based on editor state
+	const isUploading = useMemo(
+		() => isUploadingImage(editor.state),
+		[dropdownOpened, editorVersion],
+	);
+
 	return (
 		<DragHandle
 			editor={editor}
@@ -118,233 +142,141 @@ const TiptapDragHandle = memo(({ editor }: { editor: Editor }) => {
 			<div className="flex items-center pr-3">
 				<button
 					type="button"
-					className="w-6 h-8 rounded-2xl flex justify-center items-center px-0 py-2 bg-transparent hover:bg-default-100 cursor-grab text-foreground-500 hover:text-foreground transition-all"
+					className="w-6 h-8 rounded-2xl flex justify-center items-center px-0 py-2 bg-transparent hover:bg-accent cursor-grab text-muted-foreground hover:text-foreground transition-all"
 					onClick={() =>
 						addSlashParagraphAfterCurrentBlock(editor, currentNodePos)
 					}
 				>
-					<Icon name="Plus" />
+					<Plus {...iconProps} />
 				</button>
 
-				<Dropdown
-					placement="right"
-					isOpen={dropdownOpened}
-					onOpenChange={setDropdownOpened}
-				>
-					<DropdownTrigger>
+				<DropdownMenu open={dropdownOpened} onOpenChange={setDropdownOpened}>
+					<DropdownMenuTrigger asChild>
 						<button
 							type="button"
-							className="w-6 h-8 rounded-2xl flex justify-center items-center px-0 py-2 bg-transparent hover:bg-default-100 cursor-grab text-foreground-500 hover:text-foreground transition-all"
+							className="w-6 h-8 rounded-2xl flex justify-center items-center px-0 py-2 bg-transparent hover:bg-accent cursor-grab text-muted-foreground hover:text-foreground transition-all"
 							onClick={selectCurrentNode}
 						>
-							<Icon name="GripVertical" />
+							<GripVertical {...iconProps} />
 						</button>
-					</DropdownTrigger>
+					</DropdownMenuTrigger>
 
-					<DropdownMenu
-						variant="flat"
-						closeOnSelect={false}
-						disabledKeys={dragHandleDisabledKeys}
-						classNames={{
-							base: "w-[225px]",
-						}}
-					>
-						<DropdownSection
-							showDivider={Boolean(canShowColorTransform(editor))}
+					<DropdownMenuContent side="right" align="start" className="w-[225px]">
+						<DropdownMenuSub>
+							<DropdownMenuSubTrigger disabled={!canShowColor}>
+								<PaintBucket {...iconProps} />
+								Color
+							</DropdownMenuSubTrigger>
+							<DropdownMenuSubContent className="w-fit">
+								{colorSections.map((section, sectionIndex) => (
+									<div key={section.key}>
+										<DropdownMenuLabel className="px-2 py-1 text-xs font-medium text-muted-foreground">
+											{section.title}
+										</DropdownMenuLabel>
+										{section.colors.map((el) => (
+											<DropdownMenuItem
+												key={`${section.key}_${el.color}`}
+												onSelect={() => {
+													if (section.key === "text") {
+														editor.chain().focus().setColor(el.hsl).run();
+													} else if (section.key === "highlight") {
+														editor
+															.chain()
+															.focus()
+															.setHighlight({ color: el.hsl })
+															.run();
+													}
+													setDropdownOpened(false);
+												}}
+											>
+												<ColorIcon
+													buttonType={section.buttonType}
+													color={el.color}
+													bgColor={el.bgColor}
+												/>
+												{el.tooltipText}
+											</DropdownMenuItem>
+										))}
+										{sectionIndex !== colorSections.length - 1 ? (
+											<DropdownMenuSeparator />
+										) : null}
+									</div>
+								))}
+							</DropdownMenuSubContent>
+						</DropdownMenuSub>
+
+						<DropdownMenuSub>
+							<DropdownMenuSubTrigger disabled={!canShowTransform}>
+								<Replace className="w-4 h-4" strokeWidth={2.5} />
+								Transform into
+							</DropdownMenuSubTrigger>
+							<DropdownMenuSubContent className="w-fit">
+								{formattedTransformOptions.map((node) => {
+									const NodeIcon = node.icon;
+									return (
+										<DropdownMenuItem
+											key={node.key}
+											onSelect={() => {
+												transformNodeToAlternative(editor, node);
+												setDropdownOpened(false);
+											}}
+										>
+											<NodeIcon {...iconProps} />
+											{node.title}
+										</DropdownMenuItem>
+									);
+								})}
+							</DropdownMenuSubContent>
+						</DropdownMenuSub>
+
+						<DropdownMenuItem
+							disabled={!canShowResetFormatting}
+							onSelect={() => {
+								if (!canShowResetFormatting) return;
+								removeAllFormatting(editor);
+								setDropdownOpened(false);
+							}}
 						>
-							{canShowColorTransform(editor) ? (
-								<DropdownItem
-									key="color"
-									isReadOnly
-									textValue="color"
-									className="text-foreground-500 hover:text-foreground outline-none p-0 h-8 flex justify-center"
-								>
-									<Popover
-										placement="right"
-										isOpen={isOpenColorMenu}
-										shouldCloseOnBlur={false}
-										triggerScaleOnOpen={false}
-										onOpenChange={(open) => setIsOpenColorMenu(open)}
-									>
-										<PopoverTrigger>
-											<button
-												type="button"
-												className="w-full h-8 px-2 py-1.5 flex items-center justify-between text-left"
-												onClick={() => {
-													setIsOpenTransformMenu(false);
-													setIsOpenColorMenu(true);
-												}}
-											>
-												<span className="flex items-center gap-2">
-													<Icon name="PaintBucket" />
+							<RotateCcw {...iconProps} />
+							Reset formatting
+						</DropdownMenuItem>
 
-													<p>{"Color"}</p>
-												</span>
-
-												<Icon name="ChevronRight" />
-											</button>
-										</PopoverTrigger>
-
-										<PopoverContent>
-											<DragHandleColorList
-												editor={editor}
-												onCloseMenu={() => {
-													setIsOpenColorMenu(false);
-
-													setTimeout(() => {
-														setDropdownOpened(false);
-													}, 100);
-												}}
-											/>
-										</PopoverContent>
-									</Popover>
-								</DropdownItem>
-							) : null}
-
-							{canShowNodeTransform(editor) ? (
-								<DropdownItem
-									key="turn_into"
-									isReadOnly
-									textValue="turn_into"
-									className="text-foreground-500 hover:text-foreground outline-none p-0 h-8 flex justify-center"
-								>
-									<Popover
-										placement="right"
-										shouldCloseOnBlur={false}
-										triggerScaleOnOpen={false}
-										isOpen={isOpenTransformMenu}
-										onOpenChange={(open) => setIsOpenTransformMenu(open)}
-									>
-										<PopoverTrigger>
-											<button
-												type="button"
-												className="w-full h-8 px-2 py-1.5 flex items-center justify-between text-left"
-												onClick={() => {
-													setIsOpenColorMenu(false);
-													setIsOpenTransformMenu(!isOpenTransformMenu);
-												}}
-											>
-												<span className="flex items-center gap-2">
-													<TransformIntoIcon />
-
-													<p>{"Transform into"}</p>
-												</span>
-
-												<Icon name="ChevronRight" />
-											</button>
-										</PopoverTrigger>
-
-										<PopoverContent>
-											<Listbox
-												label="Turn into list"
-												variant="flat"
-												classNames={{ list: "p-0", base: "p-0" }}
-											>
-												{formattedTransformOptions.map((node) => (
-													<ListboxItem
-														key={node.key}
-														startContent={
-															<Icon
-																name={
-																	node.icon as unknown as keyof typeof icons
-																}
-															/>
-														}
-														className="text-foreground-500 hover:text-foreground outline-none"
-														onPress={() => {
-															transformNodeToAlternative(editor, node);
-
-															setIsOpenTransformMenu(false);
-
-															setTimeout(() => {
-																setDropdownOpened(false);
-															}, 100);
-														}}
-													>
-														{node.title}
-													</ListboxItem>
-												))}
-											</Listbox>
-										</PopoverContent>
-									</Popover>
-								</DropdownItem>
-							) : null}
-
-							{hasAtLeastOneMark(editor) ? (
-								<DropdownItem
-									key="reset_formatting"
-									textValue="reset_formatting"
-									className="text-foreground-500 hover:text-foreground outline-none p-0 h-8 flex justify-center"
-									onPress={() => removeAllFormatting(editor)}
-								>
-									<div className="w-full h-8 px-2 py-1.5 flex items-center justify-between">
-										<div className="flex items-center gap-2">
-											<Icon name="RotateCcw" />
-
-											<p>{"Reset formatting"}</p>
-										</div>
-									</div>
-								</DropdownItem>
-							) : null}
-						</DropdownSection>
-
-						<DropdownSection showDivider>
-							<DropdownItem
-								key="duplicate_node"
-								textValue="duplicate_node"
-								className="text-foreground-500 hover:text-foreground outline-none p-0 h-8 flex justify-center"
-								onPress={() => duplicateNode(editor)}
-							>
-								<div className="w-full h-8 px-2 py-1.5 flex items-center justify-between">
-									<div className="flex items-center gap-2">
-										<Icon name="Copy" />
-
-										<p>{"Duplicate block"}</p>
-									</div>
-
-									<Kbd keys={["command"]}>D</Kbd>
-								</div>
-							</DropdownItem>
-
-							{nodeHasTextContent(editor) ? (
-								<DropdownItem
-									key="copy_to_clipboard"
-									closeOnSelect={true}
-									textValue="copy_to_clipboard"
-									className="text-foreground-500 hover:text-foreground outline-none p-0 h-8 flex justify-center"
-									onPress={() => copyNodeTextContent(editor)}
-								>
-									<div className="w-full h-8 px-2 py-1.5 flex items-center justify-between">
-										<div className="flex items-center gap-2">
-											<Icon name="Clipboard" />
-
-											<p>{"Copy to clipboard"}</p>
-										</div>
-
-										<Kbd keys={["command"]}>C</Kbd>
-									</div>
-								</DropdownItem>
-							) : null}
-						</DropdownSection>
-
-						<DropdownItem
-							key="delete"
-							textValue="delete"
-							className="text-foreground-500 hover:text-foreground outline-none p-0 h-8 flex justify-center"
-							onPress={() => deleteNode(editor)}
+						<DropdownMenuItem
+							disabled={isUploading}
+							onSelect={() => {
+								duplicateNode(editor);
+								setDropdownOpened(false);
+							}}
 						>
-							<div className="w-full h-8 px-2 py-1.5 flex items-center justify-between">
-								<div className="flex items-center gap-2">
-									<Icon name="Trash" />
+							<Copy {...iconProps} />
+							Duplicate block
+						</DropdownMenuItem>
 
-									<p>{"Delete"}</p>
-								</div>
+						<DropdownMenuItem
+							disabled={!canCopyToClipboard}
+							onSelect={() => {
+								if (!canCopyToClipboard) return;
+								copyNodeTextContent(editor);
+								setDropdownOpened(false);
+							}}
+						>
+							<Clipboard {...iconProps} />
+							Copy to clipboard
+						</DropdownMenuItem>
+						<DropdownMenuSeparator />
 
-								<Kbd>{"Del"}</Kbd>
-							</div>
-						</DropdownItem>
-					</DropdownMenu>
-				</Dropdown>
+						<DropdownMenuItem
+							variant="destructive"
+							onSelect={() => {
+								deleteNode(editor);
+								setDropdownOpened(false);
+							}}
+						>
+							<Trash {...iconProps} />
+							Delete
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</div>
 		</DragHandle>
 	);

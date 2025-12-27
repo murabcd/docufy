@@ -1,5 +1,10 @@
-import { Button, Tooltip } from "@heroui/react";
 import React, { useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { ColorButtonProps } from "@/tiptap/types";
 import ColorIcon from "./color-icon";
 
@@ -30,27 +35,21 @@ const ColorButton = ({
 	}, [editor, buttonType, hsl, isActive]);
 
 	return (
-		<Tooltip
-			content={tooltipText}
-			delay={250}
-			closeDelay={0}
-			isDisabled={tooltipDisabled}
-		>
-			<Button
-				size="sm"
-				isIconOnly
-				color="default"
-				variant="light"
-				isDisabled={false}
-				aria-label={tooltipText}
-				data-active={isActive}
-				className="text-foreground-500 data-[active=true]:bg-divider/45 data-[active=true]:hover:bg-divider/45"
-				onPress={handlePress}
-			>
-				<div className="w-full h-full flex items-center justify-center">
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<Button
+					type="button"
+					size="icon-sm"
+					variant="ghost"
+					aria-label={tooltipText}
+					data-active={isActive}
+					className="text-muted-foreground data-[active=true]:bg-accent data-[active=true]:hover:bg-accent"
+					onClick={handlePress}
+				>
 					<ColorIcon color={color} bgColor={bgColor} buttonType={buttonType} />
-				</div>
-			</Button>
+				</Button>
+			</TooltipTrigger>
+			{tooltipDisabled ? null : <TooltipContent>{tooltipText}</TooltipContent>}
 		</Tooltip>
 	);
 };

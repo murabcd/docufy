@@ -64,7 +64,7 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
 					},
 					dropcursor: {
 						width: 1.5,
-						color: "hsl(var(--heroui-primary))",
+						color: "var(--primary)",
 					},
 				}),
 				ListKit,

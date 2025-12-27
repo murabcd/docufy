@@ -1,4 +1,18 @@
 import type { Editor, Range } from "@tiptap/react";
+import {
+	FileText,
+	Heading1,
+	Heading2,
+	Heading3,
+	Image,
+	List,
+	ListOrdered,
+	ListTodo,
+	Minus,
+	Quote,
+	SquareCode,
+	Type,
+} from "lucide-react";
 
 export const colorSections = [
 	{
@@ -8,8 +22,8 @@ export const colorSections = [
 		colors: [
 			{
 				hsl: "hsl()",
-				color: "--heroui-foreground",
-				bgColor: "--heroui-background",
+				color: "--text-color-default",
+				bgColor: "--bg-color-default",
 				tooltipText: "Default text",
 			},
 			{
@@ -75,8 +89,8 @@ export const colorSections = [
 		colors: [
 			{
 				hsl: "hsl()",
-				color: "--heroui-background",
-				bgColor: "--heroui-background",
+				color: "--swatch-border-default",
+				bgColor: "",
 				tooltipText: "Default background",
 			},
 			{
@@ -145,7 +159,7 @@ export const commandGroups = [
 			{
 				key: "paragraph",
 				title: "Paragraph",
-				icon: "Type",
+				icon: Type,
 				description: "",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor.chain().focus().deleteRange(range).setNode("paragraph").run();
@@ -154,7 +168,7 @@ export const commandGroups = [
 			{
 				key: "heading1",
 				title: "Heading 1",
-				icon: "Heading1",
+				icon: Heading1,
 				description: "",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor
@@ -168,7 +182,7 @@ export const commandGroups = [
 			{
 				key: "heading2",
 				title: "Heading 2",
-				icon: "Heading2",
+				icon: Heading2,
 				description: "",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor
@@ -182,7 +196,7 @@ export const commandGroups = [
 			{
 				key: "heading3",
 				title: "Heading 3",
-				icon: "Heading3",
+				icon: Heading3,
 				description: "",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor
@@ -202,7 +216,7 @@ export const commandGroups = [
 			{
 				key: "bulletList",
 				title: "Bulleted list",
-				icon: "List",
+				icon: List,
 				description: "",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor
@@ -216,7 +230,7 @@ export const commandGroups = [
 			{
 				key: "orderedList",
 				title: "Ordered list",
-				icon: "ListOrdered",
+				icon: ListOrdered,
 				description: "",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor
@@ -230,7 +244,7 @@ export const commandGroups = [
 			{
 				key: "taskList",
 				title: "Todo list",
-				icon: "ListTodo",
+				icon: ListTodo,
 				description: "",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor
@@ -244,7 +258,7 @@ export const commandGroups = [
 			{
 				key: "blockquote",
 				title: "Blockquote",
-				icon: "Quote",
+				icon: Quote,
 				description: "",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor.chain().focus().deleteRange(range).toggleBlockquote().run();
@@ -253,7 +267,7 @@ export const commandGroups = [
 			{
 				key: "codeBlock",
 				title: "Code block",
-				icon: "SquareCode",
+				icon: SquareCode,
 				description: "",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
@@ -268,7 +282,7 @@ export const commandGroups = [
 			{
 				key: "page",
 				title: "Subpage",
-				icon: "FileText",
+				icon: FileText,
 				description: "Create a subpage",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor.chain().focus().deleteRange(range).run();
@@ -284,7 +298,7 @@ export const commandGroups = [
 			{
 				key: "horizontalRule",
 				title: "Separator",
-				icon: "Minus",
+				icon: Minus,
 				description: "",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor.chain().focus().deleteRange(range).setHorizontalRule().run();
@@ -293,7 +307,7 @@ export const commandGroups = [
 			{
 				key: "imageUploader",
 				title: "Image",
-				icon: "Image",
+				icon: Image,
 				description: "",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor.chain().focus().deleteRange(range).insertImageUploader().run();

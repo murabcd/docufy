@@ -1,4 +1,3 @@
-import { addToast } from "@heroui/react";
 import {
 	type Editor,
 	findParentNodeClosestToPos,
@@ -10,7 +9,7 @@ import {
 	NodeSelection,
 	TextSelection,
 } from "@tiptap/pm/state";
-import CloseIcon from "@/components/tiptap/close-icon";
+import { toast } from "sonner";
 import { CodeBlock } from "./extensions/code-block";
 import HorizontalRule from "./extensions/horizontal-rule";
 import type { SlashCommandGroupCommandsProps } from "./types";
@@ -128,6 +127,38 @@ export const hasAtLeastOneMark = (editor: Editor) => {
 	});
 
 	return found;
+};
+
+export const canResetFormatting = (editor: Editor) => {
+	const { state } = editor;
+	const { selection } = state;
+
+	if (!(selection instanceof NodeSelection)) {
+		return false;
+	}
+
+	const node = selection.node;
+	if (!node) return false;
+
+	if (!node.isTextblock) {
+		return false;
+	}
+
+	if (node.type.name !== "paragraph") {
+		return true;
+	}
+
+	if (hasAtLeastOneMark(editor)) {
+		return true;
+	}
+
+	const textAlign = (node.attrs as { textAlign?: string | null } | null)
+		?.textAlign;
+	if (textAlign && textAlign !== "left") {
+		return true;
+	}
+
+	return false;
 };
 
 export const nodeHasTextContent = (editor: Editor) => {
@@ -520,16 +551,22 @@ export const showToast = (
 		| undefined,
 	description?: string,
 ) => {
-	addToast({
-		title: title || "Title",
-		color: color || "primary",
-		timeout: 5000,
-		description: description || "Description",
-		classNames: {
-			closeButton: "opacity-100 absolute right-4 top-1/2 -translate-y-1/2",
-		},
-		closeIcon: CloseIcon,
-	});
+	const message = title || "Title";
+	const options = { description: description || "Description" };
+
+	switch (color) {
+		case "success":
+			toast.success(message, options);
+			break;
+		case "warning":
+			toast.warning(message, options);
+			break;
+		case "danger":
+			toast.error(message, options);
+			break;
+		default:
+			toast(message, options);
+	}
 };
 
 export const getUploaderAtPos = (state: Editor["state"], pos: number) => {

@@ -1,5 +1,5 @@
 .bubble-menu {
-	@apply flex items-center h-10 gap-1 p-[3px] border border-divider rounded-[15px] bg-background shadow-md outline-0 overflow-hidden z-50;
+	@apply flex items-center h-10 gap-1 p-[3px] border border-border rounded-[15px] bg-background shadow-md outline-0 overflow-hidden z-50;
 }
 
 .ProseMirror {
@@ -147,11 +147,11 @@
 
 	/* CodeBlock and code styles */
 	code {
-		@apply bg-foreground-500/10 text-foreground rounded-md text-xs py-1 px-1.5 border border-divider;
+		@apply bg-muted text-foreground rounded-md text-xs py-1 px-1.5 border border-border;
 	}
 
 	pre {
-		@apply whitespace-pre-wrap my-6 rounded border border-content1 bg-foreground-500 dark:bg-divider p-3 text-background caret-background;
+		@apply whitespace-pre-wrap my-6 rounded border border-border bg-muted p-3 text-foreground caret-primary;
 
 		code {
 			@apply bg-transparent p-0 text-inherit rounded-none border-none;
@@ -215,13 +215,13 @@
 		@apply my-1 py-4 transition-all duration-100 ease-in-out cursor-pointer;
 
 		hr {
-			@apply border-0 border-t border-t-divider;
+			@apply border-0 border-t border-t-border;
 		}
 	}
 
 	/* Slash command decoration styles */
 	.tiptap-slash-highlight {
-		@apply rounded bg-divider/65 outline-[5.5px] outline-solid outline-divider/65;
+		@apply rounded bg-accent/60 outline-[5.5px] outline-solid outline-border/60;
 	}
 
 	/* Highlight styles */
@@ -246,9 +246,9 @@
 }
 
 .ProseMirror ::selection {
-	@apply bg-primary-50 dark:bg-cyan-700;
+	@apply bg-primary/20;
 }
 
 .ProseMirror-selectednode {
-	@apply bg-primary-50 dark:bg-cyan-700 rounded-lg !outline-none;
+	@apply bg-primary/20 rounded-lg !outline-none;
 }

@@ -1,6 +1,6 @@
-import { cn } from "@heroui/react";
 import type { EmojiItem } from "@tiptap/extension-emoji";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { cn } from "@/lib/utils";
 import type { KeyDownRef } from "@/tiptap/types";
 
 const EmojiList = forwardRef<
@@ -61,7 +61,7 @@ const EmojiList = forwardRef<
 	};
 
 	return (
-		<div className="w-full max-w-[250px] max-h-[500px] bg-background border border-divider shadow rounded-2xl flex flex-col gap-1 p-2.5 relative overflow-hidden">
+		<div className="w-full max-w-[250px] max-h-[500px] bg-popover border border-border shadow rounded-2xl flex flex-col gap-1 p-2.5 relative overflow-hidden">
 			<div className="w-full flex flex-col gap-1 overflow-y-auto">
 				{items.length > 0 ? (
 					items.map((item, index) => (
@@ -69,9 +69,9 @@ const EmojiList = forwardRef<
 							type="button"
 							key={item.name}
 							className={cn(
-								"w-full h-7 rounded-lg flex gap-1.5 items-center p-2 bg-transparent hover:bg-default-100 cursor-pointer text-foreground-500 transition-all",
+								"w-full h-7 rounded-lg flex gap-1.5 items-center p-2 bg-transparent hover:bg-accent cursor-pointer text-muted-foreground transition-all",
 								selectedIndex === index
-									? "bg-default-100 text-primary"
+									? "bg-accent text-primary"
 									: "hover:text-foreground",
 							)}
 							data-emoji-name={item.name}
@@ -96,7 +96,7 @@ const EmojiList = forwardRef<
 						</button>
 					))
 				) : (
-					<p className="text-foreground-500 text-sm">{"No results"}</p>
+					<p className="text-muted-foreground text-sm">{"No results"}</p>
 				)}
 			</div>
 		</div>

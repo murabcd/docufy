@@ -1,6 +1,5 @@
-import { Divider } from "@heroui/react";
 import { BubbleMenu } from "@tiptap/react/menus";
-import type { icons } from "lucide-react";
+import { Bold, CodeXml, Italic, Strikethrough, Underline } from "lucide-react";
 import React, {
 	useCallback,
 	useEffect,
@@ -8,6 +7,7 @@ import React, {
 	useRef,
 	useState,
 } from "react";
+import { Separator } from "@/components/ui/separator";
 import {
 	hasTextNodeInSelection,
 	isForbiddenNodeSelected,
@@ -31,31 +31,31 @@ const TextSelectionMenu = ({
 	const formattingButtons = useMemo(
 		() => [
 			{
-				icon: "Bold",
+				icon: Bold,
 				buttonKey: "bold",
 				tooltipText: "Bold",
 				command: () => editor.chain().focus().toggleMark("bold").run(),
 			},
 			{
-				icon: "Italic",
+				icon: Italic,
 				buttonKey: "italic",
 				tooltipText: "Italic",
 				command: () => editor.chain().focus().toggleMark("italic").run(),
 			},
 			{
-				icon: "Underline",
+				icon: Underline,
 				buttonKey: "underline",
 				tooltipText: "Underline",
 				command: () => editor.chain().focus().toggleMark("underline").run(),
 			},
 			{
-				icon: "Strikethrough",
+				icon: Strikethrough,
 				buttonKey: "strike",
 				tooltipText: "Strikethrough",
 				command: () => editor.chain().focus().toggleMark("strike").run(),
 			},
 			{
-				icon: "CodeXml",
+				icon: CodeXml,
 				buttonKey: "code",
 				tooltipText: "Code",
 				command: () => editor.chain().focus().toggleMark("code").run(),
@@ -103,7 +103,7 @@ const TextSelectionMenu = ({
 				{prepend && (
 					<div className="flex items-center gap-1">
 						{prepend}
-						<Divider orientation="vertical" className="h-6" />
+						<Separator orientation="vertical" className="h-6" />
 					</div>
 				)}
 
@@ -115,24 +115,22 @@ const TextSelectionMenu = ({
 							editor={editor}
 							buttonKey={btn.buttonKey}
 							tooltipText={btn.tooltipText}
-							icon={btn.icon as keyof typeof icons}
+							icon={btn.icon}
 							onPressed={btn.command}
 						/>
 					</div>
 				))}
 
-				<Divider orientation="vertical" className="h-6" />
-
 				<LinkButtonMenu editor={editor} />
 
 				<ColorButtonMenu editor={editor} />
 
-				<Divider orientation="vertical" className="h-6" />
+				<Separator orientation="vertical" className="h-6" />
 
 				{append && (
 					<div className="flex items-center gap-1">
 						{append}
-						<Divider orientation="vertical" className="h-6" />
+						<Separator orientation="vertical" className="h-6" />
 					</div>
 				)}
 

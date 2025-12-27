@@ -1,13 +1,13 @@
-import {
-	Button,
-	Divider,
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-	Tooltip,
-} from "@heroui/react";
 import type { Editor } from "@tiptap/react";
-import type { icons } from "lucide-react";
+import {
+	EllipsisVertical,
+	Subscript,
+	Superscript,
+	TextAlignCenter,
+	TextAlignEnd,
+	TextAlignJustify,
+	TextAlignStart,
+} from "lucide-react";
 import React, {
 	useCallback,
 	useEffect,
@@ -15,8 +15,19 @@ import React, {
 	useMemo,
 	useState,
 } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import EditorButton from "./editor-button";
-import Icon from "./icon";
 
 interface MoreOptionsButtonMenuProps {
 	editor: Editor;
@@ -54,13 +65,13 @@ const MoreOptionsButtonMenu = ({ editor }: MoreOptionsButtonMenuProps) => {
 		() => [
 			{
 				key: "superscript",
-				icon: "Superscript" as keyof typeof icons,
+				icon: Superscript,
 				tooltipText: "Superscript",
 				command: () => editor.chain().focus().toggleSuperscript().run(),
 			},
 			{
 				key: "subscript",
-				icon: "Subscript" as keyof typeof icons,
+				icon: Subscript,
 				tooltipText: "Subscript",
 				command: () => editor.chain().focus().toggleSubscript().run(),
 			},
@@ -72,25 +83,25 @@ const MoreOptionsButtonMenu = ({ editor }: MoreOptionsButtonMenuProps) => {
 		() => [
 			{
 				key: "left",
-				icon: "TextAlignStart" as keyof typeof icons,
+				icon: TextAlignStart,
 				tooltipText: "Align left",
 				command: () => editor.chain().focus().setTextAlign("left").run(),
 			},
 			{
 				key: "center",
-				icon: "TextAlignCenter" as keyof typeof icons,
+				icon: TextAlignCenter,
 				tooltipText: "Align center",
 				command: () => editor.chain().focus().setTextAlign("center").run(),
 			},
 			{
 				key: "right",
-				icon: "TextAlignEnd" as keyof typeof icons,
+				icon: TextAlignEnd,
 				tooltipText: "Align right",
 				command: () => editor.chain().focus().setTextAlign("right").run(),
 			},
 			{
 				key: "justify",
-				icon: "TextAlignJustify" as keyof typeof icons,
+				icon: TextAlignJustify,
 				tooltipText: "Align justify",
 				command: () => editor.chain().focus().setTextAlign("justify").run(),
 			},
@@ -99,29 +110,28 @@ const MoreOptionsButtonMenu = ({ editor }: MoreOptionsButtonMenuProps) => {
 	);
 
 	return (
-		<Popover placement="bottom">
-			<PopoverTrigger>
+		<Popover>
+			<PopoverTrigger asChild>
 				<Button
-					size="sm"
+					type="button"
+					size="icon-sm"
+					variant="ghost"
 					data-active={isActive}
-					color="default"
-					variant="light"
-					isIconOnly
-					isDisabled={false}
 					aria-label="More options"
-					className="text-foreground-500 hover:text-foreground
-            data-[active=true]:bg-divider/45 data-[active=true]:text-primary
-            data-[active=true]:hover:bg-divider/45 data-[active=true]:hover:text-foreground"
+					className="text-muted-foreground hover:text-foreground data-[active=true]:bg-accent data-[active=true]:text-primary data-[active=true]:hover:bg-accent"
 				>
-					<Tooltip content="More options" delay={250} closeDelay={0}>
-						<div className="w-full h-full flex items-center justify-center">
-							<Icon name="EllipsisVertical" />
-						</div>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<div className="w-full h-full flex items-center justify-center">
+								<EllipsisVertical className="w-4 h-4" strokeWidth={2.5} />
+							</div>
+						</TooltipTrigger>
+						<TooltipContent>More options</TooltipContent>
 					</Tooltip>
 				</Button>
 			</PopoverTrigger>
 
-			<PopoverContent className="p-1.5">
+			<PopoverContent className="w-fit p-1.5">
 				<div className="flex h-8 items-center gap-1.5">
 					{scriptButtons.map((btn) => (
 						<EditorButton
@@ -136,7 +146,7 @@ const MoreOptionsButtonMenu = ({ editor }: MoreOptionsButtonMenuProps) => {
 						/>
 					))}
 
-					<Divider orientation="vertical" className="h-6" />
+					<Separator orientation="vertical" className="h-6" />
 
 					{alignButtons.map((btn) => (
 						<EditorButton

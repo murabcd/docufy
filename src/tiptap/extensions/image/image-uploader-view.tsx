@@ -1,9 +1,10 @@
-import { Button, cn } from "@heroui/react";
 import type { NodeViewProps } from "@tiptap/core";
 import { NodeViewWrapper } from "@tiptap/react";
+import { CloudUpload, File, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import Icon from "@/components/tiptap/icon";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { showToast } from "@/tiptap/helpers";
 
 const ImageUploaderView = (props: NodeViewProps) => {
@@ -148,10 +149,8 @@ const ImageUploaderView = (props: NodeViewProps) => {
 		>
 			<div
 				className={cn(
-					isDragging ? "bg-primary-50" : " bg-background",
-					selectMedia
-						? "border-1.5 border-dashed border-divider px-6 py-8"
-						: "",
+					isDragging ? "bg-primary/10" : "bg-background",
+					selectMedia ? "border-2 border-dashed border-border px-6 py-8" : "",
 					"w-full h-full flex flex-col rounded-lg text-center cursor-pointer relative overflow-hidden transition-all",
 				)}
 				draggable={false}
@@ -173,16 +172,16 @@ const ImageUploaderView = (props: NodeViewProps) => {
 						className="flex flex-col gap-2 items-center justify-center bg-transparent text-current"
 					>
 						<div>
-							<Icon name="File" className="w-14 h-14" />
+							<File className="w-14 h-14" strokeWidth={2.5} />
 						</div>
 
 						<div className="flex flex-col items-center justify-center gap-1">
-							<span className="text-foreground-700 font-normal text-sm">
+							<span className="text-foreground font-normal text-sm">
 								<span className="underline">{"Click to upload "}</span>
 								{"or drag and drop"}
 							</span>
 
-							<span className="text-foreground-400 font-medium text-xs">
+							<span className="text-muted-foreground font-medium text-xs">
 								{"Maximum file size 5MB."}
 							</span>
 						</div>
@@ -190,17 +189,20 @@ const ImageUploaderView = (props: NodeViewProps) => {
 				)}
 
 				{uploading && (
-					<div className="w-full flex justify-between items-center gap-5 border border-divider p-4 overflow-hidden rounded-lg relative">
+					<div className="w-full flex justify-between items-center gap-5 border border-border p-4 overflow-hidden rounded-lg relative">
 						<div
-							className="h-full bg-primary-50 dark:bg-primary-200 absolute top-0 left-0 z-0 transition-all"
+							className="h-full bg-primary/10 dark:bg-primary/20 absolute top-0 left-0 z-0 transition-all"
 							style={{
 								width: `${progress}%`,
 							}}
 						></div>
 
 						<div className="w-full flex items-center gap-3 z-1">
-							<div className="w-[46px] h-10 flex items-center justify-center bg-primary dark:bg-foreground rounded-lg">
-								<Icon name="CloudUpload" className="text-background w-6 h-6" />
+							<div className="w-[46px] h-10 flex items-center justify-center bg-primary rounded-lg">
+								<CloudUpload
+									className="text-background w-6 h-6"
+									strokeWidth={2.5}
+								/>
 							</div>
 
 							<div className="w-full flex flex-col items-start gap-1">
@@ -210,7 +212,7 @@ const ImageUploaderView = (props: NodeViewProps) => {
 										: selectedFile.current?.name.toLowerCase()}
 								</span>
 
-								<span className="text-sm text-foreground-500">
+								<span className="text-sm text-muted-foreground">
 									{size
 										? (size / (1024 * 1024)).toFixed(2)
 										: selectedFile.current?.size
@@ -225,14 +227,12 @@ const ImageUploaderView = (props: NodeViewProps) => {
 							<span className="text-sm text-primary">{progress}%</span>
 
 							<Button
-								size="sm"
-								radius="md"
-								color="default"
-								variant="light"
-								isIconOnly
-								onPress={cancelUpload}
+								type="button"
+								size="icon-sm"
+								variant="ghost"
+								onClick={cancelUpload}
 							>
-								<Icon name="X" />
+								<X className="w-4 h-4" strokeWidth={2.5} />
 							</Button>
 						</div>
 					</div>

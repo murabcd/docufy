@@ -1,16 +1,20 @@
+import type { Editor } from "@tiptap/react";
+import { CornerDownLeft, ExternalLink, Link, Trash } from "lucide-react";
+import React, { useCallback, useEffect, useEffectEvent, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
-	Button,
-	Divider,
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
+} from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
+import {
 	Tooltip,
-} from "@heroui/react";
-import type { Editor } from "@tiptap/react";
-import React, { useCallback, useEffect, useEffectEvent, useState } from "react";
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { addOrUpdateLink, unsetLink } from "@/tiptap/helpers";
 import EditorButton from "./editor-button";
-import Icon from "./icon";
 
 interface LinkButtonMenuProps {
 	editor: Editor;
@@ -73,32 +77,29 @@ const LinkButtonMenu = ({ editor }: LinkButtonMenuProps) => {
 	);
 
 	return (
-		<Popover
-			placement="bottom"
-			isOpen={menuOpened}
-			onOpenChange={setMenuOpened}
-		>
-			<PopoverTrigger>
+		<Popover open={menuOpened} onOpenChange={setMenuOpened}>
+			<PopoverTrigger asChild>
 				<Button
-					size="sm"
 					data-active={isActive}
-					color="default"
-					variant="light"
-					isIconOnly
-					isDisabled={false}
+					type="button"
+					size="icon-sm"
+					variant="ghost"
 					aria-label="Link menu"
-					className="text-foreground-500 hover:text-foreground data-[active=true]:bg-divider/45 data-[active=true]:text-primary data-[active=true]:hover:bg-divider/45 data-[active=true]:hover:text-foreground"
-					onPress={() => setMenuOpened((open) => !open)}
+					className="text-muted-foreground hover:text-foreground data-[active=true]:bg-accent data-[active=true]:text-primary data-[active=true]:hover:bg-accent"
+					onClick={() => setMenuOpened((open) => !open)}
 				>
-					<Tooltip content="Link" delay={250} closeDelay={0}>
-						<div className="w-full h-full flex items-center justify-center">
-							<Icon name="Link" />
-						</div>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<div className="w-full h-full flex items-center justify-center">
+								<Link className="w-4 h-4" strokeWidth={2.5} />
+							</div>
+						</TooltipTrigger>
+						<TooltipContent>Link</TooltipContent>
 					</Tooltip>
 				</Button>
 			</PopoverTrigger>
 
-			<PopoverContent className="p-1.5">
+			<PopoverContent className="w-fit p-1.5">
 				<div className="flex items-center gap-1">
 					<div className="relative flex flex-wrap items-stretch">
 						<input
@@ -120,12 +121,12 @@ const LinkButtonMenu = ({ editor }: LinkButtonMenuProps) => {
 						editor={editor}
 						buttonKey="validate"
 						tooltipText="Set link"
-						icon="CornerDownLeft"
+						icon={CornerDownLeft}
 						withActive={false}
 						onPressed={addLink}
 					/>
 
-					<Divider orientation="vertical" className="h-6" />
+					<Separator orientation="vertical" className="h-6" />
 
 					<div className="flex items-center gap-1.5">
 						<EditorButton
@@ -134,7 +135,7 @@ const LinkButtonMenu = ({ editor }: LinkButtonMenuProps) => {
 							editor={editor}
 							buttonKey="open_in_new_tab"
 							tooltipText="Open link"
-							icon="ExternalLink"
+							icon={ExternalLink}
 							withActive={false}
 							onPressed={openInNewTab}
 						/>
@@ -142,12 +143,11 @@ const LinkButtonMenu = ({ editor }: LinkButtonMenuProps) => {
 						<EditorButton
 							isIconOnly
 							isDisabled={!linkValue}
-							color="danger"
 							buttonKey="remove_link"
-							iconClass="text-danger"
+							className="text-destructive hover:text-destructive"
 							editor={editor}
 							tooltipText="Remove link"
-							icon="Trash"
+							icon={Trash}
 							withActive={false}
 							onPressed={removeLink}
 						/>

@@ -1,23 +1,30 @@
-import { Button, Tooltip } from "@heroui/react";
+import { AtSign } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import type { EditorButtonProps } from "@/tiptap/types";
-import Icon from "./icon";
 
 const EditorButton = ({
 	editor,
 	buttonKey,
 	tooltipText,
 	isIconOnly = false,
-	color = "default",
-	variant = "light",
+	variant = "ghost",
 	isDisabled = false,
-	icon = "AtSign",
+	icon = AtSign,
+	className,
 	iconClass,
 	text = "Button",
 	withActive = false,
 	onPressed,
 }: EditorButtonProps) => {
 	const [isActive, setIsActive] = useState(() => editor.isActive(buttonKey));
+	const IconComponent = icon;
 
 	useEffect(() => {
 		const update = () => setIsActive(editor.isActive(buttonKey));
@@ -34,24 +41,31 @@ const EditorButton = ({
 	}, [onPressed]);
 
 	return (
-		<Tooltip
-			delay={250}
-			closeDelay={0}
-			content={tooltipText}
-			isDisabled={tooltipText == null}
-		>
-			<Button
-				size="sm"
-				data-active={withActive ? isActive : false}
-				color={color}
-				variant={variant}
-				isIconOnly={isIconOnly}
-				isDisabled={isDisabled}
-				className="text-foreground-500 hover:text-foreground data-[active=true]:bg-divider/45 data-[active=true]:text-primary data-[active=true]:hover:bg-divider/45 data-[active=true]:hover:text-foreground"
-				onPress={handlePress}
-			>
-				{isIconOnly ? <Icon name={icon} className={iconClass} /> : text}
-			</Button>
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<Button
+					type="button"
+					size={isIconOnly ? "icon-sm" : "sm"}
+					variant={variant}
+					disabled={isDisabled}
+					data-active={withActive ? isActive : false}
+					className={cn(
+						"text-muted-foreground hover:text-foreground data-[active=true]:bg-accent data-[active=true]:text-primary data-[active=true]:hover:bg-accent",
+						className,
+					)}
+					onClick={handlePress}
+				>
+					{isIconOnly && IconComponent ? (
+						<IconComponent
+							className={cn("w-4 h-4", iconClass)}
+							strokeWidth={2.5}
+						/>
+					) : (
+						text
+					)}
+				</Button>
+			</TooltipTrigger>
+			{tooltipText ? <TooltipContent>{tooltipText}</TooltipContent> : null}
 		</Tooltip>
 	);
 };

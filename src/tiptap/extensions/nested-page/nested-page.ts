@@ -170,7 +170,7 @@ export const NestedPage = Node.create({
 			dom.dataset.type = "nested-page";
 			dom.contentEditable = "false";
 			dom.className =
-				"inline-flex items-center gap-1.5 rounded-md border border-divider bg-background px-2 py-0.5 align-baseline text-sm hover:bg-default-100";
+				"inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-0.5 align-baseline text-sm hover:bg-accent";
 
 			const iconWrap = document.createElement("span");
 			iconWrap.className = "text-muted-foreground";

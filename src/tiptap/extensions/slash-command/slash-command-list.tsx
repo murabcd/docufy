@@ -1,7 +1,6 @@
-import { cn, Divider } from "@heroui/react";
-import type { icons } from "lucide-react";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
-import Icon from "@/components/tiptap/icon";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import type {
 	KeyDownRef,
 	SlashCommandGroupCommandsProps,
@@ -74,7 +73,7 @@ const SlashCommandList = forwardRef<
 		<div
 			role="menu"
 			aria-label="Command menu"
-			className="w-[200px] bg-background border border-divider shadow rounded-2xl flex flex-col gap-2 p-2.5 relative z-5"
+			className="w-[200px] bg-popover border border-border shadow rounded-2xl flex flex-col gap-2 p-2.5 relative z-5"
 		>
 			{items.length > 0 ? (
 				items.map((group, groupIndex) => (
@@ -89,21 +88,22 @@ const SlashCommandList = forwardRef<
 									items
 										.slice(0, groupIndex)
 										.reduce((acc, g) => acc + g.commands.length, 0) + index;
+								const ItemIcon = item.icon;
 
 								return (
 									<button
 										type="button"
 										key={item.key}
 										className={cn(
-											"w-full h-8 rounded-lg flex gap-1.5 items-center p-2 bg-transparent hover:bg-default-100 cursor-pointer text-foreground-500 transition-all",
+											"w-full h-8 rounded-lg flex gap-1.5 items-center p-2 bg-transparent hover:bg-accent cursor-pointer text-muted-foreground transition-all",
 											selectedIndex === globalIndex
-												? "bg-default-100 text-primary"
+												? "bg-accent text-primary"
 												: "hover:text-foreground",
 										)}
 										onClick={() => selectItem(globalIndex)}
 									>
 										<div>
-											<Icon name={item.icon as keyof typeof icons} />
+											<ItemIcon className="w-4 h-4" strokeWidth={2.5} />
 										</div>
 
 										<span className="text-sm">{item.title}</span>
@@ -112,11 +112,11 @@ const SlashCommandList = forwardRef<
 							})}
 						</div>
 
-						{groupIndex !== items.length - 1 && <Divider />}
+						{groupIndex !== items.length - 1 && <Separator />}
 					</div>
 				))
 			) : (
-				<p className="text-foreground-500 text-sm">{"No results"}</p>
+				<p className="text-muted-foreground text-sm">{"No results"}</p>
 			)}
 		</div>
 	);
