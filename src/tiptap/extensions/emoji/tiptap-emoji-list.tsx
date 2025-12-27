@@ -1,5 +1,6 @@
 import type { EmojiItem } from "@tiptap/extension-emoji";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { KeyDownRef } from "@/tiptap/types";
 
@@ -61,8 +62,8 @@ const EmojiList = forwardRef<
 	};
 
 	return (
-		<div className="w-full max-w-[250px] max-h-[500px] bg-popover border border-border shadow rounded-2xl flex flex-col gap-1 p-2.5 relative overflow-hidden">
-			<div className="w-full flex flex-col gap-1 overflow-y-auto">
+		<ScrollArea className="w-[220px] h-[340px] bg-popover border border-border shadow rounded-2xl relative z-50">
+			<div className="w-full flex flex-col gap-1 p-2.5">
 				{items.length > 0 ? (
 					items.map((item, index) => (
 						<button
@@ -99,7 +100,7 @@ const EmojiList = forwardRef<
 					<p className="text-muted-foreground text-sm">{"No results"}</p>
 				)}
 			</div>
-		</div>
+		</ScrollArea>
 	);
 });
 

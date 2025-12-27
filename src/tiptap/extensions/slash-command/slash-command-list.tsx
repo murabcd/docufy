@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type {
@@ -70,55 +71,57 @@ const SlashCommandList = forwardRef<
 	};
 
 	return (
-		<div
+		<ScrollArea
 			role="menu"
 			aria-label="Command menu"
-			className="w-[200px] bg-popover border border-border shadow rounded-2xl flex flex-col gap-2 p-2.5 relative z-5"
+			className="w-[220px] h-[340px] bg-popover border border-border shadow rounded-2xl relative z-50"
 		>
-			{items.length > 0 ? (
-				items.map((group, groupIndex) => (
-					<div key={group.key} className="flex flex-col gap-2">
-						<div className="w-full items-start flex flex-col gap-1">
-							<p className="px-1 text-sm font-medium text-foreground">
-								{group.title}
-							</p>
+			<div className="flex flex-col gap-2 p-2.5">
+				{items.length > 0 ? (
+					items.map((group, groupIndex) => (
+						<div key={group.key} className="flex flex-col gap-2">
+							<div className="w-full items-start flex flex-col gap-1">
+								<p className="px-1 py-0.5 text-xs font-medium text-muted-foreground">
+									{group.title}
+								</p>
 
-							{group.commands.map((item, index) => {
-								const globalIndex =
-									items
-										.slice(0, groupIndex)
-										.reduce((acc, g) => acc + g.commands.length, 0) + index;
-								const ItemIcon = item.icon;
+								{group.commands.map((item, index) => {
+									const globalIndex =
+										items
+											.slice(0, groupIndex)
+											.reduce((acc, g) => acc + g.commands.length, 0) + index;
+									const ItemIcon = item.icon;
 
-								return (
-									<button
-										type="button"
-										key={item.key}
-										className={cn(
-											"w-full h-8 rounded-lg flex gap-1.5 items-center p-2 bg-transparent hover:bg-accent cursor-pointer text-muted-foreground transition-all",
-											selectedIndex === globalIndex
-												? "bg-accent text-primary"
-												: "hover:text-foreground",
-										)}
-										onClick={() => selectItem(globalIndex)}
-									>
-										<div>
-											<ItemIcon className="w-4 h-4" strokeWidth={2.5} />
-										</div>
+									return (
+										<button
+											type="button"
+											key={item.key}
+											className={cn(
+												"w-full h-8 rounded-lg flex gap-1.5 items-center p-2 bg-transparent hover:bg-accent cursor-pointer text-muted-foreground transition-all",
+												selectedIndex === globalIndex
+													? "bg-accent text-primary"
+													: "hover:text-foreground",
+											)}
+											onClick={() => selectItem(globalIndex)}
+										>
+											<div>
+												<ItemIcon className="w-4 h-4" strokeWidth={2.5} />
+											</div>
 
-										<span className="text-sm">{item.title}</span>
-									</button>
-								);
-							})}
+											<span className="text-sm">{item.title}</span>
+										</button>
+									);
+								})}
+							</div>
+
+							{groupIndex !== items.length - 1 && <Separator />}
 						</div>
-
-						{groupIndex !== items.length - 1 && <Separator />}
-					</div>
-				))
-			) : (
-				<p className="text-muted-foreground text-sm">{"No results"}</p>
-			)}
-		</div>
+					))
+				) : (
+					<p className="text-muted-foreground text-sm">{"No results"}</p>
+				)}
+			</div>
+		</ScrollArea>
 	);
 });
 

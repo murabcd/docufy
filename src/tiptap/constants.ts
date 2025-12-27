@@ -281,9 +281,9 @@ export const commandGroups = [
 		commands: [
 			{
 				key: "page",
-				title: "Subpage",
+				title: "Page",
 				icon: FileText,
-				description: "Create a subpage",
+				description: "Create a page",
 				command: ({ editor, range }: { editor: Editor; range: Range }) => {
 					editor.chain().focus().deleteRange(range).run();
 					// Dispatch custom event for creating nested page

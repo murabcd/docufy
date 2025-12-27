@@ -28,7 +28,6 @@ const updatePosition = (editor: Editor, element: HTMLElement) => {
 		strategy: "absolute",
 		middleware: [shift(), flip()],
 	}).then(({ x, y, strategy }) => {
-		element.style.width = "max-content";
 		element.style.position = strategy;
 		element.style.left = `${x}px`;
 		element.style.top = `${y}px`;

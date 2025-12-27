@@ -24,6 +24,7 @@ import {
 	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { colorSections, commandGroups } from "@/tiptap/constants";
 import {
 	canResetFormatting,
@@ -161,47 +162,51 @@ const TiptapDragHandle = memo(({ editor }: { editor: Editor }) => {
 						</button>
 					</DropdownMenuTrigger>
 
-					<DropdownMenuContent side="right" align="start" className="w-[225px]">
+					<DropdownMenuContent side="right" align="start" className="w-[220px]">
 						<DropdownMenuSub>
 							<DropdownMenuSubTrigger disabled={!canShowColor}>
 								<PaintBucket {...iconProps} />
 								Color
 							</DropdownMenuSubTrigger>
-							<DropdownMenuSubContent className="w-fit">
-								{colorSections.map((section, sectionIndex) => (
-									<div key={section.key}>
-										<DropdownMenuLabel className="px-2 py-1 text-xs font-medium text-muted-foreground">
-											{section.title}
-										</DropdownMenuLabel>
-										{section.colors.map((el) => (
-											<DropdownMenuItem
-												key={`${section.key}_${el.color}`}
-												onSelect={() => {
-													if (section.key === "text") {
-														editor.chain().focus().setColor(el.hsl).run();
-													} else if (section.key === "highlight") {
-														editor
-															.chain()
-															.focus()
-															.setHighlight({ color: el.hsl })
-															.run();
-													}
-													setDropdownOpened(false);
-												}}
-											>
-												<ColorIcon
-													buttonType={section.buttonType}
-													color={el.color}
-													bgColor={el.bgColor}
-												/>
-												{el.tooltipText}
-											</DropdownMenuItem>
+							<DropdownMenuSubContent className="w-[220px] p-0 overflow-hidden">
+								<ScrollArea className="w-[220px] h-[340px]">
+									<div className="p-1">
+										{colorSections.map((section, sectionIndex) => (
+											<div key={section.key}>
+												<DropdownMenuLabel className="px-2 py-1 text-xs font-medium text-muted-foreground">
+													{section.title}
+												</DropdownMenuLabel>
+												{section.colors.map((el) => (
+													<DropdownMenuItem
+														key={`${section.key}_${el.color}`}
+														onSelect={() => {
+															if (section.key === "text") {
+																editor.chain().focus().setColor(el.hsl).run();
+															} else if (section.key === "highlight") {
+																editor
+																	.chain()
+																	.focus()
+																	.setHighlight({ color: el.hsl })
+																	.run();
+															}
+															setDropdownOpened(false);
+														}}
+													>
+														<ColorIcon
+															buttonType={section.buttonType}
+															color={el.color}
+															bgColor={el.bgColor}
+														/>
+														{el.tooltipText}
+													</DropdownMenuItem>
+												))}
+												{sectionIndex !== colorSections.length - 1 ? (
+													<DropdownMenuSeparator />
+												) : null}
+											</div>
 										))}
-										{sectionIndex !== colorSections.length - 1 ? (
-											<DropdownMenuSeparator />
-										) : null}
 									</div>
-								))}
+								</ScrollArea>
 							</DropdownMenuSubContent>
 						</DropdownMenuSub>
 
@@ -210,22 +215,26 @@ const TiptapDragHandle = memo(({ editor }: { editor: Editor }) => {
 								<Replace className="w-4 h-4" strokeWidth={2.5} />
 								Transform into
 							</DropdownMenuSubTrigger>
-							<DropdownMenuSubContent className="w-fit">
-								{formattedTransformOptions.map((node) => {
-									const NodeIcon = node.icon;
-									return (
-										<DropdownMenuItem
-											key={node.key}
-											onSelect={() => {
-												transformNodeToAlternative(editor, node);
-												setDropdownOpened(false);
-											}}
-										>
-											<NodeIcon {...iconProps} />
-											{node.title}
-										</DropdownMenuItem>
-									);
-								})}
+							<DropdownMenuSubContent className="w-[220px] p-0 overflow-hidden">
+								<ScrollArea className="w-[220px] h-[340px]">
+									<div className="p-1">
+										{formattedTransformOptions.map((node) => {
+											const NodeIcon = node.icon;
+											return (
+												<DropdownMenuItem
+													key={node.key}
+													onSelect={() => {
+														transformNodeToAlternative(editor, node);
+														setDropdownOpened(false);
+													}}
+												>
+													<NodeIcon {...iconProps} />
+													{node.title}
+												</DropdownMenuItem>
+											);
+										})}
+									</div>
+								</ScrollArea>
 							</DropdownMenuSubContent>
 						</DropdownMenuSub>
 

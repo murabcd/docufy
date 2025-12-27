@@ -16,7 +16,7 @@ const getTitleForNode = (
 	documentId: unknown,
 ) => {
 	if (typeof documentId !== "string" || !documentId) {
-		return "New subpage…";
+		return "New page…";
 	}
 	return state.titlesById[documentId] ?? "New page";
 };
