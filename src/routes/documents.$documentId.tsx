@@ -9,7 +9,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { AnyExtension, JSONContent } from "@tiptap/core";
 import type { Editor } from "@tiptap/react";
 import { useMutation } from "convex/react";
-import { ImageIcon, Smile, X } from "lucide-react";
+import { ImageIcon, Smile } from "lucide-react";
 import {
 	useCallback,
 	useEffect,
@@ -22,7 +22,6 @@ import { toast } from "sonner";
 import { AISidebar } from "@/components/ai-sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CoverImage } from "@/components/cover-image";
-import { CoverImageModal } from "@/components/cover-image-modal";
 import { DocumentSkeleton } from "@/components/document-skeleton";
 import { DocumentTitle } from "@/components/document-title";
 import { Header } from "@/components/header";
@@ -33,7 +32,8 @@ import TiptapEditor, {
 import { TrashBanner } from "@/components/trash-banner";
 import { Button } from "@/components/ui/button";
 import { SidebarInset } from "@/components/ui/sidebar";
-import { useCoverImage } from "@/hooks/use-cover-image";
+import { getRandomCuratedCoverImageUrl } from "@/lib/cover-gallery";
+import { cn } from "@/lib/utils";
 import { nestedPagePluginKey } from "@/tiptap/extensions/nested-page/nested-page";
 import { EMPTY_DOCUMENT } from "@/tiptap/types";
 import { api } from "../../convex/_generated/api";
@@ -154,7 +154,24 @@ function DocumentEditor() {
 	);
 
 	const removeIcon = useMutation(api.documents.update);
-	const coverImage = useCoverImage();
+
+	const onAddCover = useCallback(async () => {
+		const coverUrl = getRandomCuratedCoverImageUrl();
+		if (!coverUrl) {
+			toast.error("No cover images available");
+			return;
+		}
+
+		try {
+			await updateDocumentTitle({
+				id: documentId as Id<"documents">,
+				coverImage: coverUrl,
+			});
+		} catch (error) {
+			console.error("Failed to add cover image:", error);
+			toast.error("Failed to add cover image");
+		}
+	}, [documentId, updateDocumentTitle]);
 
 	const onIconSelect = useCallback(
 		async (icon: string) => {
@@ -526,24 +543,28 @@ function DocumentEditor() {
 					<div className="mx-auto w-full max-w-4xl">
 						<div className="px-11 group relative">
 							{!!document.icon && !document.isArchived && (
-								<div className="flex items-center gap-x-2 group/icon pt-6">
-									<IconPicker onChange={onIconSelect}>
+								<div
+									className={cn(
+										"group/icon relative z-10",
+										document.coverImage ? "-mt-10 pt-0" : "pt-6",
+									)}
+								>
+									<IconPicker onChange={onIconSelect} onRemove={onRemoveIcon}>
 										<p className="text-6xl hover:opacity-75 transition cursor-pointer">
 											{document.icon}
 										</p>
 									</IconPicker>
-									<Button
-										onClick={onRemoveIcon}
-										variant="ghost"
-										size="icon"
-										className="rounded-full opacity-0 group-hover/icon:opacity-100 transition"
-									>
-										<X className="h-4 w-4" />
-									</Button>
 								</div>
 							)}
 							{!!document.icon && document.isArchived && (
-								<p className="text-6xl pt-6">{document.icon}</p>
+								<p
+									className={cn(
+										"text-6xl relative z-10",
+										document.coverImage ? "-mt-10 pt-0" : "pt-6",
+									)}
+								>
+									{document.icon}
+								</p>
 							)}
 							<div className="opacity-0 group-hover:opacity-100 flex items-center gap-x-1 py-4">
 								{!document.icon && !document.isArchived && (
@@ -554,7 +575,7 @@ function DocumentEditor() {
 									</IconPicker>
 								)}
 								{!document.coverImage && !document.isArchived && (
-									<Button onClick={coverImage.onOpen} variant="ghost" size="sm">
+									<Button onClick={onAddCover} variant="ghost" size="sm">
 										<ImageIcon className="h-4 w-4 mr-2" /> Add cover
 									</Button>
 								)}
@@ -566,7 +587,6 @@ function DocumentEditor() {
 						</div>
 						{renderEditor()}
 					</div>
-					<CoverImageModal documentId={documentId as Id<"documents">} />
 				</div>
 			</SidebarInset>
 			<AISidebar />

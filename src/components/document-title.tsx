@@ -85,7 +85,7 @@ export function DocumentTitle({ title, onTitleChange }: DocumentTitleProps) {
 		<button
 			type="button"
 			onClick={enterEdit}
-			className="-mx-2 -my-1 w-full rounded px-2 py-1 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+			className="-mx-2 -my-1 w-full rounded px-2 py-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
 		>
 			<h1 className="cursor-text text-4xl font-semibold tracking-tight leading-tight">
 				{displayValue}

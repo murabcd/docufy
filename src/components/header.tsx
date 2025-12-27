@@ -197,18 +197,23 @@ export function Header({
 											onChange={onTitleChangeHandler}
 											onKeyDown={onTitleKeyDown}
 											value={titleValue}
-											className="h-auto px-1 py-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 border-0 bg-transparent shadow-none rounded outline-none"
+											className="h-auto px-1 py-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 border-0 bg-transparent dark:bg-transparent shadow-none rounded outline-none"
 											style={{ minWidth: "100px", maxWidth: "300px" }}
 										/>
+									) : canEditTitle ? (
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<BreadcrumbPage
+													className="line-clamp-1 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors"
+													onClick={enableTitleEdit}
+												>
+													{displayTitle}
+												</BreadcrumbPage>
+											</TooltipTrigger>
+											<TooltipContent>Edit title</TooltipContent>
+										</Tooltip>
 									) : (
-										<BreadcrumbPage
-											className={`line-clamp-1 ${
-												canEditTitle
-													? "cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors"
-													: ""
-											}`}
-											onClick={canEditTitle ? enableTitleEdit : undefined}
-										>
+										<BreadcrumbPage className="line-clamp-1">
 											{displayTitle}
 										</BreadcrumbPage>
 									)}
@@ -223,18 +228,23 @@ export function Header({
 										onChange={onTitleChangeHandler}
 										onKeyDown={onTitleKeyDown}
 										value={titleValue}
-										className="h-auto px-1 py-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 border-0 bg-transparent shadow-none rounded outline-none"
+										className="h-auto px-1 py-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 border-0 bg-transparent dark:bg-transparent shadow-none rounded outline-none"
 										style={{ minWidth: "100px", maxWidth: "300px" }}
 									/>
+								) : canEditTitle ? (
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<BreadcrumbPage
+												className="line-clamp-1 cursor-pointer rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors"
+												onClick={enableTitleEdit}
+											>
+												{displayTitle}
+											</BreadcrumbPage>
+										</TooltipTrigger>
+										<TooltipContent>Edit title</TooltipContent>
+									</Tooltip>
 								) : (
-									<BreadcrumbPage
-										className={`line-clamp-1 ${
-											canEditTitle
-												? "cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors"
-												: ""
-										}`}
-										onClick={canEditTitle ? enableTitleEdit : undefined}
-									>
+									<BreadcrumbPage className="line-clamp-1">
 										{displayTitle}
 									</BreadcrumbPage>
 								)}

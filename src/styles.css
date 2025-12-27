@@ -3,9 +3,7 @@
 @import "./tiptap/styles.css";
 @custom-variant dark (&:is(.dark *));
 
-@plugin "./tiptap/hero.ts";
 @source "./**/*.{ts,tsx}";
-@source "../node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}";
 @source "../node_modules/streamdown/dist/*.js";
 @source "../node_modules/@ferrucc-io/emoji-picker/dist/**/*.{js,jsx,ts,tsx}";
 
@@ -19,6 +17,9 @@
 	--text-color-purple: 270, 55%, 62%;
 	--text-color-pink: 329, 57%, 58%;
 	--text-color-red: 1, 69%, 60%;
+	--text-color-default: 0, 0%, 0%;
+	--bg-color-default: 0, 0%, 100%;
+	--swatch-border-default: var(--text-color-gray);
 
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.141 0.005 285.823);
@@ -56,6 +57,9 @@
 }
 
 .dark {
+	--text-color-default: 0, 0%, 100%;
+	--bg-color-default: 0, 0%, 0%;
+	--swatch-border-default: var(--text-color-gray);
 	--background: oklch(0.141 0.005 285.823);
 	--foreground: oklch(0.985 0 0);
 	--card: oklch(0.141 0.005 285.823);

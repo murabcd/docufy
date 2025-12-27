@@ -1,6 +1,5 @@
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
 import { type ConvexQueryClient, convexQuery } from "@convex-dev/react-query";
-import { HeroUIProvider, ToastProvider } from "@heroui/react";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { type QueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import {
@@ -168,25 +167,22 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<HeadContent />
 			</head>
 			<body className="min-h-screen bg-background text-foreground">
-				<HeroUIProvider>
-					<ThemeProvider>
-						<SidebarProvider>{children}</SidebarProvider>
-						<TanStackDevtools
-							config={{
-								position: "bottom-right",
-							}}
-							plugins={[
-								{
-									name: "Tanstack Router",
-									render: <TanStackRouterDevtoolsPanel />,
-								},
-							]}
-						/>
-						<ToastProvider placement="top-right" />
-						<Toaster position="top-center" />
-						<Scripts />
-					</ThemeProvider>
-				</HeroUIProvider>
+				<ThemeProvider>
+					<SidebarProvider>{children}</SidebarProvider>
+					<TanStackDevtools
+						config={{
+							position: "bottom-right",
+						}}
+						plugins={[
+							{
+								name: "Tanstack Router",
+								render: <TanStackRouterDevtoolsPanel />,
+							},
+						]}
+					/>
+					<Toaster position="top-center" />
+					<Scripts />
+				</ThemeProvider>
 			</body>
 		</html>
 	);
