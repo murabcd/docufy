@@ -11,6 +11,11 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
@@ -18,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
 	SidebarGroup,
+	SidebarGroupContent,
 	SidebarGroupLabel,
 	SidebarMenu,
 	SidebarMenuAction,
@@ -40,6 +46,7 @@ export function NavFavorites({
 	const { isMobile } = useSidebar();
 	const queryClient = useQueryClient();
 	const removeFavorite = useMutation(api.favorites.remove);
+	const [isCollapsed, setIsCollapsed] = useState(false);
 	const [isExpanded, setIsExpanded] = useState(false);
 
 	const MAX_VISIBLE = 5;
@@ -79,61 +86,78 @@ export function NavFavorites({
 
 	return (
 		<SidebarGroup className="group-data-[collapsible=icon]:hidden">
-			<SidebarGroupLabel>Starred</SidebarGroupLabel>
-			{favorites.length === 0 && (
-				<p className="text-sidebar-foreground/50 text-xs px-2 pb-2">
-					Star pages to keep them close
-				</p>
-			)}
-			<SidebarMenu>
-				{visibleFavorites.map((item) => (
-					<SidebarMenuItem key={item.name}>
-						<SidebarMenuButton asChild>
-							<Link to={item.url} title={item.name}>
-								{typeof item.icon === "string" ? (
-									<span className="text-base leading-none">{item.icon}</span>
-								) : (
-									<item.icon />
-								)}
-								<span>{item.name}</span>
-							</Link>
-						</SidebarMenuButton>
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<SidebarMenuAction showOnHover>
-									<MoreHorizontal />
-									<span className="sr-only">More</span>
-								</SidebarMenuAction>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent
-								className="w-56 rounded-lg"
-								side={isMobile ? "bottom" : "right"}
-								align={isMobile ? "end" : "start"}
-							>
-								<DropdownMenuItem onClick={() => handleUnstar(item)}>
-									<StarOff className="text-muted-foreground" />
-									<span>Unstar</span>
-								</DropdownMenuItem>
-								<DropdownMenuItem onClick={() => handleCopyLink(item.url)}>
-									<LinkIcon className="text-muted-foreground" />
-									<span>Copy link</span>
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</SidebarMenuItem>
-				))}
-				{hasMore && (
-					<SidebarMenuItem>
-						<SidebarMenuButton
-							className="text-sidebar-foreground/70"
-							onClick={() => setIsExpanded(!isExpanded)}
-						>
-							<MoreHorizontal />
-							<span>{isExpanded ? "Show less" : "More"}</span>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				)}
-			</SidebarMenu>
+			<Collapsible
+				open={!isCollapsed}
+				onOpenChange={(open) => setIsCollapsed(!open)}
+			>
+				<CollapsibleTrigger asChild>
+					<SidebarGroupLabel className="cursor-pointer select-none">
+						Starred
+					</SidebarGroupLabel>
+				</CollapsibleTrigger>
+				<CollapsibleContent>
+					{favorites.length === 0 && (
+						<p className="text-sidebar-foreground/50 text-xs px-2 pb-2">
+							Star pages to keep them close
+						</p>
+					)}
+					<SidebarGroupContent>
+						<SidebarMenu>
+							{visibleFavorites.map((item) => (
+								<SidebarMenuItem key={item.name}>
+									<SidebarMenuButton asChild>
+										<Link to={item.url} title={item.name}>
+											{typeof item.icon === "string" ? (
+												<span className="text-base leading-none">
+													{item.icon}
+												</span>
+											) : (
+												<item.icon />
+											)}
+											<span>{item.name}</span>
+										</Link>
+									</SidebarMenuButton>
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild>
+											<SidebarMenuAction showOnHover>
+												<MoreHorizontal />
+												<span className="sr-only">More</span>
+											</SidebarMenuAction>
+										</DropdownMenuTrigger>
+										<DropdownMenuContent
+											className="w-56 rounded-lg"
+											side={isMobile ? "bottom" : "right"}
+											align={isMobile ? "end" : "start"}
+										>
+											<DropdownMenuItem onClick={() => handleUnstar(item)}>
+												<StarOff className="text-muted-foreground" />
+												<span>Unstar</span>
+											</DropdownMenuItem>
+											<DropdownMenuItem
+												onClick={() => handleCopyLink(item.url)}
+											>
+												<LinkIcon className="text-muted-foreground" />
+												<span>Copy link</span>
+											</DropdownMenuItem>
+										</DropdownMenuContent>
+									</DropdownMenu>
+								</SidebarMenuItem>
+							))}
+							{hasMore && (
+								<SidebarMenuItem>
+									<SidebarMenuButton
+										className="text-sidebar-foreground/70"
+										onClick={() => setIsExpanded(!isExpanded)}
+									>
+										<MoreHorizontal />
+										<span>{isExpanded ? "Show less" : "More"}</span>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							)}
+						</SidebarMenu>
+					</SidebarGroupContent>
+				</CollapsibleContent>
+			</Collapsible>
 		</SidebarGroup>
 	);
 }

@@ -45,7 +45,6 @@ import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
-	DropdownMenuSeparator,
 	DropdownMenuSub,
 	DropdownMenuSubContent,
 	DropdownMenuSubTrigger,
@@ -281,7 +280,6 @@ function DocumentItem({
 										</DropdownMenuItem>
 									</DropdownMenuSubContent>
 								</DropdownMenuSub>
-								<DropdownMenuSeparator />
 								<DropdownMenuItem onClick={handleDuplicate}>
 									<Copy className="text-muted-foreground" />
 									<span>Duplicate</span>
@@ -407,7 +405,6 @@ function DocumentItem({
 									</DropdownMenuItem>
 								</DropdownMenuSubContent>
 							</DropdownMenuSub>
-							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={handleDuplicate}>
 								<Copy className="text-muted-foreground" />
 								<span>Duplicate</span>
