@@ -126,7 +126,7 @@ function TrashBoxContent({
 
 		try {
 			await remove({ id: documentToDelete });
-			toast.success("Page permanently deleted");
+			toast.success("Page deleted");
 			setShowDeleteDialog(false);
 			setDocumentToDelete(null);
 		} catch (_error) {

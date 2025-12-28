@@ -42,7 +42,7 @@ export function TrashBanner({ documentId }: TrashBannerProps) {
 	const handleConfirmDelete = async () => {
 		try {
 			await remove({ id: documentId });
-			toast.success("Page permanently deleted");
+			toast.success("Page deleted");
 			navigate({ to: "/" });
 			window.dispatchEvent(new Event("openTrashPopover"));
 		} catch (_error) {
