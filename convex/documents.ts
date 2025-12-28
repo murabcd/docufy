@@ -87,6 +87,79 @@ export const create = mutation({
 	},
 });
 
+const normalizePlainText = (text: string) => {
+	return text.replace(/\r\n/g, "\n").trim();
+};
+
+const plainTextToSnapshot = (text: string): typeof EMPTY_DOCUMENT => {
+	const normalized = normalizePlainText(text);
+	if (!normalized) {
+		return EMPTY_DOCUMENT;
+	}
+	const paragraphs = normalized
+		.split(/\n{2,}/)
+		.map((p) => p.trim())
+		.filter(Boolean);
+
+	const content = paragraphs.map((p) => ({
+		type: "paragraph",
+		content: [{ type: "text", text: p }],
+	}));
+	return { type: "doc", content };
+};
+
+export const createFromAi = mutation({
+	args: {
+		title: v.string(),
+		content: v.string(),
+		parentId: v.optional(v.id("documents")),
+	},
+	returns: v.id("documents"),
+	handler: async (ctx, args) => {
+		const userId = await requireUserId(ctx);
+		const now = Date.now();
+
+		const siblings = await ctx.db
+			.query("documents")
+			.withIndex("by_user_parent", (q) =>
+				q.eq("userId", userId).eq("parentId", args.parentId ?? undefined),
+			)
+			.filter((q) => q.eq(q.field("isArchived"), false))
+			.collect();
+
+		const maxOrder = siblings.reduce((max, doc) => {
+			return Math.max(max, doc.order ?? 0);
+		}, -1);
+
+		const snapshot = plainTextToSnapshot(args.content);
+		const searchableText = normalizePlainText(args.content);
+
+		const documentId = await ctx.db.insert("documents", {
+			userId,
+			title: args.title.trim() || "New page",
+			content: JSON.stringify(snapshot),
+			searchableText,
+			parentId: args.parentId ?? undefined,
+			order: maxOrder + 1,
+			icon: undefined,
+			coverImage: undefined,
+			isArchived: false,
+			archivedAt: undefined,
+			isPublished: false,
+			includeInAi: true,
+			lastEditedAt: now,
+			lastEmbeddedAt: undefined,
+			contentHash: undefined,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		await prosemirrorSync.create(ctx, documentId, snapshot);
+
+		return documentId;
+	},
+});
+
 export const get = query({
 	args: {
 		id: v.id("documents"),
@@ -509,7 +582,7 @@ export const remove = mutation({
 		}
 
 		if (!document.isArchived) {
-			throw new Error("Document must be archived before permanent deletion");
+			throw new Error("Page must be moved to trash before permanent deletion");
 		}
 		await cascadeDelete(ctx, args.id, userId);
 		return null;

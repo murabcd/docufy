@@ -226,6 +226,26 @@ function DocumentEditor() {
 		return !!(editor && !editor.isDestroyed && editor.view && editor.view.dom);
 	}, []);
 
+	const handleAddToDocumentFromAI = useCallback((content: string) => {
+		const editor = editorRef.current?.getEditor() as Editor | null;
+		if (!editor) {
+			return;
+		}
+		const paragraphs = content
+			.replace(/\r\n/g, "\n")
+			.split(/\n{2,}/)
+			.map((p) => p.trim())
+			.filter(Boolean);
+
+		const nodes = paragraphs.map((text) => ({
+			type: "paragraph",
+			content: [{ type: "text", text }],
+		}));
+
+		editor.commands.focus("end");
+		editor.commands.insertContent(nodes.length > 0 ? nodes : content);
+	}, []);
+
 	const titlesById = useMemo(() => {
 		const map: Record<string, string> = {};
 		for (const doc of allDocuments) {
@@ -422,7 +442,7 @@ function DocumentEditor() {
 		if (document === null) {
 			if (!hasRedirectedFromDeletionRef.current) {
 				hasRedirectedFromDeletionRef.current = true;
-				toast.success("Document deleted");
+				toast.success("Page deleted");
 			}
 			redirectFromMissingDocument();
 		} else {
@@ -589,7 +609,10 @@ function DocumentEditor() {
 					</div>
 				</div>
 			</SidebarInset>
-			<AISidebar contextDocumentId={documentId as Id<"documents">} />
+			<AISidebar
+				contextDocumentId={documentId as Id<"documents">}
+				onAddToDocument={handleAddToDocumentFromAI}
+			/>
 		</>
 	);
 }
