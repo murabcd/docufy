@@ -1,6 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
-import { Trash2, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -56,7 +55,6 @@ export function TrashBanner({ documentId }: TrashBannerProps) {
 			<div className="w-full bg-destructive/10 text-center text-sm p-2 text-foreground flex items-center gap-x-2 justify-center">
 				<p>This page is in the Trash.</p>
 				<Button size="sm" variant="outline" onClick={onRestore}>
-					<Undo2 className="h-3 w-3 mr-1" />
 					Restore page
 				</Button>
 				<Button
@@ -65,7 +63,6 @@ export function TrashBanner({ documentId }: TrashBannerProps) {
 					onClick={onRemove}
 					className="text-destructive hover:bg-destructive/15 hover:text-destructive dark:text-red-500 dark:hover:text-red-500"
 				>
-					<Trash2 className="h-3 w-3 mr-1 text-destructive dark:text-red-500" />
 					Delete
 				</Button>
 			</div>

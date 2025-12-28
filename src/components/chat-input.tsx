@@ -1,7 +1,7 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { ArrowUp, AtSign, FileText, X } from "lucide-react";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
 	Command,
 	CommandEmpty,
@@ -61,6 +61,8 @@ interface ChatInputProps {
 	disabled?: boolean;
 	selectedModel?: ChatModel;
 	onModelChange?: (model: ChatModel) => void;
+	sidebarOpen?: boolean;
+	autoMentionDocumentId?: Id<"documents"> | null;
 }
 
 export function ChatInput({
@@ -71,6 +73,8 @@ export function ChatInput({
 	disabled = false,
 	selectedModel: propSelectedModel,
 	onModelChange,
+	sidebarOpen,
+	autoMentionDocumentId,
 }: ChatInputProps = {}) {
 	const [internalValue, setInternalValue] = useState("");
 	const [mentions, setMentions] = useState<Id<"documents">[]>([]);
@@ -129,6 +133,31 @@ export function ChatInput({
 	const normalizedSearchTerm = deferredSearchTerm.trim();
 	const shouldSearchDocuments = normalizedSearchTerm.length > 0;
 
+	const autoMentionedDocumentIdRef = useRef<Id<"documents"> | null>(null);
+	useEffect(() => {
+		if (!sidebarOpen) {
+			autoMentionedDocumentIdRef.current = null;
+			return;
+		}
+		if (!autoMentionDocumentId) {
+			return;
+		}
+		const previousAutoMention = autoMentionedDocumentIdRef.current;
+		if (previousAutoMention === autoMentionDocumentId) {
+			return;
+		}
+		autoMentionedDocumentIdRef.current = autoMentionDocumentId;
+		setMentions((prev) => {
+			const withoutPrevious =
+				previousAutoMention === null
+					? prev
+					: prev.filter((id) => id !== previousAutoMention);
+			return withoutPrevious.includes(autoMentionDocumentId)
+				? withoutPrevious
+				: [...withoutPrevious, autoMentionDocumentId];
+		});
+	}, [autoMentionDocumentId, sidebarOpen]);
+
 	const documentSearchQuery = useQuery({
 		...convexQuery(api.documents.search, {
 			term: normalizedSearchTerm,
@@ -163,8 +192,8 @@ export function ChatInput({
 	}, [defaultDocuments, mentions, searchResults, shouldSearchDocuments]);
 
 	const emptyStateMessage = shouldSearchDocuments
-		? "No documents match your search"
-		: "No documents available";
+		? "No pages match your search"
+		: "No pages available";
 
 	return (
 		<form className="[--radius:1.2rem] w-full max-w-[560px] mx-auto">
@@ -207,7 +236,7 @@ export function ChatInput({
 							<PopoverContent className="p-0 [--radius:1.2rem]" align="start">
 								<Command>
 									<CommandInput
-										placeholder="Search documents..."
+										placeholder="Search pages..."
 										value={documentSearchTerm}
 										onValueChange={setDocumentSearchTerm}
 									/>
@@ -216,7 +245,7 @@ export function ChatInput({
 										{mentionableDocuments.length > 0 ? (
 											<CommandGroup
 												heading={
-													shouldSearchDocuments ? "Search results" : "Documents"
+													shouldSearchDocuments ? "Search results" : "Pages"
 												}
 											>
 												{mentionableDocuments.map((document) => (

@@ -589,7 +589,7 @@ function DocumentEditor() {
 					</div>
 				</div>
 			</SidebarInset>
-			<AISidebar />
+			<AISidebar contextDocumentId={documentId as Id<"documents">} />
 		</>
 	);
 }

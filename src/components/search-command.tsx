@@ -31,15 +31,15 @@ export function SearchCommand({
 		<CommandDialog
 			open={open}
 			onOpenChange={onOpenChange}
-			title="Search Documents"
-			description="Search for a document..."
+			title="Search pages"
+			description="Search for a page..."
 		>
-			<CommandInput placeholder="Search documents..." />
+			<CommandInput placeholder="Search pages..." />
 			<CommandList>
-				<CommandEmpty>No documents found.</CommandEmpty>
+				<CommandEmpty>No pages found.</CommandEmpty>
 				{documents ? (
 					documents.length > 0 && (
-						<CommandGroup heading="Documents">
+						<CommandGroup heading="Pages">
 							{documents.map((document) => (
 								<CommandItem
 									key={document._id}

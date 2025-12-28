@@ -76,6 +76,7 @@ interface AISidebarProps {
 	onSend?: (message: string) => void;
 	mentionTag?: string;
 	placeholder?: string;
+	contextDocumentId?: Id<"documents"> | null;
 	children?: React.ReactNode;
 }
 
@@ -143,11 +144,19 @@ export function AISidebar({
 	onSend,
 	mentionTag: _mentionTag,
 	placeholder,
+	contextDocumentId,
 	children,
 }: AISidebarProps) {
 	const queryClient = useQueryClient();
-	const { rightMode, setRightMode, isMobile, toggleRightSidebar } =
-		useSidebar();
+	const {
+		rightMode,
+		setRightMode,
+		isMobile,
+		toggleRightSidebar,
+		rightOpen,
+		rightOpenMobile,
+	} = useSidebar();
+	const sidebarOpen = isMobile ? rightOpenMobile : rightOpen;
 
 	const { data: chats } = useSuspenseQuery(
 		convexQuery(api.chats.list, { documentId: null }),
@@ -275,6 +284,8 @@ export function AISidebar({
 				rightMode={rightMode}
 				setRightMode={setRightMode}
 				toggleRightSidebar={toggleRightSidebar}
+				sidebarOpen={sidebarOpen}
+				contextDocumentId={contextDocumentId}
 			>
 				{children}
 			</ChatSession>
@@ -306,6 +317,8 @@ function ChatSession(
 		rightMode: "sidebar" | "floating";
 		setRightMode: (mode: "sidebar" | "floating") => void;
 		toggleRightSidebar: () => void;
+		sidebarOpen: boolean;
+		contextDocumentId?: Id<"documents"> | null;
 	}>,
 ) {
 	const {
@@ -324,6 +337,8 @@ function ChatSession(
 		rightMode,
 		setRightMode,
 		toggleRightSidebar,
+		sidebarOpen,
+		contextDocumentId,
 	} = props;
 
 	const [inputValue, setInputValue] = React.useState("");
@@ -368,6 +383,8 @@ function ChatSession(
 			rightMode={rightMode}
 			setRightMode={setRightMode}
 			toggleRightSidebar={toggleRightSidebar}
+			sidebarOpen={sidebarOpen}
+			contextDocumentId={contextDocumentId}
 			onSelectChat={onSelectChat}
 			onStartNewDraft={onStartNewDraft}
 			pendingSavedChat={pendingSavedChat}
@@ -391,6 +408,8 @@ function ChatSession(
 			rightMode={rightMode}
 			setRightMode={setRightMode}
 			toggleRightSidebar={toggleRightSidebar}
+			sidebarOpen={sidebarOpen}
+			contextDocumentId={contextDocumentId}
 			onSelectChat={onSelectChat}
 			onStartNewDraft={onStartNewDraft}
 			onDraftFinalized={onDraftFinalized}
@@ -423,6 +442,8 @@ function ChatSessionChrome(
 		onNewChat: () => void;
 		onSelectChat: (chatId: Id<"chats">) => void | Promise<void>;
 		onSendMessage: (payload: string, question: string) => void;
+		sidebarOpen: boolean;
+		contextDocumentId?: Id<"documents"> | null;
 	}>,
 ) {
 	const {
@@ -443,6 +464,8 @@ function ChatSessionChrome(
 		onNewChat,
 		onSelectChat,
 		onSendMessage,
+		sidebarOpen,
+		contextDocumentId,
 		children,
 	} = props;
 
@@ -609,6 +632,8 @@ function ChatSessionChrome(
 					disabled={isLoading}
 					selectedModel={selectedModel}
 					onModelChange={onModelChange}
+					sidebarOpen={sidebarOpen}
+					autoMentionDocumentId={contextDocumentId ?? null}
 				/>
 			</SidebarFooter>
 		</>
@@ -635,6 +660,8 @@ function PersistedChatSession(
 		rightMode: "sidebar" | "floating";
 		setRightMode: (mode: "sidebar" | "floating") => void;
 		toggleRightSidebar: () => void;
+		sidebarOpen: boolean;
+		contextDocumentId?: Id<"documents"> | null;
 		onSelectChat: (chatId: Id<"chats">) => void | Promise<void>;
 		onStartNewDraft: (opts?: { modelId?: string; draftId?: string }) => void;
 		pendingSavedChat?: PendingSavedChat;
@@ -655,6 +682,8 @@ function PersistedChatSession(
 		rightMode,
 		setRightMode,
 		toggleRightSidebar,
+		sidebarOpen,
+		contextDocumentId,
 		onSelectChat,
 		onStartNewDraft,
 		pendingSavedChat,
@@ -809,6 +838,8 @@ function PersistedChatSession(
 			rightMode={rightMode}
 			setRightMode={setRightMode}
 			toggleRightSidebar={toggleRightSidebar}
+			sidebarOpen={sidebarOpen}
+			contextDocumentId={contextDocumentId}
 			onNewChat={handleNewChat}
 			onSelectChat={handleSelectChat}
 			onSendMessage={handleSend}
@@ -838,6 +869,8 @@ function DraftChatSession(
 		rightMode: "sidebar" | "floating";
 		setRightMode: (mode: "sidebar" | "floating") => void;
 		toggleRightSidebar: () => void;
+		sidebarOpen: boolean;
+		contextDocumentId?: Id<"documents"> | null;
 		onSelectChat: (chatId: Id<"chats">) => void | Promise<void>;
 		onStartNewDraft: (opts?: { modelId?: string; draftId?: string }) => void;
 		onDraftFinalized: (payload: {
@@ -861,6 +894,8 @@ function DraftChatSession(
 		rightMode,
 		setRightMode,
 		toggleRightSidebar,
+		sidebarOpen,
+		contextDocumentId,
 		onSelectChat,
 		onStartNewDraft,
 		onDraftFinalized,
@@ -959,6 +994,8 @@ function DraftChatSession(
 			rightMode={rightMode}
 			setRightMode={setRightMode}
 			toggleRightSidebar={toggleRightSidebar}
+			sidebarOpen={sidebarOpen}
+			contextDocumentId={contextDocumentId}
 			onNewChat={handleNewChat}
 			onSelectChat={handleSelectChat}
 			onSendMessage={handleSend}

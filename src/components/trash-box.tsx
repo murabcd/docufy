@@ -1,5 +1,5 @@
 import { convexQuery } from "@convex-dev/react-query";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { FileText, HelpCircle, Search, Trash2, Undo2 } from "lucide-react";
@@ -17,6 +17,13 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -27,11 +34,8 @@ import {
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
-type TrashBoxVariant = "popover" | "page";
-
 type TrashBoxContentProps = {
 	onRequestClose?: () => void;
-	variant: TrashBoxVariant;
 	documents: Array<{
 		_id: Id<"documents">;
 		title: string;
@@ -67,7 +71,6 @@ function TrashBoxPopoverSkeleton() {
 
 function TrashBoxContent({
 	onRequestClose,
-	variant,
 	documents,
 	isOpen = true,
 }: TrashBoxContentProps) {
@@ -128,149 +131,102 @@ function TrashBoxContent({
 		}
 	};
 
-	if (documents.length === 0) {
-		if (variant === "popover") {
-			return (
-				<div className="text-sm">
-					<div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
-						<div className="flex size-12 items-center justify-center rounded-full bg-muted">
-							<Trash2 className="size-6 text-muted-foreground" />
-						</div>
-						<div className="space-y-1">
-							<p className="text-sm font-medium">No results</p>
-							<p className="text-xs text-muted-foreground">
-								Deleted pages will appear here.
-							</p>
-						</div>
-					</div>
-					<div className="px-3 py-2">
-						<div className="flex items-start gap-x-3 text-xs text-muted-foreground">
-							<HelpCircle className="size-4 translate-y-0.5 shrink-0" />
-							<div>
-								Pages in Trash for over 30 days will be automatically deleted
-							</div>
-						</div>
-					</div>
-				</div>
-			);
-		}
-
-		return (
-			<div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
-				<div className="flex flex-col items-center gap-4">
-					<div className="flex size-16 items-center justify-center rounded-full bg-muted">
-						<Trash2 className="size-8 text-muted-foreground" />
-					</div>
-					<div className="space-y-2">
-						<h2 className="text-2xl font-semibold">No pages in trash</h2>
-						<p className="text-muted-foreground max-w-md">
-							Pages you delete will appear here. You can restore them or delete
-							them permanently.
-						</p>
-					</div>
-				</div>
-				<div className="mt-8 px-3 py-2">
-					<div className="flex items-start gap-x-3 text-xs text-muted-foreground max-w-md">
-						<HelpCircle className="size-4 translate-y-0.5 shrink-0" />
-						<div>
-							Pages in Trash for over 30 days will be automatically deleted
-						</div>
-					</div>
-				</div>
-			</div>
-		);
-	}
-
 	return (
 		<div className="text-sm">
-			<div className="p-2 pb-1">
-				<div className="relative">
-					<Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-					<Input
-						value={search}
-						onChange={(e) => setSearch(e.target.value)}
-						className="h-8 bg-secondary pl-8 pr-2 focus-visible:ring-transparent"
-						placeholder="Search pages in Trash"
-					/>
-				</div>
-			</div>
-
-			<div
-				className={
-					variant === "popover"
-						? "max-h-[62vh] overflow-y-auto px-1 pb-1 space-y-1"
-						: "px-1 pb-1 space-y-1"
-				}
-			>
-				{filteredDocuments?.length === 0 ? (
-					<p className="text-xs text-center text-muted-foreground py-6">
-						No documents found.
-					</p>
-				) : (
-					filteredDocuments?.map((document) => (
-						<div
-							key={document._id}
-							className="group rounded-md w-full hover:bg-accent flex items-center gap-1 text-foreground justify-between px-2 py-1.5 text-left"
-						>
-							<Link
-								to="/documents/$documentId"
-								params={{ documentId: document._id }}
-								onClick={() => onRequestClose?.()}
-								className="flex items-center gap-1 flex-1 min-w-0 truncate"
-							>
-								{document.icon ? (
-									<span className="text-base leading-none shrink-0">
-										{document.icon}
-									</span>
-								) : (
-									<FileText className="size-4 shrink-0" />
-								)}
-								<span className="truncate">{document.title}</span>
-							</Link>
-							<div className="flex items-center gap-x-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-								<Tooltip>
-									<TooltipTrigger asChild>
-										<Button
-											variant="ghost"
-											size="sm"
-											className="h-6 w-6 p-0"
-											onClick={(e) => onRestore(e, document._id)}
-										>
-											<Undo2 className="size-4" />
-											<span className="sr-only">Restore</span>
-										</Button>
-									</TooltipTrigger>
-									<TooltipContent>Restore</TooltipContent>
-								</Tooltip>
-								<Tooltip>
-									<TooltipTrigger asChild>
-										<Button
-											variant="ghost"
-											size="sm"
-											className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-											onClick={(e) => {
-												e.stopPropagation();
-												onRemove(document._id);
-											}}
-										>
-											<Trash2 className="size-4" />
-											<span className="sr-only">Delete</span>
-										</Button>
-									</TooltipTrigger>
-									<TooltipContent>Delete</TooltipContent>
-								</Tooltip>
-							</div>
+			{documents.length === 0 ? (
+				<Empty className="min-h-[240px] border-0 gap-3 p-6 md:p-6">
+					<EmptyHeader className="gap-1">
+						<EmptyMedia variant="icon" className="text-muted-foreground">
+							<Trash2 />
+						</EmptyMedia>
+						<EmptyTitle>No results</EmptyTitle>
+						<EmptyDescription>Deleted pages will appear here.</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
+			) : (
+				<>
+					<div className="p-2 pb-1">
+						<div className="relative">
+							<Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+							<Input
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+								className="h-8 bg-secondary pl-8 pr-2 focus-visible:ring-transparent"
+								placeholder="Search pages..."
+							/>
 						</div>
-					))
-				)}
-			</div>
+					</div>
+
+					<div className="max-h-[62vh] overflow-y-auto px-1 pb-1 space-y-1">
+						{filteredDocuments.length === 0 ? (
+							<p className="text-xs text-center text-muted-foreground py-6">
+								No pages found.
+							</p>
+						) : (
+							filteredDocuments.map((document) => (
+								<div
+									key={document._id}
+									className="group rounded-md w-full hover:bg-accent flex items-center gap-1 text-foreground justify-between px-2 py-1.5 text-left"
+								>
+									<Link
+										to="/documents/$documentId"
+										params={{ documentId: document._id }}
+										onClick={() => onRequestClose?.()}
+										className="flex items-center gap-1 flex-1 min-w-0 truncate"
+									>
+										{document.icon ? (
+											<span className="text-base leading-none shrink-0">
+												{document.icon}
+											</span>
+										) : (
+											<FileText className="size-4 shrink-0" />
+										)}
+										<span className="truncate">{document.title}</span>
+									</Link>
+									<div className="flex items-center gap-x-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<Button
+													variant="ghost"
+													size="sm"
+													className="h-6 w-6 p-0"
+													onClick={(e) => onRestore(e, document._id)}
+												>
+													<Undo2 className="size-4" />
+													<span className="sr-only">Restore</span>
+												</Button>
+											</TooltipTrigger>
+											<TooltipContent>Restore</TooltipContent>
+										</Tooltip>
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<Button
+													variant="ghost"
+													size="sm"
+													className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+													onClick={(e) => {
+														e.stopPropagation();
+														onRemove(document._id);
+													}}
+												>
+													<Trash2 className="size-4" />
+													<span className="sr-only">Delete</span>
+												</Button>
+											</TooltipTrigger>
+											<TooltipContent>Delete</TooltipContent>
+										</Tooltip>
+									</div>
+								</div>
+							))
+						)}
+					</div>
+				</>
+			)}
 
 			<div className="px-3 py-2 border-t">
 				<div className="flex items-start gap-x-3 text-xs text-muted-foreground">
 					<HelpCircle className="size-4 translate-y-0.5 shrink-0" />
-					<div>
-						Pages in Trash for over 30 days will be automatically deleted
-					</div>
+					<div>Pages older than 30 days will be automatically deleted.</div>
 				</div>
 			</div>
 
@@ -322,18 +278,9 @@ export function TrashBoxPopover({
 
 	return (
 		<TrashBoxContent
-			variant="popover"
 			documents={documents}
 			onRequestClose={onRequestClose}
 			isOpen={open}
 		/>
 	);
-}
-
-export function TrashBoxPage() {
-	const { data: documents } = useSuspenseQuery(
-		convexQuery(api.documents.getTrash),
-	);
-
-	return <TrashBoxContent variant="page" documents={documents} />;
 }

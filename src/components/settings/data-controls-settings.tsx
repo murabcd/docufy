@@ -1,6 +1,6 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+
 import * as React from "react";
 import { toast } from "sonner";
 import {
@@ -70,7 +70,6 @@ export function DataControlsSettings() {
 							className="text-destructive hover:text-destructive focus:text-destructive dark:text-red-500"
 							disabled={isDeleting}
 						>
-							<Trash2 className="size-4 mr-2" />
 							{isDeleting ? "Deleting..." : "Delete"}
 						</Button>
 					</AlertDialogTrigger>
