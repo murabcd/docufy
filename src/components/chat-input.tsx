@@ -63,6 +63,9 @@ interface ChatInputProps {
 	onModelChange?: (model: ChatModel) => void;
 	sidebarOpen?: boolean;
 	autoMentionDocumentId?: Id<"documents"> | null;
+	isAutoMentionDismissed?: boolean;
+	onAutoMentionDismiss?: (documentId: Id<"documents">) => void;
+	onAutoMentionUndismiss?: (documentId: Id<"documents">) => void;
 }
 
 export function ChatInput({
@@ -73,8 +76,11 @@ export function ChatInput({
 	disabled = false,
 	selectedModel: propSelectedModel,
 	onModelChange,
-	sidebarOpen,
+	sidebarOpen = false,
 	autoMentionDocumentId,
+	isAutoMentionDismissed = false,
+	onAutoMentionDismiss,
+	onAutoMentionUndismiss,
 }: ChatInputProps = {}) {
 	const [internalValue, setInternalValue] = useState("");
 	const [mentions, setMentions] = useState<Id<"documents">[]>([]);
@@ -94,6 +100,19 @@ export function ChatInput({
 	const onChange = propOnChange ?? setInternalValue;
 	const selectedModel = propSelectedModel ?? internalSelectedModel;
 	const setSelectedModel = onModelChange ?? setInternalSelectedModel;
+
+	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const wasSidebarOpenRef = useRef(false);
+	useEffect(() => {
+		if (sidebarOpen && !wasSidebarOpenRef.current) {
+			requestAnimationFrame(() => {
+				if (textareaRef.current && !textareaRef.current.disabled) {
+					textareaRef.current.focus({ preventScroll: true });
+				}
+			});
+		}
+		wasSidebarOpenRef.current = sidebarOpen;
+	}, [sidebarOpen]);
 
 	const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
 		onChange(e.target.value);
@@ -133,6 +152,7 @@ export function ChatInput({
 	const normalizedSearchTerm = deferredSearchTerm.trim();
 	const shouldSearchDocuments = normalizedSearchTerm.length > 0;
 
+	const autoAddedMentionIdsRef = useRef<Set<Id<"documents">>>(new Set());
 	const autoMentionedDocumentIdRef = useRef<Id<"documents"> | null>(null);
 	useEffect(() => {
 		if (!sidebarOpen) {
@@ -142,21 +162,33 @@ export function ChatInput({
 		if (!autoMentionDocumentId) {
 			return;
 		}
+		if (isAutoMentionDismissed) {
+			return;
+		}
 		const previousAutoMention = autoMentionedDocumentIdRef.current;
 		if (previousAutoMention === autoMentionDocumentId) {
 			return;
 		}
 		autoMentionedDocumentIdRef.current = autoMentionDocumentId;
 		setMentions((prev) => {
-			const withoutPrevious =
-				previousAutoMention === null
-					? prev
-					: prev.filter((id) => id !== previousAutoMention);
-			return withoutPrevious.includes(autoMentionDocumentId)
-				? withoutPrevious
-				: [...withoutPrevious, autoMentionDocumentId];
+			let next = prev;
+			if (
+				previousAutoMention &&
+				previousAutoMention !== autoMentionDocumentId &&
+				autoAddedMentionIdsRef.current.has(previousAutoMention)
+			) {
+				next = next.filter((id) => id !== previousAutoMention);
+				autoAddedMentionIdsRef.current.delete(previousAutoMention);
+			}
+
+			if (next.includes(autoMentionDocumentId)) {
+				return next;
+			}
+
+			autoAddedMentionIdsRef.current.add(autoMentionDocumentId);
+			return [...next, autoMentionDocumentId];
 		});
-	}, [autoMentionDocumentId, sidebarOpen]);
+	}, [autoMentionDocumentId, isAutoMentionDismissed, sidebarOpen]);
 
 	const documentSearchQuery = useQuery({
 		...convexQuery(api.documents.search, {
@@ -204,10 +236,12 @@ export function ChatInput({
 				<InputGroup>
 					<InputGroupTextarea
 						id="notion-prompt"
+						ref={textareaRef}
 						value={value}
 						onChange={handleInputChange}
 						onKeyDown={handleKeyDown}
 						placeholder={placeholder}
+						disabled={disabled}
 					/>
 
 					<InputGroupAddon align="block-start">
@@ -230,7 +264,7 @@ export function ChatInput({
 										</InputGroupButton>
 									</PopoverTrigger>
 								</TooltipTrigger>
-								<TooltipContent>Mention documents</TooltipContent>
+								<TooltipContent>Mention a page</TooltipContent>
 							</Tooltip>
 
 							<PopoverContent className="p-0 [--radius:1.2rem]" align="start">
@@ -253,6 +287,10 @@ export function ChatInput({
 														key={document._id}
 														value={`${document._id} ${document.title}`}
 														onSelect={() => {
+															autoAddedMentionIdsRef.current.delete(
+																document._id,
+															);
+															onAutoMentionUndismiss?.(document._id);
 															setMentions((prev) => [...prev, document._id]);
 															setDocumentSearchTerm("");
 															setMentionPopoverOpen(false);
@@ -284,6 +322,14 @@ export function ChatInput({
 										variant="secondary"
 										className="rounded-full pl-2!"
 										onClick={() => {
+											autoAddedMentionIdsRef.current.delete(mentionId);
+											if (
+												sidebarOpen &&
+												autoMentionDocumentId &&
+												mentionId === autoMentionDocumentId
+											) {
+												onAutoMentionDismiss?.(mentionId);
+											}
 											setMentions((prev) =>
 												prev.filter((m) => m !== mentionId),
 											);

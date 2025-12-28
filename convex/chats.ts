@@ -3,6 +3,9 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { authComponent } from "./auth";
 
+const DOCUMENT_CONTEXT_PREFIX = "__DOCCTX__";
+const DOCUMENT_CONTEXT_SUFFIX = "__ENDDOCCTX__";
+
 const getUserId = async (ctx: QueryCtx | MutationCtx) => {
 	const user = await authComponent.safeGetAuthUser(ctx);
 	return user ? String(user._id) : null;
@@ -38,6 +41,18 @@ const messageFields = {
 	createdAt: v.number(),
 };
 
+const stripDocumentContext = (text: string): string => {
+	const trimmed = text.trimStart();
+	if (!trimmed.startsWith(DOCUMENT_CONTEXT_PREFIX)) {
+		return text;
+	}
+	const suffixIndex = trimmed.indexOf(DOCUMENT_CONTEXT_SUFFIX);
+	if (suffixIndex === -1) {
+		return "";
+	}
+	return trimmed.slice(suffixIndex + DOCUMENT_CONTEXT_SUFFIX.length);
+};
+
 const getPreviewText = (message: unknown): string | undefined => {
 	if (!message || typeof message !== "object") return undefined;
 	const parts = (message as any).parts;
@@ -45,7 +60,8 @@ const getPreviewText = (message: unknown): string | undefined => {
 	const textPart = parts.find((p: any) => p && p.type === "text");
 	const content = textPart?.content;
 	if (typeof content !== "string") return undefined;
-	const trimmed = content.trim();
+	const stripped = stripDocumentContext(content);
+	const trimmed = stripped.trim();
 	if (!trimmed) return undefined;
 	return trimmed.length > 120 ? `${trimmed.slice(0, 117)}...` : trimmed;
 };

@@ -9,6 +9,7 @@ import {
 	useQueryClient,
 	useSuspenseQuery,
 } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
 	Check,
@@ -30,6 +31,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	Sidebar,
 	SidebarContent,
@@ -61,6 +63,9 @@ type ActiveChat =
 	| { kind: "draft"; id: string; modelId: string }
 	| { kind: "persisted"; id: Id<"chats"> };
 
+const DOCUMENT_CONTEXT_PREFIX = "__DOCCTX__";
+const DOCUMENT_CONTEXT_SUFFIX = "__ENDDOCCTX__";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
@@ -77,6 +82,7 @@ interface AISidebarProps {
 	mentionTag?: string;
 	placeholder?: string;
 	contextDocumentId?: Id<"documents"> | null;
+	onAddToDocument?: (content: string) => void;
 	children?: React.ReactNode;
 }
 
@@ -119,6 +125,18 @@ function mergeMessages(
 	return [...persisted, ...extras];
 }
 
+function stripDocumentContext(text: string): string {
+	const trimmed = text.trimStart();
+	if (!trimmed.startsWith(DOCUMENT_CONTEXT_PREFIX)) {
+		return text;
+	}
+	const suffixIndex = trimmed.indexOf(DOCUMENT_CONTEXT_SUFFIX);
+	if (suffixIndex === -1) {
+		return "";
+	}
+	return trimmed.slice(suffixIndex + DOCUMENT_CONTEXT_SUFFIX.length);
+}
+
 function getChatTitleFromMessages(messages: ReadonlyArray<UIMessage>): string {
 	for (const message of messages) {
 		if (message.role !== "user") continue;
@@ -127,7 +145,7 @@ function getChatTitleFromMessages(messages: ReadonlyArray<UIMessage>): string {
 			if (part.type !== "text") continue;
 			const content = part.content;
 			if (typeof content !== "string") continue;
-			const trimmed = content.trim();
+			const trimmed = stripDocumentContext(content).trim();
 			if (!trimmed) continue;
 			return trimmed.length > 120 ? `${trimmed.slice(0, 117)}...` : trimmed;
 		}
@@ -145,9 +163,11 @@ export function AISidebar({
 	mentionTag: _mentionTag,
 	placeholder,
 	contextDocumentId,
+	onAddToDocument,
 	children,
 }: AISidebarProps) {
 	const queryClient = useQueryClient();
+	const navigate = useNavigate();
 	const {
 		rightMode,
 		setRightMode,
@@ -160,6 +180,60 @@ export function AISidebar({
 
 	const { data: chats } = useSuspenseQuery(
 		convexQuery(api.chats.list, { documentId: null }),
+	);
+
+	const createDocumentFromAi = useMutation(api.documents.createFromAi);
+
+	const [dismissedAutoMentionById, setDismissedAutoMentionById] =
+		React.useState<Record<string, true>>({});
+	const isAutoMentionDismissed = contextDocumentId
+		? dismissedAutoMentionById[String(contextDocumentId)] === true
+		: false;
+
+	const handleAutoMentionDismiss = React.useCallback(
+		(documentId: Id<"documents">) => {
+			setDismissedAutoMentionById((prev) => {
+				const key = String(documentId);
+				if (prev[key]) {
+					return prev;
+				}
+				return { ...prev, [key]: true };
+			});
+		},
+		[],
+	);
+
+	const handleAutoMentionUndismiss = React.useCallback(
+		(documentId: Id<"documents">) => {
+			setDismissedAutoMentionById((prev) => {
+				const key = String(documentId);
+				if (!prev[key]) {
+					return prev;
+				}
+				const next = { ...prev };
+				delete next[key];
+				return next;
+			});
+		},
+		[],
+	);
+
+	const handleCreatePageFromAi = React.useCallback(
+		async (chatTitle: string, content: string) => {
+			const title = chatTitle.trim() || "New page";
+			const documentId = await createDocumentFromAi({
+				title,
+				content,
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.documents.getAll).queryKey.slice(0, 2),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.documents.list).queryKey.slice(0, 2),
+			});
+			navigate({ to: "/documents/$documentId", params: { documentId } });
+		},
+		[createDocumentFromAi, navigate, queryClient],
 	);
 
 	const [pendingSavedChatById, setPendingSavedChatById] = React.useState<
@@ -286,6 +360,11 @@ export function AISidebar({
 				toggleRightSidebar={toggleRightSidebar}
 				sidebarOpen={sidebarOpen}
 				contextDocumentId={contextDocumentId}
+				isAutoMentionDismissed={isAutoMentionDismissed}
+				onAutoMentionDismiss={handleAutoMentionDismiss}
+				onAutoMentionUndismiss={handleAutoMentionUndismiss}
+				onAddToDocument={onAddToDocument}
+				onCreatePageFromAi={handleCreatePageFromAi}
 			>
 				{children}
 			</ChatSession>
@@ -319,6 +398,11 @@ function ChatSession(
 		toggleRightSidebar: () => void;
 		sidebarOpen: boolean;
 		contextDocumentId?: Id<"documents"> | null;
+		isAutoMentionDismissed: boolean;
+		onAutoMentionDismiss: (documentId: Id<"documents">) => void;
+		onAutoMentionUndismiss: (documentId: Id<"documents">) => void;
+		onAddToDocument?: (content: string) => void;
+		onCreatePageFromAi: (chatTitle: string, content: string) => Promise<void>;
 	}>,
 ) {
 	const {
@@ -339,6 +423,11 @@ function ChatSession(
 		toggleRightSidebar,
 		sidebarOpen,
 		contextDocumentId,
+		isAutoMentionDismissed,
+		onAutoMentionDismiss,
+		onAutoMentionUndismiss,
+		onAddToDocument,
+		onCreatePageFromAi,
 	} = props;
 
 	const [inputValue, setInputValue] = React.useState("");
@@ -385,6 +474,11 @@ function ChatSession(
 			toggleRightSidebar={toggleRightSidebar}
 			sidebarOpen={sidebarOpen}
 			contextDocumentId={contextDocumentId}
+			isAutoMentionDismissed={isAutoMentionDismissed}
+			onAutoMentionDismiss={onAutoMentionDismiss}
+			onAutoMentionUndismiss={onAutoMentionUndismiss}
+			onAddToDocument={onAddToDocument}
+			onCreatePageFromAi={onCreatePageFromAi}
 			onSelectChat={onSelectChat}
 			onStartNewDraft={onStartNewDraft}
 			pendingSavedChat={pendingSavedChat}
@@ -410,6 +504,11 @@ function ChatSession(
 			toggleRightSidebar={toggleRightSidebar}
 			sidebarOpen={sidebarOpen}
 			contextDocumentId={contextDocumentId}
+			isAutoMentionDismissed={isAutoMentionDismissed}
+			onAutoMentionDismiss={onAutoMentionDismiss}
+			onAutoMentionUndismiss={onAutoMentionUndismiss}
+			onAddToDocument={onAddToDocument}
+			onCreatePageFromAi={onCreatePageFromAi}
 			onSelectChat={onSelectChat}
 			onStartNewDraft={onStartNewDraft}
 			onDraftFinalized={onDraftFinalized}
@@ -444,6 +543,11 @@ function ChatSessionChrome(
 		onSendMessage: (payload: string, question: string) => void;
 		sidebarOpen: boolean;
 		contextDocumentId?: Id<"documents"> | null;
+		isAutoMentionDismissed: boolean;
+		onAutoMentionDismiss: (documentId: Id<"documents">) => void;
+		onAutoMentionUndismiss: (documentId: Id<"documents">) => void;
+		onAddToDocument?: (content: string) => void;
+		onCreatePageFromAi: (chatTitle: string, content: string) => Promise<void>;
 	}>,
 ) {
 	const {
@@ -466,27 +570,49 @@ function ChatSessionChrome(
 		onSendMessage,
 		sidebarOpen,
 		contextDocumentId,
+		isAutoMentionDismissed,
+		onAutoMentionDismiss,
+		onAutoMentionUndismiss,
+		onAddToDocument,
+		onCreatePageFromAi,
 		children,
 	} = props;
 
 	const isFloating = rightMode === "floating";
 	const ModeIcon = isFloating ? PanelRightDashed : PanelRight;
 
+	const plusTooltip = onAddToDocument
+		? "Insert into this page"
+		: "Save to private pages";
+
+	const handlePlusAction = React.useCallback(
+		(content: string) => {
+			if (onAddToDocument) {
+				onAddToDocument(content);
+				return "added" as const;
+			}
+			return onCreatePageFromAi(title, content).then(() => "created" as const);
+		},
+		[onAddToDocument, onCreatePageFromAi, title],
+	);
+
 	return (
 		<>
 			<SidebarHeader className="flex flex-row items-center gap-2 p-3 min-w-0">
-				<div className="flex-1 min-w-0">
+				<div className="flex items-center min-w-0 flex-1">
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
 							<Button
 								variant="ghost"
 								size="sm"
 								className={cn(
-									"h-7 px-2 gap-1 min-w-0 w-full justify-start",
-									rightMode === "sidebar" ? "max-w-full" : "max-w-56",
+									"h-7 px-2 gap-1 w-auto justify-start overflow-hidden",
+									rightMode === "sidebar"
+										? "max-w-[min(100%,calc(100vw-20rem))]"
+										: "max-w-56",
 								)}
 							>
-								<span className="truncate text-sm font-medium min-w-0">
+								<span className="truncate text-sm font-medium block">
 									{title}
 								</span>
 								<ChevronDown className="size-3 text-muted-foreground shrink-0" />
@@ -494,54 +620,65 @@ function ChatSessionChrome(
 						</DropdownMenuTrigger>
 						<DropdownMenuContent
 							align="start"
-							className={cn("min-w-56 w-72 max-w-88", "overflow-hidden")}
+							className={cn(
+								"min-w-56 w-72 max-w-88 overflow-hidden p-0",
+								"max-h-none",
+							)}
 						>
-							{todayChats.length === 0 && previousChats.length === 0 ? (
-								<div className="px-2 py-2">
-									<div className="mt-1 text-xs text-muted-foreground">
-										Send a message to start a chat.
-									</div>
+							<ScrollArea className="h-[min(20rem,var(--radix-dropdown-menu-content-available-height))]">
+								<div className="p-1 pr-3">
+									{todayChats.length === 0 && previousChats.length === 0 ? (
+										<div className="px-2 py-2">
+											<div className="mt-1 text-xs text-muted-foreground">
+												Send a message to start a chat.
+											</div>
+										</div>
+									) : null}
+									{todayChats.length ? (
+										<>
+											<DropdownMenuLabel className="text-muted-foreground text-xs px-2">
+												Today
+											</DropdownMenuLabel>
+											{todayChats.map((chat) => (
+												<DropdownMenuItem
+													key={chat._id}
+													className="gap-2 min-w-0 overflow-hidden grid grid-cols-[minmax(0,1fr)_auto] items-center"
+													onSelect={() => void onSelectChat(chat._id)}
+												>
+													<div className="min-w-0 overflow-hidden">
+														<span className="block truncate">{chat.title}</span>
+													</div>
+													{activePersistedChatId === chat._id ? (
+														<Check className="size-4 shrink-0 text-muted-foreground" />
+													) : null}
+												</DropdownMenuItem>
+											))}
+										</>
+									) : null}
+									{previousChats.length ? (
+										<>
+											{todayChats.length ? <DropdownMenuSeparator /> : null}
+											<DropdownMenuLabel className="text-muted-foreground text-xs px-2">
+												Previous
+											</DropdownMenuLabel>
+											{previousChats.map((chat) => (
+												<DropdownMenuItem
+													key={chat._id}
+													className="gap-2 min-w-0 overflow-hidden grid grid-cols-[minmax(0,1fr)_auto] items-center"
+													onSelect={() => void onSelectChat(chat._id)}
+												>
+													<div className="min-w-0 overflow-hidden">
+														<span className="block truncate">{chat.title}</span>
+													</div>
+													{activePersistedChatId === chat._id ? (
+														<Check className="size-4 shrink-0 text-muted-foreground" />
+													) : null}
+												</DropdownMenuItem>
+											))}
+										</>
+									) : null}
 								</div>
-							) : null}
-							{todayChats.length ? (
-								<>
-									<DropdownMenuLabel className="text-muted-foreground text-xs px-2">
-										Today
-									</DropdownMenuLabel>
-									{todayChats.map((chat) => (
-										<DropdownMenuItem
-											key={chat._id}
-											className="gap-2 min-w-0"
-											onSelect={() => void onSelectChat(chat._id)}
-										>
-											<span className="truncate min-w-0">{chat.title}</span>
-											{activePersistedChatId === chat._id ? (
-												<Check className="ml-auto size-4" />
-											) : null}
-										</DropdownMenuItem>
-									))}
-								</>
-							) : null}
-							{previousChats.length ? (
-								<>
-									{todayChats.length ? <DropdownMenuSeparator /> : null}
-									<DropdownMenuLabel className="text-muted-foreground text-xs px-2">
-										Previous
-									</DropdownMenuLabel>
-									{previousChats.slice(0, 12).map((chat) => (
-										<DropdownMenuItem
-											key={chat._id}
-											className="gap-2 min-w-0"
-											onSelect={() => void onSelectChat(chat._id)}
-										>
-											<span className="truncate min-w-0">{chat.title}</span>
-											{activePersistedChatId === chat._id ? (
-												<Check className="ml-auto size-4" />
-											) : null}
-										</DropdownMenuItem>
-									))}
-								</>
-							) : null}
+							</ScrollArea>
 						</DropdownMenuContent>
 					</DropdownMenu>
 				</div>
@@ -620,7 +757,14 @@ function ChatSessionChrome(
 			</SidebarHeader>
 
 			<SidebarContent className="flex-1 overflow-y-auto p-3">
-				{children || <ChatMessages messages={messages} isLoading={isLoading} />}
+				{children || (
+					<ChatMessages
+						messages={messages}
+						isLoading={isLoading}
+						onPlusAction={handlePlusAction}
+						plusTooltip={plusTooltip}
+					/>
+				)}
 			</SidebarContent>
 
 			<SidebarFooter className="p-3">
@@ -634,6 +778,9 @@ function ChatSessionChrome(
 					onModelChange={onModelChange}
 					sidebarOpen={sidebarOpen}
 					autoMentionDocumentId={contextDocumentId ?? null}
+					isAutoMentionDismissed={isAutoMentionDismissed}
+					onAutoMentionDismiss={onAutoMentionDismiss}
+					onAutoMentionUndismiss={onAutoMentionUndismiss}
 				/>
 			</SidebarFooter>
 		</>
@@ -662,6 +809,11 @@ function PersistedChatSession(
 		toggleRightSidebar: () => void;
 		sidebarOpen: boolean;
 		contextDocumentId?: Id<"documents"> | null;
+		isAutoMentionDismissed: boolean;
+		onAutoMentionDismiss: (documentId: Id<"documents">) => void;
+		onAutoMentionUndismiss: (documentId: Id<"documents">) => void;
+		onAddToDocument?: (content: string) => void;
+		onCreatePageFromAi: (chatTitle: string, content: string) => Promise<void>;
 		onSelectChat: (chatId: Id<"chats">) => void | Promise<void>;
 		onStartNewDraft: (opts?: { modelId?: string; draftId?: string }) => void;
 		pendingSavedChat?: PendingSavedChat;
@@ -684,6 +836,11 @@ function PersistedChatSession(
 		toggleRightSidebar,
 		sidebarOpen,
 		contextDocumentId,
+		isAutoMentionDismissed,
+		onAutoMentionDismiss,
+		onAutoMentionUndismiss,
+		onAddToDocument,
+		onCreatePageFromAi,
 		onSelectChat,
 		onStartNewDraft,
 		pendingSavedChat,
@@ -840,6 +997,11 @@ function PersistedChatSession(
 			toggleRightSidebar={toggleRightSidebar}
 			sidebarOpen={sidebarOpen}
 			contextDocumentId={contextDocumentId}
+			isAutoMentionDismissed={isAutoMentionDismissed}
+			onAutoMentionDismiss={onAutoMentionDismiss}
+			onAutoMentionUndismiss={onAutoMentionUndismiss}
+			onAddToDocument={onAddToDocument}
+			onCreatePageFromAi={onCreatePageFromAi}
 			onNewChat={handleNewChat}
 			onSelectChat={handleSelectChat}
 			onSendMessage={handleSend}
@@ -871,6 +1033,11 @@ function DraftChatSession(
 		toggleRightSidebar: () => void;
 		sidebarOpen: boolean;
 		contextDocumentId?: Id<"documents"> | null;
+		isAutoMentionDismissed: boolean;
+		onAutoMentionDismiss: (documentId: Id<"documents">) => void;
+		onAutoMentionUndismiss: (documentId: Id<"documents">) => void;
+		onAddToDocument?: (content: string) => void;
+		onCreatePageFromAi: (chatTitle: string, content: string) => Promise<void>;
 		onSelectChat: (chatId: Id<"chats">) => void | Promise<void>;
 		onStartNewDraft: (opts?: { modelId?: string; draftId?: string }) => void;
 		onDraftFinalized: (payload: {
@@ -896,6 +1063,11 @@ function DraftChatSession(
 		toggleRightSidebar,
 		sidebarOpen,
 		contextDocumentId,
+		isAutoMentionDismissed,
+		onAutoMentionDismiss,
+		onAutoMentionUndismiss,
+		onAddToDocument,
+		onCreatePageFromAi,
 		onSelectChat,
 		onStartNewDraft,
 		onDraftFinalized,
@@ -996,6 +1168,11 @@ function DraftChatSession(
 			toggleRightSidebar={toggleRightSidebar}
 			sidebarOpen={sidebarOpen}
 			contextDocumentId={contextDocumentId}
+			isAutoMentionDismissed={isAutoMentionDismissed}
+			onAutoMentionDismiss={onAutoMentionDismiss}
+			onAutoMentionUndismiss={onAutoMentionUndismiss}
+			onAddToDocument={onAddToDocument}
+			onCreatePageFromAi={onCreatePageFromAi}
 			onNewChat={handleNewChat}
 			onSelectChat={handleSelectChat}
 			onSendMessage={handleSend}
