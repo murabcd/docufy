@@ -96,7 +96,7 @@ export function NavActions({
 	const handleDuplicate = React.useCallback(async () => {
 		if (!documentId) return;
 		const newId = await duplicateDocument({ id: documentId });
-		toast.success("Document duplicated");
+		toast.success("Page duplicated");
 		setIsOpen(false);
 		navigate({
 			to: "/documents/$documentId",
@@ -110,9 +110,9 @@ export function NavActions({
 		navigate({ to: "/", replace: true });
 		try {
 			await archiveDocument({ id: documentId });
-			toast.success("Document moved to trash");
+			toast.success("Page moved to trash");
 		} catch (_error) {
-			toast.error("Failed to move document to trash");
+			toast.error("Failed to move page to trash");
 		}
 	}, [archiveDocument, documentId, navigate]);
 

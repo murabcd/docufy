@@ -94,13 +94,14 @@ export function NavSecondary({
 											<SidebarMenuButton
 												onPointerEnter={prefetchTrash}
 												onFocus={prefetchTrash}
+												isActive={trashOpen}
 											>
 												<item.icon />
 												<span>{item.title}</span>
 											</SidebarMenuButton>
 										</PopoverTrigger>
 										<PopoverContent
-											className="p-0 w-72"
+											className="p-0 overflow-hidden w-[min(420px,calc(100vw-2rem))] h-[420px] max-h-[70vh]"
 											side={isMobile ? "bottom" : "right"}
 											align="end"
 											alignOffset={-24}

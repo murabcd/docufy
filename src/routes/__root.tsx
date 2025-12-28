@@ -45,7 +45,7 @@ export const Route = createRootRouteWithContext<{
 			{
 				name: "description",
 				content:
-					"AI Document Management Platform Built with TanStack Start, TanStack AI and Convex.",
+					"Notion-like Platform Built with TanStack Start, TanStack AI and Convex.",
 			},
 		],
 		links: [

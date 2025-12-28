@@ -218,7 +218,7 @@ function SidebarProvider({
 			enabled: typeof window !== "undefined" && !isMobile,
 			preventDefault: true,
 			enableOnContentEditable: false,
-			enableOnFormTags: false,
+			enableOnFormTags: true,
 		},
 		[toggleRightSidebar, isMobile],
 	);

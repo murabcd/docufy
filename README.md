@@ -1,5 +1,5 @@
 <a href="https://docufy-oss.vercel.app">
-  <img alt="AI Document Management Platform Built with TanStack Start, TanStack AI and Convex." src="./public/preview/docufy.png">
+  <img alt="Notion-like Platform Built with TanStack Start, TanStack AI and Convex." src="./public/preview/docufy.png">
   <h1 align="center">Docufy</h1>
 </a>
 

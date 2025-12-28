@@ -154,7 +154,7 @@ export function WorkspaceSwitcher({
 										<div className="flex flex-col">
 											<span className="text-sm font-medium">{displayName}</span>
 											<span className="text-xs text-muted-foreground">
-												{activeTeam.plan} Plan · 1 member
+												{activeTeam.plan} · 1 member
 											</span>
 										</div>
 									</div>
