@@ -39,16 +39,6 @@ import {
 import { useEffect, useEffectEvent, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
@@ -109,7 +99,6 @@ function DocumentItem({
 	const { isMobile } = useSidebar();
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [isMounted, setIsMounted] = useState(false);
-	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
 	const queryClient = useQueryClient();
 	const archiveDocument = useMutation(api.documents.archive);
@@ -167,24 +156,49 @@ function DocumentItem({
 		backgroundColor: isOver ? "var(--sidebar-accent)" : undefined,
 	};
 
-	const handleDelete = async () => {
-		setShowDeleteDialog(false);
+	const handleMoveToTrash = async () => {
 		const isCurrent = currentDocumentId === document._id;
 		if (isCurrent) {
 			navigate({ to: "/", replace: true });
 		}
 		try {
 			await archiveDocument({ id: document._id });
-			toast.success("Document moved to trash");
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.documents.getAll).queryKey.slice(0, 2),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.documents.list).queryKey.slice(0, 2),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.documents.listShared).queryKey.slice(0, 2),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.documents.getTrash).queryKey.slice(0, 2),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.documents.get, { id: document._id }).queryKey,
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
+					0,
+					2,
+				),
+			});
+			await queryClient.invalidateQueries({
+				queryKey: convexQuery(api.favorites.isFavorite, {
+					documentId: document._id,
+				}).queryKey,
+			});
+			toast.success("Page moved to trash");
 		} catch (_error) {
-			toast.error("Failed to move document to trash");
+			toast.error("Failed to move page to trash");
 		}
 	};
 
 	const handleDuplicate = async () => {
 		startTransition(async () => {
 			const newId = await duplicateDocument({ id: document._id });
-			toast.success("Document duplicated");
+			toast.success("Page duplicated");
 			navigate({
 				to: "/documents/$documentId",
 				params: { documentId: newId },
@@ -344,34 +358,14 @@ function DocumentItem({
 								</DropdownMenuItem>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem
-									onClick={() => setShowDeleteDialog(true)}
+									onClick={handleMoveToTrash}
 									className="text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"
 								>
 									<Trash2 className="text-destructive dark:text-red-500" />
-									<span>Delete</span>
+									<span>Move to trash</span>
 								</DropdownMenuItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
-						<AlertDialog
-							open={showDeleteDialog}
-							onOpenChange={setShowDeleteDialog}
-						>
-							<AlertDialogContent>
-								<AlertDialogHeader>
-									<AlertDialogTitle>Move to trash?</AlertDialogTitle>
-									<AlertDialogDescription>
-										This will move the document to trash. You can restore it
-										later from the trash.
-									</AlertDialogDescription>
-								</AlertDialogHeader>
-								<AlertDialogFooter>
-									<AlertDialogCancel>Cancel</AlertDialogCancel>
-									<AlertDialogAction onClick={handleDelete}>
-										Move to trash
-									</AlertDialogAction>
-								</AlertDialogFooter>
-							</AlertDialogContent>
-						</AlertDialog>
 					</div>
 				</SidebarMenuSubItem>
 				{isExpanded && (
@@ -502,34 +496,14 @@ function DocumentItem({
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem
-								onClick={() => setShowDeleteDialog(true)}
+								onClick={handleMoveToTrash}
 								className="text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"
 							>
 								<Trash2 className="text-destructive dark:text-red-500" />
-								<span>Delete</span>
+								<span>Move to trash</span>
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
-					<AlertDialog
-						open={showDeleteDialog}
-						onOpenChange={setShowDeleteDialog}
-					>
-						<AlertDialogContent>
-							<AlertDialogHeader>
-								<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-								<AlertDialogDescription>
-									This action cannot be undone. This will permanently delete
-									your document and all associated data.
-								</AlertDialogDescription>
-							</AlertDialogHeader>
-							<AlertDialogFooter>
-								<AlertDialogCancel>Cancel</AlertDialogCancel>
-								<AlertDialogAction onClick={handleDelete}>
-									Delete
-								</AlertDialogAction>
-							</AlertDialogFooter>
-						</AlertDialogContent>
-					</AlertDialog>
 				</div>
 			</SidebarMenuItem>
 			{isExpanded && (

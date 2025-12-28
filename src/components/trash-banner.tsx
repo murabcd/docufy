@@ -29,9 +29,9 @@ export function TrashBanner({ documentId }: TrashBannerProps) {
 	const onRestore = async () => {
 		try {
 			await restore({ id: documentId });
-			toast.success("Document restored");
+			toast.success("Page restored");
 		} catch (_error) {
-			toast.error("Failed to restore document");
+			toast.error("Failed to restore page");
 		}
 	};
 
@@ -42,11 +42,11 @@ export function TrashBanner({ documentId }: TrashBannerProps) {
 	const handleConfirmDelete = async () => {
 		try {
 			await remove({ id: documentId });
-			toast.success("Document permanently deleted");
+			toast.success("Page permanently deleted");
 			navigate({ to: "/" });
 			window.dispatchEvent(new Event("openTrashPopover"));
 		} catch (_error) {
-			toast.error("Failed to delete document");
+			toast.error("Failed to delete page");
 		}
 	};
 
@@ -73,7 +73,7 @@ export function TrashBanner({ documentId }: TrashBannerProps) {
 						<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
 						<AlertDialogDescription>
 							This action cannot be undone. This will permanently delete your
-							document and all associated data.
+							page and all associated data.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
