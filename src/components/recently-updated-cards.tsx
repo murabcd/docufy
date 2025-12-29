@@ -4,12 +4,17 @@ import { Link } from "@tanstack/react-router";
 import { FileText } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { formatRelativeTime } from "@/lib/utils";
 import { api } from "../../convex/_generated/api";
 
 export function RecentlyUpdatedCards() {
+	const { activeWorkspaceId } = useActiveWorkspace();
 	const { data: documents } = useSuspenseQuery(
-		convexQuery(api.documents.getRecentlyUpdated, { limit: 6 }),
+		convexQuery(api.documents.getRecentlyUpdated, {
+			limit: 6,
+			workspaceId: activeWorkspaceId ?? undefined,
+		}),
 	);
 	const { data: currentUser } = useSuspenseQuery(
 		convexQuery(api.auth.getCurrentUser, {}),

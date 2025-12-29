@@ -19,6 +19,7 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { api } from "../../convex/_generated/api";
 
 export function NavSecondary({
@@ -39,6 +40,7 @@ export function NavSecondary({
 	const pathname = location.pathname;
 	const queryClient = useQueryClient();
 	const [trashOpen, setTrashOpen] = useState(false);
+	const { activeWorkspaceId } = useActiveWorkspace();
 
 	useEffect(() => {
 		if (pathname) setTrashOpen(false);
@@ -46,9 +48,13 @@ export function NavSecondary({
 
 	const prefetchTrash = useCallback(() => {
 		void queryClient
-			.prefetchQuery(convexQuery(api.documents.getTrash))
+			.prefetchQuery(
+				convexQuery(api.documents.getTrash, {
+					workspaceId: activeWorkspaceId ?? undefined,
+				}),
+			)
 			.catch(() => {});
-	}, [queryClient]);
+	}, [activeWorkspaceId, queryClient]);
 
 	useEffect(() => {
 		const openTrash = () => {

@@ -9,6 +9,7 @@ import {
 	CommandItem,
 	CommandList,
 } from "@/components/ui/command";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -23,8 +24,11 @@ export function SearchCommand({
 	onOpenChange,
 	onSelectDocument,
 }: SearchCommandProps) {
+	const { activeWorkspaceId } = useActiveWorkspace();
 	const { data: documents } = useSuspenseQuery(
-		convexQuery(api.documents.getAll),
+		convexQuery(api.documents.getAll, {
+			workspaceId: activeWorkspaceId ?? undefined,
+		}),
 	);
 
 	return (

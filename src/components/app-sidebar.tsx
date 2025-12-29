@@ -25,10 +25,12 @@ import {
 	SidebarHeader,
 } from "@/components/ui/sidebar";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export interface Team {
+	id?: string;
 	name: string;
 	logo: LucideIcon;
 	plan: string;
@@ -114,30 +116,48 @@ export function AppSidebar({
 	const { data: currentUser } = useSuspenseQuery(
 		convexQuery(api.auth.getCurrentUser, {}),
 	);
+	const { workspaces, activeWorkspaceId, setActiveWorkspaceId } =
+		useActiveWorkspace();
 	const { data: favoritesData } = useSuspenseQuery(
-		convexQuery(api.favorites.listWithDocuments),
+		convexQuery(api.favorites.listWithDocuments, {
+			workspaceId: activeWorkspaceId ?? undefined,
+		}),
 	);
 
 	const fullName = (currentUser as { isAnonymous?: boolean } | null)
 		?.isAnonymous
 		? "Guest"
 		: currentUser?.name || "Guest";
+	const isAnonymousUser = Boolean(
+		(currentUser as { isAnonymous?: boolean } | null)?.isAnonymous,
+	);
 	const firstName = fullName.trim().split(/\s+/)[0] || "Guest";
 	const possessiveFirstName = /s$/i.test(firstName)
 		? `${firstName}'`
 		: `${firstName}'s`;
 
 	const teams = React.useMemo((): Team[] => {
-		return (
-			teamsProp ?? [
-				{
-					name: `${possessiveFirstName} workspace`,
-					logo: Command,
-					plan: "Free",
-				},
-			]
-		);
-	}, [possessiveFirstName, teamsProp]);
+		if (teamsProp) return teamsProp;
+		if (workspaces.length > 0) {
+			return workspaces.map((workspace) => ({
+				id: String(workspace._id),
+				name:
+					isAnonymousUser && workspace.name.toLowerCase().startsWith("guest")
+						? "Guest"
+						: workspace.name,
+				logo: Command,
+				plan: workspace.isPrivate ? "Private" : "Free",
+			}));
+		}
+		return [
+			{
+				id: "default",
+				name: isAnonymousUser ? "Guest" : `${possessiveFirstName} workspace`,
+				logo: Command,
+				plan: "Free",
+			},
+		];
+	}, [isAnonymousUser, possessiveFirstName, teamsProp, workspaces]);
 
 	const pathname = location.pathname;
 	const isHomeActive = pathname === "/";
@@ -184,6 +204,17 @@ export function AppSidebar({
 				<SidebarHeader>
 					<WorkspaceSwitcher
 						teams={teams}
+						activeTeamId={
+							activeWorkspaceId ? String(activeWorkspaceId) : undefined
+						}
+						onSelectTeamId={(teamId) => {
+							const match = workspaces.find(
+								(w) => String(w._id) === String(teamId),
+							);
+							if (match) {
+								setActiveWorkspaceId(match._id);
+							}
+						}}
 						onSettingsOpen={() => setSettingsOpen(true)}
 					/>
 					<NavMain

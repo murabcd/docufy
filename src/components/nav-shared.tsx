@@ -63,6 +63,7 @@ import {
 	SidebarMenuSubItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -94,6 +95,7 @@ function DocumentItem({
 }) {
 	const navigate = useNavigate();
 	const { isMobile } = useSidebar();
+	const { activeWorkspaceId } = useActiveWorkspace();
 	const [isExpanded, setIsExpanded] = useState(false);
 
 	const queryClient = useQueryClient();
@@ -103,7 +105,10 @@ function DocumentItem({
 	const [, startTransition] = useTransition();
 
 	const { data: children = [] } = useSuspenseQuery(
-		convexQuery(api.documents.listShared, { parentId: document._id }),
+		convexQuery(api.documents.listShared, {
+			parentId: document._id,
+			workspaceId: activeWorkspaceId ?? undefined,
+		}),
 	);
 
 	const { data: isFavorite } = useQuery({
@@ -460,11 +465,15 @@ export function NavShared() {
 		? (pathname.split("/documents/")[1] as Id<"documents">)
 		: null;
 
+	const { activeWorkspaceId } = useActiveWorkspace();
 	const [isCollapsed, setIsCollapsed] = useState(false);
 	const [isExpanded, setIsExpanded] = useState(false);
 
 	const { data: documents = [] } = useSuspenseQuery(
-		convexQuery(api.documents.listShared, { parentId: null }),
+		convexQuery(api.documents.listShared, {
+			parentId: null,
+			workspaceId: activeWorkspaceId ?? undefined,
+		}),
 	);
 
 	const MAX_VISIBLE = 5;

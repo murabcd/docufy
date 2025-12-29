@@ -32,6 +32,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -265,8 +266,11 @@ export function TrashBoxPopover({
 	open: boolean;
 	onRequestClose?: () => void;
 }) {
+	const { activeWorkspaceId } = useActiveWorkspace();
 	const { data: documents, isLoading } = useQuery({
-		...convexQuery(api.documents.getTrash),
+		...convexQuery(api.documents.getTrash, {
+			workspaceId: activeWorkspaceId ?? undefined,
+		}),
 		enabled: open,
 		gcTime: 2 * 60_000,
 		placeholderData: (previousData) => previousData,
