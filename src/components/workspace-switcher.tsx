@@ -34,31 +34,45 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useCreateDocumentNavigation } from "@/hooks/use-create-document-navigation";
+import { CreateWorkspaceDialog } from "@/components/workspaces/create-workspace-dialog";
+import { useCreateDocument } from "@/hooks/use-create-document";
 import { authClient } from "@/lib/auth-client";
 import { api } from "../../convex/_generated/api";
 
 export function WorkspaceSwitcher({
 	teams,
+	activeTeamId,
+	onSelectTeamId,
 	onSettingsOpen,
 }: {
 	teams: {
+		id?: string;
 		name: string;
 		logo: React.ElementType;
 		plan: string;
 	}[];
+	activeTeamId?: string;
+	onSelectTeamId?: (teamId: string) => void;
 	onSettingsOpen?: () => void;
 }) {
-	const [activeTeam, setActiveTeam] = React.useState(teams[0]);
 	const { state, isMobile } = useSidebar();
-	const { createAndNavigate, isCreating } = useCreateDocumentNavigation();
+	const { createAndNavigate, isCreating } = useCreateDocument();
 
 	const [loginOpen, setLoginOpen] = React.useState(false);
 	const [logOutPending, setLogOutPending] = React.useState(false);
+	const [createWorkspaceOpen, setCreateWorkspaceOpen] = React.useState(false);
 
 	const { data: currentUser } = useSuspenseQuery(
 		convexQuery(api.auth.getCurrentUser, {}),
 	);
+
+	const activeTeam = React.useMemo(() => {
+		const requestedKey = activeTeamId;
+		if (requestedKey) {
+			return teams.find((t) => (t.id ?? t.name) === requestedKey) ?? teams[0];
+		}
+		return teams[0];
+	}, [activeTeamId, teams]);
 
 	if (!activeTeam) {
 		return null;
@@ -120,6 +134,14 @@ export function WorkspaceSwitcher({
 	return (
 		<>
 			<LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
+			<CreateWorkspaceDialog
+				open={createWorkspaceOpen}
+				onOpenChange={setCreateWorkspaceOpen}
+				showTrigger={false}
+				onCreated={(workspaceId) => {
+					onSelectTeamId?.(String(workspaceId));
+				}}
+			/>
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<div className="flex items-center gap-1 w-full relative">
@@ -185,29 +207,38 @@ export function WorkspaceSwitcher({
 								<DropdownMenuLabel className="text-muted-foreground text-xs px-2">
 									Workspaces
 								</DropdownMenuLabel>
-								{teams.map((team) => (
+								{teams.map((team) => {
+									const teamKey = team.id ?? team.name;
+									const activeKey = activeTeam.id ?? activeTeam.name;
+									return (
+										<DropdownMenuItem
+											key={teamKey}
+											onClick={() => onSelectTeamId?.(teamKey)}
+											className="gap-2"
+										>
+											<div className="flex size-6 items-center justify-center rounded-xs border">
+												<team.logo className="size-4 shrink-0" />
+											</div>
+											{team.name}
+											{activeKey === teamKey && (
+												<Check className="ml-auto size-4" />
+											)}
+										</DropdownMenuItem>
+									);
+								})}
+								{!isAnonymousUser ? (
 									<DropdownMenuItem
-										key={team.name}
-										onClick={() => setActiveTeam(team)}
 										className="gap-2"
+										onClick={() => setCreateWorkspaceOpen(true)}
 									>
-										<div className="flex size-6 items-center justify-center rounded-xs border">
-											<team.logo className="size-4 shrink-0" />
+										<div className="bg-background flex size-6 items-center justify-center rounded-md border">
+											<Plus className="size-4" />
 										</div>
-										{team.name}
-										{activeTeam.name === team.name && (
-											<Check className="ml-auto size-4" />
-										)}
+										<div className="text-muted-foreground font-medium">
+											Add workspace
+										</div>
 									</DropdownMenuItem>
-								))}
-								<DropdownMenuItem className="gap-2">
-									<div className="bg-background flex size-6 items-center justify-center rounded-md border">
-										<Plus className="size-4" />
-									</div>
-									<div className="text-muted-foreground font-medium">
-										New workspace
-									</div>
-								</DropdownMenuItem>
+								) : null}
 								<DropdownMenuSeparator />
 								{currentUser && !isAnonymousUser ? (
 									<DropdownMenuItem
