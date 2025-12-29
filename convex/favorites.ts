@@ -64,7 +64,7 @@ export const list = query({
 });
 
 export const listWithDocuments = query({
-	args: {},
+	args: { workspaceId: v.optional(v.id("workspaces")) },
 	returns: v.array(
 		v.object({
 			_id: v.id("favorites"),
@@ -87,9 +87,23 @@ export const listWithDocuments = query({
 			),
 		}),
 	),
-	handler: async (ctx) => {
+	handler: async (ctx, args) => {
 		const userId = await getUserId(ctx);
 		if (!userId) return [];
+		const workspaceId = args.workspaceId
+			? args.workspaceId
+			: (await ctx.db
+						.query("members")
+						.withIndex("by_user", (q) => q.eq("userId", userId))
+						.first())?.workspaceId ?? null;
+		if (!workspaceId) return [];
+		const membership = await ctx.db
+			.query("members")
+			.withIndex("by_workspace_user", (q) =>
+				q.eq("workspaceId", workspaceId).eq("userId", userId),
+			)
+			.unique();
+		if (!membership) return [];
 		const toFavoriteDocument = (document: {
 			_id: any;
 			_creationTime: number;
@@ -130,7 +144,11 @@ export const listWithDocuments = query({
 				return {
 					...safeFavorite,
 					document:
-						document && !document.isArchived ? toFavoriteDocument(document) : null,
+						document &&
+						!document.isArchived &&
+						document.workspaceId === workspaceId
+							? toFavoriteDocument(document)
+							: null,
 				};
 			}),
 		);

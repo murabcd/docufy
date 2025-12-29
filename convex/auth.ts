@@ -108,7 +108,7 @@ export const migrateAnonymousData = mutation({
       .withIndex('by_user', (q) => q.eq('userId', fromUserId))
       .collect()
     for (const doc of docs) {
-      await ctx.db.patch(doc._id, { userId: toUserId })
+      await ctx.db.patch(doc._id, { userId: toUserId, workspaceId: undefined })
     }
 
     const favorites = await ctx.db

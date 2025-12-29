@@ -19,10 +19,42 @@ const requireUserId = async (ctx: QueryCtx | MutationCtx) => {
 	return userId;
 };
 
+const requireWorkspaceAccess = async (
+	ctx: QueryCtx | MutationCtx,
+	workspaceId: Id<"workspaces">,
+) => {
+	const userId = await requireUserId(ctx);
+	const membership = await ctx.db
+		.query("members")
+		.withIndex("by_workspace_user", (q) =>
+			q.eq("workspaceId", workspaceId).eq("userId", userId),
+		)
+		.unique();
+	if (!membership) {
+		throw new ConvexError("Unauthorized");
+	}
+	return userId;
+};
+
+const resolveWorkspaceId = async (
+	ctx: QueryCtx,
+	workspaceId: Id<"workspaces"> | undefined,
+) => {
+	if (workspaceId) return workspaceId;
+	const userId = await getUserId(ctx);
+	if (!userId) return null;
+	const membership = await ctx.db
+		.query("members")
+		.withIndex("by_user", (q) => q.eq("userId", userId))
+		.first();
+	return membership?.workspaceId ?? null;
+};
+
 const documentFields = {
 	_id: v.id("documents"),
 	_creationTime: v.number(),
 	userId: v.optional(v.string()),
+	workspaceId: v.optional(v.id("workspaces")),
 	title: v.string(),
 	content: v.optional(v.string()),
 	searchableText: v.string(),
@@ -43,18 +75,29 @@ const documentFields = {
 
 export const create = mutation({
 	args: {
+		workspaceId: v.optional(v.id("workspaces")),
 		title: v.optional(v.string()),
 		parentId: v.optional(v.id("documents")),
 	},
 	returns: v.id("documents"),
 	handler: async (ctx, args) => {
 		const userId = await requireUserId(ctx);
+		const workspaceId =
+			args.workspaceId ??
+			(await ctx.db
+				.query("members")
+				.withIndex("by_user", (q) => q.eq("userId", userId))
+				.first())?.workspaceId;
+		if (!workspaceId) throw new ConvexError("No workspace");
+		await requireWorkspaceAccess(ctx, workspaceId);
 		const now = Date.now();
 
 		const siblings = await ctx.db
 			.query("documents")
-			.withIndex("by_user_parent", (q) =>
-				q.eq("userId", userId).eq("parentId", args.parentId ?? undefined),
+			.withIndex("by_workspace_parent", (q) =>
+				q
+					.eq("workspaceId", workspaceId)
+					.eq("parentId", args.parentId ?? undefined),
 			)
 			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
@@ -65,6 +108,7 @@ export const create = mutation({
 
 		const documentId = await ctx.db.insert("documents", {
 			userId,
+			workspaceId,
 			title: args.title || "New page",
 			content: JSON.stringify(EMPTY_DOCUMENT),
 			searchableText: "",
@@ -110,6 +154,7 @@ const plainTextToSnapshot = (text: string): typeof EMPTY_DOCUMENT => {
 
 export const createFromAi = mutation({
 	args: {
+		workspaceId: v.optional(v.id("workspaces")),
 		title: v.string(),
 		content: v.string(),
 		parentId: v.optional(v.id("documents")),
@@ -117,12 +162,22 @@ export const createFromAi = mutation({
 	returns: v.id("documents"),
 	handler: async (ctx, args) => {
 		const userId = await requireUserId(ctx);
+		const workspaceId =
+			args.workspaceId ??
+			(await ctx.db
+				.query("members")
+				.withIndex("by_user", (q) => q.eq("userId", userId))
+				.first())?.workspaceId;
+		if (!workspaceId) throw new ConvexError("No workspace");
+		await requireWorkspaceAccess(ctx, workspaceId);
 		const now = Date.now();
 
 		const siblings = await ctx.db
 			.query("documents")
-			.withIndex("by_user_parent", (q) =>
-				q.eq("userId", userId).eq("parentId", args.parentId ?? undefined),
+			.withIndex("by_workspace_parent", (q) =>
+				q
+					.eq("workspaceId", workspaceId)
+					.eq("parentId", args.parentId ?? undefined),
 			)
 			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
@@ -136,6 +191,7 @@ export const createFromAi = mutation({
 
 		const documentId = await ctx.db.insert("documents", {
 			userId,
+			workspaceId,
 			title: args.title.trim() || "New page",
 			content: JSON.stringify(snapshot),
 			searchableText,
@@ -172,7 +228,18 @@ export const get = query({
 		const userId = await getUserId(ctx);
 		if (!userId) return null;
 		const doc = await ctx.db.get(args.id);
-		if (!doc || doc.userId !== userId) return null;
+		if (!doc) return null;
+		if (doc.workspaceId) {
+			const membership = await ctx.db
+				.query("members")
+				.withIndex("by_workspace_user", (q) =>
+					q.eq("workspaceId", doc.workspaceId!).eq("userId", userId),
+				)
+				.unique();
+			if (!membership) return null;
+		} else if (doc.userId !== userId) {
+			return null;
+		}
 		return doc;
 	},
 });
@@ -211,7 +278,12 @@ export const update = mutation({
 	handler: async (ctx, args) => {
 		const userId = await requireUserId(ctx);
 		const existing = await ctx.db.get(args.id);
-		if (!existing || existing.userId !== userId) {
+		if (!existing) {
+			throw new ConvexError("Not found");
+		}
+		if (existing.workspaceId) {
+			await requireWorkspaceAccess(ctx, existing.workspaceId);
+		} else if (existing.userId !== userId) {
 			throw new ConvexError("Not found");
 		}
 
@@ -233,6 +305,7 @@ export const update = mutation({
 
 export const list = query({
 	args: {
+		workspaceId: v.optional(v.id("workspaces")),
 		parentId: v.optional(v.union(v.id("documents"), v.null())),
 	},
 	returns: v.array(
@@ -241,12 +314,21 @@ export const list = query({
 	handler: async (ctx, args) => {
 		const userId = await getUserId(ctx);
 		if (!userId) return [];
+		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
+		if (!workspaceId) return [];
+		const membership = await ctx.db
+			.query("members")
+			.withIndex("by_workspace_user", (q) =>
+				q.eq("workspaceId", workspaceId).eq("userId", userId),
+			)
+			.unique();
+		if (!membership) return [];
 		const parentId = args.parentId === null ? undefined : args.parentId;
 
 		const docs = await ctx.db
 			.query("documents")
-			.withIndex("by_user_parent", (q) =>
-				q.eq("userId", userId).eq("parentId", parentId),
+			.withIndex("by_workspace_parent", (q) =>
+				q.eq("workspaceId", workspaceId).eq("parentId", parentId),
 			)
 			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
@@ -270,26 +352,34 @@ export const reorder = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		const userId = await requireUserId(ctx);
+		await requireUserId(ctx);
 		const document = await ctx.db.get(args.id);
 		if (!document) {
 			throw new ConvexError("Not found");
 		}
-		if (document.userId !== userId) {
-			throw new ConvexError("Not found");
-		}
+		if (!document.workspaceId) throw new ConvexError("Not found");
+		await requireWorkspaceAccess(ctx, document.workspaceId);
 		if (document.isArchived) {
 			throw new Error("Cannot reorder an archived document");
 		}
+
+		const workspaceId = document.workspaceId;
 		
 		const oldParentId = document.parentId;
 		const newParentId = args.newParentId ?? undefined;
+
+		if (newParentId) {
+			const newParent = await ctx.db.get(newParentId);
+			if (!newParent || newParent.workspaceId !== workspaceId) {
+				throw new ConvexError("Not found");
+			}
+		}
 		
 		if (oldParentId !== newParentId) {
 			const oldSiblings = await ctx.db
 				.query("documents")
-				.withIndex("by_user_parent", (q) =>
-					q.eq("userId", userId).eq("parentId", oldParentId ?? undefined),
+				.withIndex("by_workspace_parent", (q) =>
+					q.eq("workspaceId", workspaceId).eq("parentId", oldParentId ?? undefined),
 				)
 				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
@@ -305,8 +395,8 @@ export const reorder = mutation({
 
 			const newSiblings = await ctx.db
 				.query("documents")
-				.withIndex("by_user_parent", (q) =>
-					q.eq("userId", userId).eq("parentId", newParentId ?? undefined),
+				.withIndex("by_workspace_parent", (q) =>
+					q.eq("workspaceId", workspaceId).eq("parentId", newParentId ?? undefined),
 				)
 				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
@@ -322,8 +412,8 @@ export const reorder = mutation({
 		} else {
 			const siblings = await ctx.db
 				.query("documents")
-				.withIndex("by_user_parent", (q) =>
-					q.eq("userId", userId).eq("parentId", oldParentId ?? undefined),
+				.withIndex("by_workspace_parent", (q) =>
+					q.eq("workspaceId", workspaceId).eq("parentId", oldParentId ?? undefined),
 				)
 				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
@@ -376,21 +466,21 @@ export const archive = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		const userId = await requireUserId(ctx);
+		await requireUserId(ctx);
 		const now = Date.now();
 		const document = await ctx.db.get(args.id);
 		if (!document) {
 			throw new ConvexError("Not found");
 		}
-		if (document.userId !== userId) {
-			throw new ConvexError("Not found");
-		}
+		if (!document.workspaceId) throw new ConvexError("Not found");
+		await requireWorkspaceAccess(ctx, document.workspaceId);
+		const workspaceId = document.workspaceId;
 
 		const recursiveArchive = async (documentId: Id<"documents">) => {
 			const children = await ctx.db
 				.query("documents")
-				.withIndex("by_user_parent", (q) =>
-					q.eq("userId", userId).eq("parentId", documentId),
+				.withIndex("by_workspace_parent", (q) =>
+					q.eq("workspaceId", workspaceId).eq("parentId", documentId),
 				)
 				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
@@ -419,15 +509,24 @@ export const archive = mutation({
 });
 
 export const getTrash = query({
-	args: {},
+	args: { workspaceId: v.optional(v.id("workspaces")) },
 	returns: v.array(v.object(documentFields)),
-	handler: async (ctx) => {
+	handler: async (ctx, args) => {
 		const userId = await getUserId(ctx);
 		if (!userId) return [];
+		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
+		if (!workspaceId) return [];
+		const membership = await ctx.db
+			.query("members")
+			.withIndex("by_workspace_user", (q) =>
+				q.eq("workspaceId", workspaceId).eq("userId", userId),
+			)
+			.unique();
+		if (!membership) return [];
 		const documents = await ctx.db
 			.query("documents")
-			.withIndex("by_user_isArchived_archivedAt", (q) =>
-				q.eq("userId", userId).eq("isArchived", true),
+			.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+				q.eq("workspaceId", workspaceId).eq("isArchived", true),
 			)
 			.collect();
 
@@ -445,21 +544,21 @@ export const restore = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		const userId = await requireUserId(ctx);
+		await requireUserId(ctx);
 		const now = Date.now();
 		const document = await ctx.db.get(args.id);
 		if (!document) {
 			throw new ConvexError("Not found");
 		}
-		if (document.userId !== userId) {
-			throw new ConvexError("Not found");
-		}
+		if (!document.workspaceId) throw new ConvexError("Not found");
+		await requireWorkspaceAccess(ctx, document.workspaceId);
+		const workspaceId = document.workspaceId;
 
 		const recursiveRestore = async (documentId: Id<"documents">) => {
 			const children = await ctx.db
 				.query("documents")
-				.withIndex("by_user_parent", (q) =>
-					q.eq("userId", userId).eq("parentId", documentId),
+				.withIndex("by_workspace_parent", (q) =>
+					q.eq("workspaceId", workspaceId).eq("parentId", documentId),
 				)
 				.filter((q) => q.eq(q.field("isArchived"), true))
 				.collect();
@@ -489,7 +588,7 @@ export const restore = mutation({
 		let targetParentId: Id<"documents"> | undefined = document.parentId;
 		if (targetParentId) {
 			const parent = await ctx.db.get(targetParentId);
-			if (parent?.isArchived) {
+			if (parent?.isArchived || parent?.workspaceId !== workspaceId) {
 				targetParentId = undefined;
 			}
 		}
@@ -498,8 +597,8 @@ export const restore = mutation({
 
 		const siblings = await ctx.db
 			.query("documents")
-			.withIndex("by_user_parent", (q) =>
-				q.eq("userId", userId).eq("parentId", targetParentId),
+			.withIndex("by_workspace_parent", (q) =>
+				q.eq("workspaceId", workspaceId).eq("parentId", targetParentId),
 			)
 			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
@@ -520,7 +619,7 @@ export const restore = mutation({
 async function cascadeDelete(
 	ctx: MutationCtx,
 	rootId: Id<"documents">,
-	userId: string,
+	workspaceId: Id<"workspaces">,
 ) {
 	const idsToDelete: Id<"documents">[] = [];
 	const stack: Id<"documents">[] = [rootId];
@@ -531,8 +630,8 @@ async function cascadeDelete(
 
 		const children = await ctx.db
 			.query("documents")
-			.withIndex("by_user_parent", (q) =>
-				q.eq("userId", userId).eq("parentId", currentId),
+			.withIndex("by_workspace_parent", (q) =>
+				q.eq("workspaceId", workspaceId).eq("parentId", currentId),
 			)
 			.collect();
 
@@ -572,19 +671,18 @@ export const remove = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		const userId = await requireUserId(ctx);
+		await requireUserId(ctx);
 		const document = await ctx.db.get(args.id);
 		if (!document) {
 			throw new ConvexError("Not found");
 		}
-		if (document.userId !== userId) {
-			throw new ConvexError("Not found");
-		}
+		if (!document.workspaceId) throw new ConvexError("Not found");
+		await requireWorkspaceAccess(ctx, document.workspaceId);
 
 		if (!document.isArchived) {
 			throw new Error("Page must be moved to trash before permanent deletion");
 		}
-		await cascadeDelete(ctx, args.id, userId);
+		await cascadeDelete(ctx, args.id, document.workspaceId);
 		return null;
 	},
 });
@@ -636,7 +734,8 @@ export const cleanupTrash = internalMutation({
 			if (!current.userId) continue;
 			const archivedAt = current.archivedAt ?? current.updatedAt;
 			if (archivedAt >= cutoff) continue;
-			await cascadeDelete(ctx, current._id, current.userId);
+			if (!current.workspaceId) continue;
+			await cascadeDelete(ctx, current._id, current.workspaceId);
 		}
 
 		return null;
@@ -649,29 +748,29 @@ export const duplicate = mutation({
 	},
 	returns: v.id("documents"),
 	handler: async (ctx, args) => {
-		const userId = await requireUserId(ctx);
+		await requireUserId(ctx);
 		const original = await ctx.db.get(args.id);
 		if (!original) {
 			throw new ConvexError("Not found");
 		}
-		if (original.userId !== userId) {
-			throw new ConvexError("Not found");
-		}
+		if (!original.workspaceId) throw new ConvexError("Not found");
+		const userId = await requireWorkspaceAccess(ctx, original.workspaceId);
+		const workspaceId = original.workspaceId;
 
 		const now = Date.now();
 
 		let targetParentId: Id<"documents"> | undefined = original.parentId;
 		if (targetParentId) {
 			const parent = await ctx.db.get(targetParentId);
-			if (parent?.isArchived) {
+			if (parent?.isArchived || parent?.workspaceId !== workspaceId) {
 				targetParentId = undefined;
 			}
 		}
 
 		const siblings = await ctx.db
 			.query("documents")
-			.withIndex("by_user_parent", (q) =>
-				q.eq("userId", userId).eq("parentId", targetParentId),
+			.withIndex("by_workspace_parent", (q) =>
+				q.eq("workspaceId", workspaceId).eq("parentId", targetParentId),
 			)
 			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
@@ -691,6 +790,7 @@ export const duplicate = mutation({
 
 		const documentId = await ctx.db.insert("documents", {
 			userId,
+			workspaceId,
 			title: `${original.title} (Copy)`,
 			content: JSON.stringify(contentJson),
 			searchableText: original.searchableText ?? "",
@@ -728,7 +828,18 @@ export const getAncestors = query({
 		const ancestors: Doc<"documents">[] = [];
 
 		const currentDoc = await ctx.db.get(args.id);
-		if (!currentDoc || currentDoc.userId !== userId) {
+		if (!currentDoc) {
+			return ancestors;
+		}
+		if (currentDoc.workspaceId) {
+			const membership = await ctx.db
+				.query("members")
+				.withIndex("by_workspace_user", (q) =>
+					q.eq("workspaceId", currentDoc.workspaceId!).eq("userId", userId),
+				)
+				.unique();
+			if (!membership) return ancestors;
+		} else if (currentDoc.userId !== userId) {
 			return ancestors;
 		}
 
@@ -736,7 +847,12 @@ export const getAncestors = query({
 
 		while (currentId) {
 			const doc = await ctx.db.get(currentId);
-			if (!doc || doc.userId !== userId) {
+			if (!doc) {
+				break;
+			}
+			if (currentDoc.workspaceId) {
+				if (doc.workspaceId !== currentDoc.workspaceId) break;
+			} else if (doc.userId !== userId) {
 				break;
 			}
 
@@ -749,17 +865,26 @@ export const getAncestors = query({
 });
 
 export const getAll = query({
-	args: {},
+	args: { workspaceId: v.optional(v.id("workspaces")) },
 	returns: v.array(
 		v.object(documentFields),
 	),
-	handler: async (ctx) => {
+	handler: async (ctx, args) => {
 		const userId = await getUserId(ctx);
 		if (!userId) return [];
+		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
+		if (!workspaceId) return [];
+		const membership = await ctx.db
+			.query("members")
+			.withIndex("by_workspace_user", (q) =>
+				q.eq("workspaceId", workspaceId).eq("userId", userId),
+			)
+			.unique();
+		if (!membership) return [];
 		return await ctx.db
 			.query("documents")
-			.withIndex("by_user_isArchived_updatedAt", (q) =>
-				q.eq("userId", userId).eq("isArchived", false),
+			.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+				q.eq("workspaceId", workspaceId).eq("isArchived", false),
 			)
 			.order("desc")
 			.collect();
@@ -768,6 +893,7 @@ export const getAll = query({
 
 export const getRecentlyUpdated = query({
 	args: {
+		workspaceId: v.optional(v.id("workspaces")),
 		limit: v.optional(v.number()),
 	},
 	returns: v.array(
@@ -776,11 +902,20 @@ export const getRecentlyUpdated = query({
 	handler: async (ctx, args) => {
 		const userId = await getUserId(ctx);
 		if (!userId) return [];
+		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
+		if (!workspaceId) return [];
+		const membership = await ctx.db
+			.query("members")
+			.withIndex("by_workspace_user", (q) =>
+				q.eq("workspaceId", workspaceId).eq("userId", userId),
+			)
+			.unique();
+		if (!membership) return [];
 		const limit = Math.max(1, Math.min(args.limit ?? 6, 50));
 		return await ctx.db
 			.query("documents")
-			.withIndex("by_user_isArchived_updatedAt", (q) =>
-				q.eq("userId", userId).eq("isArchived", false),
+			.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+				q.eq("workspaceId", workspaceId).eq("isArchived", false),
 			)
 			.order("desc")
 			.take(limit);
@@ -789,6 +924,7 @@ export const getRecentlyUpdated = query({
 
 export const search = query({
 	args: {
+		workspaceId: v.optional(v.id("workspaces")),
 		term: v.string(),
 		limit: v.optional(v.number()),
 	},
@@ -796,6 +932,15 @@ export const search = query({
 	handler: async (ctx, args) => {
 		const userId = await getUserId(ctx);
 		if (!userId) return [];
+		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
+		if (!workspaceId) return [];
+		const membership = await ctx.db
+			.query("members")
+			.withIndex("by_workspace_user", (q) =>
+				q.eq("workspaceId", workspaceId).eq("userId", userId),
+			)
+			.unique();
+		if (!membership) return [];
 		const limit = Math.max(1, Math.min(args.limit ?? 20, 50));
 		const term = args.term.trim();
 		if (!term) {
@@ -806,7 +951,7 @@ export const search = query({
 			.withSearchIndex("search_body", (q) =>
 				q
 					.search("searchableText", term)
-					.eq("userId", userId)
+					.eq("workspaceId", workspaceId)
 					.eq("isArchived", false),
 			)
 			.take(limit);
@@ -814,8 +959,66 @@ export const search = query({
 	},
 });
 
+export const searchInWorkspaces = query({
+	args: {
+		term: v.string(),
+		workspaceIds: v.optional(v.array(v.id("workspaces"))),
+		limit: v.optional(v.number()),
+	},
+	returns: v.array(v.object(documentFields)),
+	handler: async (ctx, args) => {
+		const userId = await getUserId(ctx);
+		if (!userId) return [];
+		const limit = Math.max(1, Math.min(args.limit ?? 20, 50));
+		const term = args.term.trim();
+		if (!term) return [];
+
+		const memberships = await ctx.db
+			.query("members")
+			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.collect();
+		const accessibleByString = new Map<string, Id<"workspaces">>(
+			memberships.map((m) => [String(m.workspaceId), m.workspaceId]),
+		);
+		const requestedWorkspaceIds =
+			args.workspaceIds?.filter((id) => accessibleByString.has(String(id))) ?? null;
+		const workspaceIds =
+			requestedWorkspaceIds && requestedWorkspaceIds.length > 0
+				? requestedWorkspaceIds
+				: Array.from(accessibleByString.values());
+		if (workspaceIds.length === 0) return [];
+
+		const perWorkspaceLimit = Math.max(1, Math.ceil(limit / workspaceIds.length));
+		const results = await Promise.all(
+			workspaceIds.map(async (workspaceId) => {
+				return await ctx.db
+					.query("documents")
+					.withSearchIndex("search_body", (q) =>
+						q
+							.search("searchableText", term)
+							.eq("workspaceId", workspaceId)
+							.eq("isArchived", false),
+					)
+					.take(perWorkspaceLimit);
+			}),
+		);
+
+		const byId = new Map<string, Doc<"documents">>();
+		for (const group of results) {
+			for (const doc of group) {
+				byId.set(String(doc._id), doc);
+			}
+		}
+
+		return Array.from(byId.values())
+			.sort((a, b) => b.updatedAt - a.updatedAt)
+			.slice(0, limit);
+	},
+});
+
 export const listShared = query({
 	args: {
+		workspaceId: v.optional(v.id("workspaces")),
 		parentId: v.optional(v.union(v.id("documents"), v.null())),
 	},
 	returns: v.array(
@@ -824,12 +1027,21 @@ export const listShared = query({
 	handler: async (ctx, args) => {
 		const userId = await getUserId(ctx);
 		if (!userId) return [];
+		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
+		if (!workspaceId) return [];
+		const membership = await ctx.db
+			.query("members")
+			.withIndex("by_workspace_user", (q) =>
+				q.eq("workspaceId", workspaceId).eq("userId", userId),
+			)
+			.unique();
+		if (!membership) return [];
 		const parentId = args.parentId === null ? undefined : args.parentId;
 
 		const docs = await ctx.db
 			.query("documents")
-			.withIndex("by_user_parent", (q) =>
-				q.eq("userId", userId).eq("parentId", parentId),
+			.withIndex("by_workspace_parent", (q) =>
+				q.eq("workspaceId", workspaceId).eq("parentId", parentId),
 			)
 			.filter((q) =>
 				q.and(
