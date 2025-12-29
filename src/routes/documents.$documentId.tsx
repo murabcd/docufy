@@ -32,6 +32,7 @@ import TiptapEditor, {
 import { TrashBanner } from "@/components/trash-banner";
 import { Button } from "@/components/ui/button";
 import { SidebarInset } from "@/components/ui/sidebar";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { getRandomCuratedCoverImageUrl } from "@/lib/cover-gallery";
 import { cn } from "@/lib/utils";
 import { nestedPagePluginKey } from "@/tiptap/extensions/nested-page/nested-page";
@@ -76,6 +77,7 @@ function DocumentEditor() {
 	const updateDocumentTitle = useMutation(api.documents.update);
 	const editorRef = useRef<TiptapEditorHandle>(null);
 	const [, startTransition] = useTransition();
+	const { activeWorkspaceId, setActiveWorkspaceId } = useActiveWorkspace();
 	const { data: document } = useSuspenseQuery(
 		convexQuery(api.documents.get, {
 			id: documentId as Id<"documents">,
@@ -86,11 +88,23 @@ function DocumentEditor() {
 			id: documentId as Id<"documents">,
 		}),
 	);
+
+	useEffect(() => {
+		if (!document?.workspaceId) return;
+		if (String(document.workspaceId) === String(activeWorkspaceId)) return;
+		setActiveWorkspaceId(document.workspaceId);
+	}, [activeWorkspaceId, document?.workspaceId, setActiveWorkspaceId]);
+
 	const { data: rootDocuments = [] } = useSuspenseQuery(
-		convexQuery(api.documents.list, { parentId: null }),
+		convexQuery(api.documents.list, {
+			parentId: null,
+			workspaceId: activeWorkspaceId ?? undefined,
+		}),
 	);
 	const { data: allDocuments = [] } = useQuery({
-		...convexQuery(api.documents.getAll),
+		...convexQuery(api.documents.getAll, {
+			workspaceId: activeWorkspaceId ?? undefined,
+		}),
 		placeholderData: [],
 	});
 	const sync = useTiptapSync(api.prosemirrorSync, documentId);
@@ -304,6 +318,7 @@ function DocumentEditor() {
 			try {
 				const newId = await createDocument({
 					parentId: documentId as Id<"documents">,
+					workspaceId: activeWorkspaceId ?? undefined,
 				});
 
 				// Replace placeholder attrs with the real document id.

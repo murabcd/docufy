@@ -19,7 +19,9 @@ import {
 } from "@/components/ui/empty";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCreateDocumentNavigation } from "@/hooks/use-create-document-navigation";
+import { CreateWorkspaceDialog } from "@/components/workspaces/create-workspace-dialog";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
+import { useCreateDocument } from "@/hooks/use-create-document";
 import { getGreeting } from "@/lib/utils";
 import { api } from "../../convex/_generated/api";
 
@@ -27,6 +29,7 @@ export const Route = createFileRoute("/")({
 	component: EditorHome,
 	loader: async ({ context }) => {
 		const { queryClient } = context;
+		await queryClient.prefetchQuery(convexQuery(api.workspaces.listMine, {}));
 		await queryClient.prefetchQuery(
 			convexQuery(api.documents.getRecentlyUpdated, { limit: 6 }),
 		);
@@ -35,18 +38,38 @@ export const Route = createFileRoute("/")({
 
 function EditorHome() {
 	const [greeting, setGreeting] = useState<string | null>(null);
-	const { createAndNavigate, isCreating } = useCreateDocumentNavigation();
+	const { createAndNavigate, isCreating } = useCreateDocument();
 	const { data: currentUser } = useSuspenseQuery(
 		convexQuery(api.auth.getCurrentUser, {}),
 	);
-	const { data: documents } = useSuspenseQuery(
-		convexQuery(api.documents.getRecentlyUpdated, { limit: 6 }),
-	);
+	const { workspaces, activeWorkspaceId, setActiveWorkspaceId } =
+		useActiveWorkspace();
 	const fullName = (currentUser as { isAnonymous?: boolean } | null)
 		?.isAnonymous
 		? "Guest"
 		: currentUser?.name || "Guest";
 	const firstName = fullName.trim().split(/\s+/)[0] || "Guest";
+	const isAnonymousUser = Boolean(
+		(currentUser as { isAnonymous?: boolean } | null)?.isAnonymous,
+	);
+	const needsWorkspace =
+		Boolean(currentUser) && !isAnonymousUser && workspaces.length === 0;
+	const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
+
+	useEffect(() => {
+		if (needsWorkspace) {
+			setCreateWorkspaceOpen(true);
+		} else {
+			setCreateWorkspaceOpen(false);
+		}
+	}, [needsWorkspace]);
+
+	const { data: documents } = useSuspenseQuery(
+		convexQuery(api.documents.getRecentlyUpdated, {
+			limit: 6,
+			workspaceId: activeWorkspaceId ?? undefined,
+		}),
+	);
 
 	const handleCreateDocument = useCallback(async () => {
 		await createAndNavigate();
@@ -89,6 +112,24 @@ function EditorHome() {
 
 	if (isCreating) {
 		return <DocumentSkeleton />;
+	}
+
+	if (needsWorkspace) {
+		return (
+			<div className="min-h-[calc(100vh-1px)] flex items-center justify-center p-6">
+				<div className="w-full max-w-md">
+					<CreateWorkspaceDialog
+						open={createWorkspaceOpen}
+						onOpenChange={setCreateWorkspaceOpen}
+						defaultOpen
+						showTrigger={false}
+						onCreated={(workspaceId) => {
+							setActiveWorkspaceId(workspaceId);
+						}}
+					/>
+				</div>
+			</div>
+		);
 	}
 
 	return (

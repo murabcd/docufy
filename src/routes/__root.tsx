@@ -17,6 +17,7 @@ import { NotFound } from "@/components/not-found";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { ActiveWorkspaceProvider } from "@/hooks/use-active-workspace";
 import { authClient } from "@/lib/auth-client";
 import { getToken } from "@/lib/auth-server";
 import appCss from "@/styles.css?url";
@@ -91,8 +92,13 @@ function RootComponent() {
 			initialToken={context.token}
 		>
 			<EnsureGuestSession />
+			<EnsureGuestWorkspace />
 			<MigrateAnonymousData />
-			{context.isAuthenticated ? <Outlet /> : null}
+			{context.isAuthenticated ? (
+				<ActiveWorkspaceProvider>
+					<Outlet />
+				</ActiveWorkspaceProvider>
+			) : null}
 		</ConvexBetterAuthProvider>
 	);
 }
@@ -156,6 +162,26 @@ function MigrateAnonymousData() {
 				console.error(error);
 			});
 	}, [currentUser, migrateAnonymousData]);
+
+	return null;
+}
+
+function EnsureGuestWorkspace() {
+	const { data: currentUser } = useSuspenseQuery(
+		convexQuery(api.auth.getCurrentUser, {}),
+	);
+	const ensureDefault = useMutation(api.workspaces.ensureDefault);
+
+	React.useEffect(() => {
+		if (typeof window === "undefined") return;
+		const isAnonymousUser = Boolean(
+			(currentUser as { isAnonymous?: boolean } | null)?.isAnonymous,
+		);
+		if (!isAnonymousUser) return;
+		ensureDefault({ defaultName: "Guest" }).catch((error) => {
+			console.error(error);
+		});
+	}, [currentUser, ensureDefault]);
 
 	return null;
 }
