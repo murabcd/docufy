@@ -2,8 +2,25 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+	workspaces: defineTable({
+		name: v.string(),
+		ownerId: v.string(),
+		isPrivate: v.optional(v.boolean()),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	}).index("by_owner", ["ownerId"]),
+	members: defineTable({
+		workspaceId: v.id("workspaces"),
+		userId: v.string(),
+		role: v.union(v.literal("owner"), v.literal("member")),
+		createdAt: v.number(),
+	})
+		.index("by_user", ["userId"])
+		.index("by_workspace", ["workspaceId"])
+		.index("by_workspace_user", ["workspaceId", "userId"]),
 	documents: defineTable({
 		userId: v.optional(v.string()),
+		workspaceId: v.optional(v.id("workspaces")),
 		title: v.string(),
 		content: v.optional(v.string()),
 		searchableText: v.string(),
@@ -24,6 +41,13 @@ export default defineSchema({
 		.index("by_user", ["userId"])
 		.index("by_user_parent", ["userId", "parentId"])
 		.index("by_user_isArchived_updatedAt", ["userId", "isArchived", "updatedAt"])
+		.index("by_workspace", ["workspaceId"])
+		.index("by_workspace_parent", ["workspaceId", "parentId"])
+		.index("by_workspace_isArchived_updatedAt", [
+			"workspaceId",
+			"isArchived",
+			"updatedAt",
+		])
 		.index("by_createdAt", ["createdAt"])
 		.index("by_parentId", ["parentId"])
 		.index("by_parentId_and_order", ["parentId", "order"])
@@ -31,11 +55,11 @@ export default defineSchema({
 		.index("by_user_isArchived_archivedAt", ["userId", "isArchived", "archivedAt"])
 		.searchIndex("search_title", {
 			searchField: "title",
-			filterFields: ["userId", "isArchived"],
+			filterFields: ["workspaceId", "isArchived"],
 		})
 		.searchIndex("search_body", {
 			searchField: "searchableText",
-			filterFields: ["userId", "isArchived"],
+			filterFields: ["workspaceId", "isArchived"],
 		}),
 	chunks: defineTable({
 		documentId: v.id("documents"),

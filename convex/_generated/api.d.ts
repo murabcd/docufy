@@ -15,6 +15,7 @@ import type * as favorites from "../favorites.js";
 import type * as http from "../http.js";
 import type * as init from "../init.js";
 import type * as prosemirrorSync from "../prosemirrorSync.js";
+import type * as workspaces from "../workspaces.js";
 
 import type {
   ApiFromModules,
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   init: typeof init;
   prosemirrorSync: typeof prosemirrorSync;
+  workspaces: typeof workspaces;
 }>;
 
 /**
@@ -1095,6 +1097,7 @@ export declare const components: {
         "query",
         "internal",
         {
+          join?: any;
           limit?: number;
           model:
             | "user"
@@ -1148,6 +1151,7 @@ export declare const components: {
         "query",
         "internal",
         {
+          join?: any;
           model:
             | "user"
             | "session"
@@ -2157,14 +2161,8 @@ export declare const components: {
       >;
     };
     adapterTest: {
-      count: FunctionReference<"query", "internal", any, any>;
-      create: FunctionReference<"mutation", "internal", any, any>;
-      delete: FunctionReference<"mutation", "internal", any, any>;
-      deleteMany: FunctionReference<"mutation", "internal", any, any>;
-      findMany: FunctionReference<"query", "internal", any, any>;
-      findOne: FunctionReference<"query", "internal", any, any>;
-      update: FunctionReference<"mutation", "internal", any, any>;
-      updateMany: FunctionReference<"mutation", "internal", any, any>;
+      runCustomTests: FunctionReference<"action", "internal", any, any>;
+      runTests: FunctionReference<"action", "internal", any, any>;
     };
   };
 };
