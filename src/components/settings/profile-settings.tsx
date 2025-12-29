@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { ImageUp } from "lucide-react";
@@ -9,14 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+import { authQueries } from "@/queries";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 export function ProfileSettings({ onClose }: { onClose?: () => void }) {
 	const queryClient = useQueryClient();
-	const { data: currentUser } = useSuspenseQuery(
-		convexQuery(api.auth.getCurrentUser, {}),
-	);
+	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 	const generateAvatarUploadUrl = useMutation(api.auth.generateAvatarUploadUrl);
 
 	const [name, setName] = React.useState("");
@@ -78,9 +76,7 @@ export function ProfileSettings({ onClose }: { onClose?: () => void }) {
 						storageId: string;
 					};
 					image = await queryClient.fetchQuery(
-						convexQuery(api.auth.getStorageUrl, {
-							storageId: storageId as Id<"_storage">,
-						}),
+						authQueries.storageUrl(storageId as Id<"_storage">),
 					);
 					if (!image) {
 						throw new Error("Failed to get avatar URL");
@@ -92,7 +88,7 @@ export function ProfileSettings({ onClose }: { onClose?: () => void }) {
 					body: { name: name.trim(), ...(image ? { image } : {}) },
 				});
 				await queryClient.invalidateQueries({
-					queryKey: convexQuery(api.auth.getCurrentUser, {}).queryKey,
+					queryKey: authQueries.currentUser().queryKey,
 				});
 				toast.success("Profile updated");
 				onClose?.();

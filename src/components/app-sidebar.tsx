@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
@@ -26,7 +25,7 @@ import {
 } from "@/components/ui/sidebar";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
-import { api } from "../../convex/_generated/api";
+import { authQueries, favoritesQueries } from "@/queries";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export interface Team {
@@ -113,15 +112,11 @@ export function AppSidebar({
 	const location = useLocation();
 	const [settingsOpen, setSettingsOpen] = React.useState(false);
 	const [searchOpen, setSearchOpen] = React.useState(false);
-	const { data: currentUser } = useSuspenseQuery(
-		convexQuery(api.auth.getCurrentUser, {}),
-	);
+	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 	const { workspaces, activeWorkspaceId, setActiveWorkspaceId } =
 		useActiveWorkspace();
 	const { data: favoritesData } = useSuspenseQuery(
-		convexQuery(api.favorites.listWithDocuments, {
-			workspaceId: activeWorkspaceId ?? undefined,
-		}),
+		favoritesQueries.listWithDocuments(activeWorkspaceId ?? undefined),
 	);
 
 	const fullName = (currentUser as { isAnonymous?: boolean } | null)

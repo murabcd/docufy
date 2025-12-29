@@ -1,5 +1,8 @@
-import { convexQuery } from "@convex-dev/react-query";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import {
+	useQuery,
+	useQueryClient,
+	useSuspenseQuery,
+} from "@tanstack/react-query";
 import {
 	ArrowUp,
 	AtSign,
@@ -8,7 +11,6 @@ import {
 	FileText,
 	Globe,
 	Grid3x3,
-	Paperclip,
 	Plus,
 	X,
 } from "lucide-react";
@@ -58,7 +60,7 @@ import {
 	chatModels,
 	DEFAULT_CHAT_MODEL,
 } from "@/lib/ai/models";
-import { api } from "../../convex/_generated/api";
+import { authQueries, documentsQueries } from "@/queries";
 import type { Id } from "../../convex/_generated/dataModel";
 
 const CONTEXT_PREFIX = "__DOCCTX__";
@@ -139,39 +141,54 @@ export function ChatInput({
 		onChange(e.target.value);
 	};
 
-	const handleSend = () => {
+	const queryClient = useQueryClient();
+	const [isSending, setIsSending] = useState(false);
+
+	const handleSend = async () => {
 		const trimmed = value.trim();
-		if (!trimmed || disabled || !propOnSend) {
+		if (!trimmed || disabled || !propOnSend || isSending) {
 			return;
 		}
-		const mentionsWithContent = mentionDetails.map((doc) => ({
-			id: doc._id,
-			title: doc.title,
-			searchableText: doc.searchableText.slice(0, 2000),
-		}));
+		setIsSending(true);
+		const mentionsWithContent = await Promise.all(
+			mentionDetails.map(async (doc) => {
+				const fullDoc = await queryClient.fetchQuery(
+					documentsQueries.get(doc._id),
+				);
+				return {
+					id: String(doc._id),
+					title: doc.title,
+					searchableText: (fullDoc?.searchableText ?? "").slice(0, 2000),
+				};
+			}),
+		);
 		const payload =
 			mentionsWithContent.length > 0
 				? `${CONTEXT_PREFIX}${JSON.stringify({
 						mentions: mentionsWithContent,
 					})}${CONTEXT_SUFFIX}${trimmed}`
 				: trimmed;
-		propOnSend(payload, trimmed);
+		try {
+			propOnSend(payload, trimmed);
+		} finally {
+			setIsSending(false);
+		}
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
 			e.preventDefault();
-			handleSend();
+			void handleSend();
 		}
 	};
 
-	const { data: currentUser } = useSuspenseQuery(
-		convexQuery(api.auth.getCurrentUser, {}),
-	);
+	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 	const { activeWorkspaceId } = useActiveWorkspace();
 	const { data: documents } = useSuspenseQuery(
-		convexQuery(api.documents.getAll, {
+		documentsQueries.listIndex({
 			workspaceId: activeWorkspaceId ?? undefined,
+			includeArchived: false,
+			limit: 2_000,
 		}),
 	);
 
@@ -231,7 +248,7 @@ export function ChatInput({
 	}, [autoMentionDocumentId, isAutoMentionDismissed, sidebarOpen]);
 
 	const documentSearchQuery = useQuery({
-		...convexQuery(api.documents.search, {
+		...documentsQueries.search({
 			term: normalizedSearchTerm,
 			limit: 25,
 			workspaceId: activeWorkspaceId ?? undefined,
@@ -242,7 +259,7 @@ export function ChatInput({
 	const searchResults = documentSearchQuery.data ?? [];
 
 	const sourceSearchQuery = useQuery({
-		...convexQuery(api.documents.search, {
+		...documentsQueries.search({
 			term: normalizedSourceSearchTerm,
 			limit: 25,
 			workspaceId: activeWorkspaceId ?? undefined,

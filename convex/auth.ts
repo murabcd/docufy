@@ -62,6 +62,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
 // Feel free to edit, omit, etc.
 export const getCurrentUser = query({
   args: {},
+  returns: v.union(v.any(), v.null()),
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity()
     if (!identity) return null
@@ -79,6 +80,7 @@ export const getCurrentUser = query({
 
 export const generateAvatarUploadUrl = mutation({
   args: {},
+  returns: v.string(),
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity()
     if (!identity) throw new ConvexError('Unauthenticated')
@@ -88,6 +90,7 @@ export const generateAvatarUploadUrl = mutation({
 
 export const getStorageUrl = query({
   args: { storageId: v.id('_storage') },
+  returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
     return await ctx.storage.getUrl(args.storageId)
   },
@@ -95,6 +98,7 @@ export const getStorageUrl = query({
 
 export const migrateAnonymousData = mutation({
   args: { fromUserId: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const authUser = await authComponent.safeGetAuthUser(ctx)
     if (!authUser) throw new ConvexError('Unauthenticated')
@@ -129,7 +133,7 @@ export const migrateAnonymousData = mutation({
 
     const messages = await ctx.db
       .query('messages')
-      .filter((q) => q.eq(q.field('userId'), fromUserId))
+      .withIndex('by_userId', (q) => q.eq('userId', fromUserId))
       .collect()
     for (const message of messages) {
       await ctx.db.patch(message._id, { userId: toUserId })

@@ -1,7 +1,6 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import * as React from "react";
-import { api } from "../../convex/_generated/api";
+import { workspacesQueries } from "@/queries";
 import type { Id } from "../../convex/_generated/dataModel";
 
 type WorkspaceSummary = {
@@ -26,9 +25,7 @@ export function ActiveWorkspaceProvider({
 }: {
 	children: React.ReactNode;
 }) {
-	const { data: workspaces } = useSuspenseQuery(
-		convexQuery(api.workspaces.listMine, {}),
-	);
+	const { data: workspaces } = useSuspenseQuery(workspacesQueries.mine());
 	const [activeWorkspaceId, setActiveWorkspaceIdState] =
 		React.useState<Id<"workspaces"> | null>(null);
 

@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import * as React from "react";
@@ -13,7 +12,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { authClient } from "@/lib/auth-client";
-import { api } from "../../convex/_generated/api";
+import { authQueries } from "@/queries";
 
 interface LoginDialogProps {
 	open?: boolean;
@@ -24,9 +23,7 @@ export function LoginDialog({
 	open: controlledOpen,
 	onOpenChange,
 }: LoginDialogProps) {
-	const { data: currentUser } = useSuspenseQuery(
-		convexQuery(api.auth.getCurrentUser, {}),
-	);
+	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 	const [internalOpen, setInternalOpen] = React.useState(false);
 	const [loadingGitHub, setLoadingGitHub] = React.useState(false);
 

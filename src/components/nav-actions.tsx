@@ -1,5 +1,4 @@
-import { convexQuery } from "@convex-dev/react-query";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
@@ -37,6 +36,8 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { optimisticToggleFavorite } from "@/lib/optimistic-favorites";
+import { favoritesQueries } from "@/queries";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -55,16 +56,16 @@ export function NavActions({
 	updatedAt?: number;
 }) {
 	const [isOpen, setIsOpen] = React.useState(false);
-	const queryClient = useQueryClient();
-	const toggleFavorite = useMutation(api.favorites.toggle);
+	const toggleFavorite = useMutation(api.favorites.toggle).withOptimisticUpdate(
+		optimisticToggleFavorite,
+	);
 	const duplicateDocument = useMutation(api.documents.duplicate);
 	const archiveDocument = useMutation(api.documents.archive);
 	const navigate = useNavigate();
 	const { data: isFavorite } = useQuery({
-		...convexQuery(
-			api.favorites.isFavorite,
-			documentId ? { documentId } : { documentId: "" as Id<"documents"> },
-		),
+		...(documentId
+			? favoritesQueries.isFavorite(documentId)
+			: favoritesQueries.isFavorite("" as Id<"documents">)),
 		enabled: !!documentId,
 	});
 
@@ -72,16 +73,6 @@ export function NavActions({
 		if (documentId) {
 			const added = await toggleFavorite({ documentId });
 			toast.success(added ? "Page starred" : "Page unstarred");
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
-					0,
-					2,
-				),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.favorites.isFavorite, { documentId })
-					.queryKey,
-			});
 		}
 	};
 

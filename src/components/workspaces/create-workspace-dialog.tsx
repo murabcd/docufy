@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import type { FormEvent } from "react";
 import { useState } from "react";
@@ -31,7 +30,6 @@ export function CreateWorkspaceDialog({
 	showTrigger?: boolean;
 	onCreated?: (workspaceId: Id<"workspaces">) => void;
 }) {
-	const queryClient = useQueryClient();
 	const createWorkspace = useMutation(api.workspaces.create);
 	const [name, setName] = useState("");
 	const [isPrivate, setIsPrivate] = useState(false);
@@ -55,7 +53,6 @@ export function CreateWorkspaceDialog({
 		setPending(true);
 		try {
 			const workspaceId = await createWorkspace({ name: trimmed, isPrivate });
-			await queryClient.invalidateQueries();
 			onCreated?.(workspaceId);
 			setDialogOpen(false);
 			setName("");

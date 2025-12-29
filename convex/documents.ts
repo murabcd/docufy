@@ -94,12 +94,12 @@ export const create = mutation({
 
 		const siblings = await ctx.db
 			.query("documents")
-			.withIndex("by_workspace_parent", (q) =>
+			.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
 				q
 					.eq("workspaceId", workspaceId)
-					.eq("parentId", args.parentId ?? undefined),
+					.eq("parentId", args.parentId ?? undefined)
+					.eq("isArchived", false),
 			)
-			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
 
 		const maxOrder = siblings.reduce((max, doc) => {
@@ -174,12 +174,12 @@ export const createFromAi = mutation({
 
 		const siblings = await ctx.db
 			.query("documents")
-			.withIndex("by_workspace_parent", (q) =>
+			.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
 				q
 					.eq("workspaceId", workspaceId)
-					.eq("parentId", args.parentId ?? undefined),
+					.eq("parentId", args.parentId ?? undefined)
+					.eq("isArchived", false),
 			)
-			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
 
 		const maxOrder = siblings.reduce((max, doc) => {
@@ -327,10 +327,12 @@ export const list = query({
 
 		const docs = await ctx.db
 			.query("documents")
-			.withIndex("by_workspace_parent", (q) =>
-				q.eq("workspaceId", workspaceId).eq("parentId", parentId),
+			.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
+				q
+					.eq("workspaceId", workspaceId)
+					.eq("parentId", parentId)
+					.eq("isArchived", false),
 			)
-			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
 
 		return docs.sort((a, b) => {
@@ -378,10 +380,12 @@ export const reorder = mutation({
 		if (oldParentId !== newParentId) {
 			const oldSiblings = await ctx.db
 				.query("documents")
-				.withIndex("by_workspace_parent", (q) =>
-					q.eq("workspaceId", workspaceId).eq("parentId", oldParentId ?? undefined),
+				.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
+					q
+						.eq("workspaceId", workspaceId)
+						.eq("parentId", oldParentId ?? undefined)
+						.eq("isArchived", false),
 				)
-				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
 
 			for (const sibling of oldSiblings) {
@@ -395,10 +399,12 @@ export const reorder = mutation({
 
 			const newSiblings = await ctx.db
 				.query("documents")
-				.withIndex("by_workspace_parent", (q) =>
-					q.eq("workspaceId", workspaceId).eq("parentId", newParentId ?? undefined),
+				.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
+					q
+						.eq("workspaceId", workspaceId)
+						.eq("parentId", newParentId ?? undefined)
+						.eq("isArchived", false),
 				)
-				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
 
 			for (const sibling of newSiblings) {
@@ -412,10 +418,12 @@ export const reorder = mutation({
 		} else {
 			const siblings = await ctx.db
 				.query("documents")
-				.withIndex("by_workspace_parent", (q) =>
-					q.eq("workspaceId", workspaceId).eq("parentId", oldParentId ?? undefined),
+				.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
+					q
+						.eq("workspaceId", workspaceId)
+						.eq("parentId", oldParentId ?? undefined)
+						.eq("isArchived", false),
 				)
-				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
 
 			const oldOrder = document.order ?? 0;
@@ -479,10 +487,12 @@ export const archive = mutation({
 		const recursiveArchive = async (documentId: Id<"documents">) => {
 			const children = await ctx.db
 				.query("documents")
-				.withIndex("by_workspace_parent", (q) =>
-					q.eq("workspaceId", workspaceId).eq("parentId", documentId),
+				.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
+					q
+						.eq("workspaceId", workspaceId)
+						.eq("parentId", documentId)
+						.eq("isArchived", false),
 				)
-				.filter((q) => q.eq(q.field("isArchived"), false))
 				.collect();
 
 			for (const child of children) {
@@ -557,10 +567,12 @@ export const restore = mutation({
 		const recursiveRestore = async (documentId: Id<"documents">) => {
 			const children = await ctx.db
 				.query("documents")
-				.withIndex("by_workspace_parent", (q) =>
-					q.eq("workspaceId", workspaceId).eq("parentId", documentId),
+				.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
+					q
+						.eq("workspaceId", workspaceId)
+						.eq("parentId", documentId)
+						.eq("isArchived", true),
 				)
-				.filter((q) => q.eq(q.field("isArchived"), true))
 				.collect();
 
 			for (const child of children) {
@@ -597,10 +609,12 @@ export const restore = mutation({
 
 		const siblings = await ctx.db
 			.query("documents")
-			.withIndex("by_workspace_parent", (q) =>
-				q.eq("workspaceId", workspaceId).eq("parentId", targetParentId),
+			.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
+				q
+					.eq("workspaceId", workspaceId)
+					.eq("parentId", targetParentId)
+					.eq("isArchived", false),
 			)
-			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
 		const maxOrder = siblings.reduce(
 			(max, doc) => Math.max(max, doc.order ?? 0),
@@ -769,10 +783,12 @@ export const duplicate = mutation({
 
 		const siblings = await ctx.db
 			.query("documents")
-			.withIndex("by_workspace_parent", (q) =>
-				q.eq("workspaceId", workspaceId).eq("parentId", targetParentId),
+			.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
+				q
+					.eq("workspaceId", workspaceId)
+					.eq("parentId", targetParentId)
+					.eq("isArchived", false),
 			)
-			.filter((q) => q.eq(q.field("isArchived"), false))
 			.collect();
 		const maxOrder = siblings.reduce(
 			(max, doc) => Math.max(max, doc.order ?? 0),
@@ -888,6 +904,84 @@ export const getAll = query({
 			)
 			.order("desc")
 			.collect();
+	},
+});
+
+export const listIndex = query({
+	args: {
+		workspaceId: v.optional(v.id("workspaces")),
+		includeArchived: v.optional(v.boolean()),
+		limit: v.optional(v.number()),
+	},
+	returns: v.array(
+		v.object({
+			_id: v.id("documents"),
+			_creationTime: v.number(),
+			title: v.string(),
+			parentId: v.optional(v.id("documents")),
+			icon: v.optional(v.string()),
+			isArchived: v.boolean(),
+			updatedAt: v.number(),
+		}),
+	),
+	handler: async (ctx, args) => {
+		const userId = await getUserId(ctx);
+		if (!userId) return [];
+		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
+		if (!workspaceId) return [];
+		const membership = await ctx.db
+			.query("members")
+			.withIndex("by_workspace_user", (q) =>
+				q.eq("workspaceId", workspaceId).eq("userId", userId),
+			)
+			.unique();
+		if (!membership) return [];
+
+		const limit = Math.max(1, Math.min(args.limit ?? 2_000, 10_000));
+		const includeArchived = args.includeArchived ?? false;
+		const toIndex = (doc: Doc<"documents">) => ({
+			_id: doc._id,
+			_creationTime: doc._creationTime,
+			title: doc.title,
+			parentId: doc.parentId,
+			icon: doc.icon,
+			isArchived: doc.isArchived,
+			updatedAt: doc.updatedAt,
+		});
+
+		if (!includeArchived) {
+			return (
+				await ctx.db
+					.query("documents")
+					.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+						q.eq("workspaceId", workspaceId).eq("isArchived", false),
+					)
+					.order("desc")
+					.take(limit)
+			).map(toIndex);
+		}
+
+		const [active, archived] = await Promise.all([
+			ctx.db
+				.query("documents")
+				.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+					q.eq("workspaceId", workspaceId).eq("isArchived", false),
+				)
+				.order("desc")
+				.take(limit),
+			ctx.db
+				.query("documents")
+				.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+					q.eq("workspaceId", workspaceId).eq("isArchived", true),
+				)
+				.order("desc")
+				.take(limit),
+		]);
+
+		const combined = [...active, ...archived]
+			.sort((a, b) => b.updatedAt - a.updatedAt)
+			.slice(0, limit);
+		return combined.map(toIndex);
 	},
 });
 
@@ -1040,14 +1134,12 @@ export const listShared = query({
 
 		const docs = await ctx.db
 			.query("documents")
-			.withIndex("by_workspace_parent", (q) =>
-				q.eq("workspaceId", workspaceId).eq("parentId", parentId),
-			)
-			.filter((q) =>
-				q.and(
-					q.eq(q.field("isArchived"), false),
-					q.eq(q.field("isPublished"), true),
-				),
+			.withIndex("by_workspaceId_and_parentId_and_isArchived_and_isPublished", (q) =>
+				q
+					.eq("workspaceId", workspaceId)
+					.eq("parentId", parentId)
+					.eq("isArchived", false)
+					.eq("isPublished", true),
 			)
 			.collect();
 

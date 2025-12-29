@@ -1,5 +1,5 @@
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
-import { type ConvexQueryClient, convexQuery } from "@convex-dev/react-query";
+import type { ConvexQueryClient } from "@convex-dev/react-query";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { type QueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import {
@@ -20,6 +20,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ActiveWorkspaceProvider } from "@/hooks/use-active-workspace";
 import { authClient } from "@/lib/auth-client";
 import { getToken } from "@/lib/auth-server";
+import { authQueries } from "@/queries";
 import appCss from "@/styles.css?url";
 import { api } from "../../convex/_generated/api";
 
@@ -73,9 +74,7 @@ export const Route = createRootRouteWithContext<{
 		};
 	},
 	loader: async ({ context }) => {
-		await context.queryClient.ensureQueryData(
-			convexQuery(api.auth.getCurrentUser, {}),
-		);
+		await context.queryClient.ensureQueryData(authQueries.currentUser());
 	},
 	component: RootComponent,
 
@@ -134,9 +133,7 @@ function EnsureGuestSession() {
 }
 
 function MigrateAnonymousData() {
-	const { data: currentUser } = useSuspenseQuery(
-		convexQuery(api.auth.getCurrentUser, {}),
-	);
+	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 	const migrateAnonymousData = useMutation(api.auth.migrateAnonymousData);
 
 	React.useEffect(() => {
@@ -167,9 +164,7 @@ function MigrateAnonymousData() {
 }
 
 function EnsureGuestWorkspace() {
-	const { data: currentUser } = useSuspenseQuery(
-		convexQuery(api.auth.getCurrentUser, {}),
-	);
+	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 	const ensureDefault = useMutation(api.workspaces.ensureDefault);
 
 	React.useEffect(() => {

@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import {
 	Check,
@@ -37,7 +36,7 @@ import {
 import { CreateWorkspaceDialog } from "@/components/workspaces/create-workspace-dialog";
 import { useCreateDocument } from "@/hooks/use-create-document";
 import { authClient } from "@/lib/auth-client";
-import { api } from "../../convex/_generated/api";
+import { authQueries } from "@/queries";
 
 export function WorkspaceSwitcher({
 	teams,
@@ -62,9 +61,7 @@ export function WorkspaceSwitcher({
 	const [logOutPending, setLogOutPending] = React.useState(false);
 	const [createWorkspaceOpen, setCreateWorkspaceOpen] = React.useState(false);
 
-	const { data: currentUser } = useSuspenseQuery(
-		convexQuery(api.auth.getCurrentUser, {}),
-	);
+	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 
 	const activeTeam = React.useMemo(() => {
 		const requestedKey = activeTeamId;

@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Clock, FileText, Plus } from "lucide-react";
@@ -23,15 +22,15 @@ import { CreateWorkspaceDialog } from "@/components/workspaces/create-workspace-
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { useCreateDocument } from "@/hooks/use-create-document";
 import { getGreeting } from "@/lib/utils";
-import { api } from "../../convex/_generated/api";
+import { authQueries, documentsQueries, workspacesQueries } from "@/queries";
 
 export const Route = createFileRoute("/")({
 	component: EditorHome,
 	loader: async ({ context }) => {
 		const { queryClient } = context;
-		await queryClient.prefetchQuery(convexQuery(api.workspaces.listMine, {}));
-		await queryClient.prefetchQuery(
-			convexQuery(api.documents.getRecentlyUpdated, { limit: 6 }),
+		await queryClient.ensureQueryData(workspacesQueries.mine());
+		await queryClient.ensureQueryData(
+			documentsQueries.recentlyUpdated({ limit: 6 }),
 		);
 	},
 });
@@ -39,9 +38,7 @@ export const Route = createFileRoute("/")({
 function EditorHome() {
 	const [greeting, setGreeting] = useState<string | null>(null);
 	const { createAndNavigate, isCreating } = useCreateDocument();
-	const { data: currentUser } = useSuspenseQuery(
-		convexQuery(api.auth.getCurrentUser, {}),
-	);
+	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 	const { workspaces, activeWorkspaceId, setActiveWorkspaceId } =
 		useActiveWorkspace();
 	const fullName = (currentUser as { isAnonymous?: boolean } | null)
@@ -65,7 +62,7 @@ function EditorHome() {
 	}, [needsWorkspace]);
 
 	const { data: documents } = useSuspenseQuery(
-		convexQuery(api.documents.getRecentlyUpdated, {
+		documentsQueries.recentlyUpdated({
 			limit: 6,
 			workspaceId: activeWorkspaceId ?? undefined,
 		}),

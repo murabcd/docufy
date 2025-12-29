@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { FileText, LoaderCircle } from "lucide-react";
 import {
@@ -10,7 +9,7 @@ import {
 	CommandList,
 } from "@/components/ui/command";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
-import { api } from "../../convex/_generated/api";
+import { documentsQueries } from "@/queries";
 import type { Id } from "../../convex/_generated/dataModel";
 
 interface SearchCommandProps {
@@ -26,8 +25,10 @@ export function SearchCommand({
 }: SearchCommandProps) {
 	const { activeWorkspaceId } = useActiveWorkspace();
 	const { data: documents } = useSuspenseQuery(
-		convexQuery(api.documents.getAll, {
+		documentsQueries.listIndex({
 			workspaceId: activeWorkspaceId ?? undefined,
+			includeArchived: false,
+			limit: 2_000,
 		}),
 	);
 

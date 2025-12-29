@@ -1,9 +1,9 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { useCallback, useState } from "react";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
+import { documentsQueries } from "@/queries";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -23,15 +23,11 @@ export function useCreateDocument() {
 			});
 
 			void queryClient
-				.prefetchQuery(
-					convexQuery(api.documents.get, { id: documentId as Id<"documents"> }),
-				)
+				.prefetchQuery(documentsQueries.get(documentId as Id<"documents">))
 				.catch(() => {});
 			void queryClient
 				.prefetchQuery(
-					convexQuery(api.documents.getAncestors, {
-						id: documentId as Id<"documents">,
-					}),
+					documentsQueries.getAncestors(documentId as Id<"documents">),
 				)
 				.catch(() => {});
 

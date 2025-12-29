@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import type { JSONContent } from "@tiptap/core";
@@ -7,8 +6,8 @@ import { DocumentSkeleton } from "@/components/document-skeleton";
 import { LoginDialog } from "@/components/login-dialog";
 import TiptapEditor from "@/components/tiptap/tiptap-editor";
 import { Button } from "@/components/ui/button";
+import { authQueries, documentsQueries } from "@/queries";
 import { EMPTY_DOCUMENT } from "@/tiptap/types";
-import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export const Route = createFileRoute("/share/$documentId")({
@@ -16,10 +15,8 @@ export const Route = createFileRoute("/share/$documentId")({
 	pendingComponent: DocumentSkeleton,
 	loader: async ({ context, params }) => {
 		const { queryClient } = context;
-		await queryClient.prefetchQuery(
-			convexQuery(api.documents.getPublished, {
-				id: params.documentId as Id<"documents">,
-			}),
+		await queryClient.ensureQueryData(
+			documentsQueries.getPublished(params.documentId as Id<"documents">),
 		);
 	},
 });
@@ -27,14 +24,10 @@ export const Route = createFileRoute("/share/$documentId")({
 function ShareDocument() {
 	const { documentId } = Route.useParams();
 	const { data: document } = useSuspenseQuery(
-		convexQuery(api.documents.getPublished, {
-			id: documentId as Id<"documents">,
-		}),
+		documentsQueries.getPublished(documentId as Id<"documents">),
 	);
 
-	const { data: currentUser } = useSuspenseQuery(
-		convexQuery(api.auth.getCurrentUser, {}),
-	);
+	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 	const isAnonymous = (currentUser as { isAnonymous?: boolean } | null)
 		?.isAnonymous;
 

@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import {
 	fetchServerSentEvents,
 	type UIMessage,
@@ -51,6 +50,7 @@ import {
 	DEFAULT_CHAT_MODEL,
 } from "@/lib/ai/models";
 import { cn } from "@/lib/utils";
+import { chatsQueries } from "@/queries";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -167,7 +167,6 @@ export function AISidebar({
 	onAddToDocument,
 	children,
 }: AISidebarProps) {
-	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 	const {
 		rightMode,
@@ -181,7 +180,7 @@ export function AISidebar({
 	const { activeWorkspaceId } = useActiveWorkspace();
 
 	const { data: chats } = useSuspenseQuery(
-		convexQuery(api.chats.list, { documentId: null }),
+		chatsQueries.list({ documentId: null }),
 	);
 
 	const createDocumentFromAi = useMutation(api.documents.createFromAi);
@@ -228,15 +227,9 @@ export function AISidebar({
 				content,
 				workspaceId: activeWorkspaceId ?? undefined,
 			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.getAll).queryKey.slice(0, 2),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.list).queryKey.slice(0, 2),
-			});
 			navigate({ to: "/documents/$documentId", params: { documentId } });
 		},
-		[activeWorkspaceId, createDocumentFromAi, navigate, queryClient],
+		[activeWorkspaceId, createDocumentFromAi, navigate],
 	);
 
 	const [pendingSavedChatById, setPendingSavedChatById] = React.useState<
@@ -319,13 +312,8 @@ export function AISidebar({
 				[String(payload.chatId)]: payload.pending,
 			}));
 			setActiveChat({ kind: "persisted", id: payload.chatId });
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.chats.list, {
-					documentId: null,
-				}).queryKey,
-			});
 		},
-		[queryClient],
+		[],
 	);
 
 	return (
@@ -854,9 +842,7 @@ function PersistedChatSession(
 	const upsertMessage = useMutation(api.chats.upsertMessage);
 	const setChatModel = useMutation(api.chats.setModel);
 
-	const persistedMessagesQueryBase = convexQuery(api.chats.messages, {
-		chatId,
-	});
+	const persistedMessagesQueryBase = chatsQueries.messages(chatId);
 	type StoredMessages = Awaited<
 		ReturnType<NonNullable<typeof persistedMessagesQueryBase.queryFn>>
 	>;
@@ -911,9 +897,6 @@ function PersistedChatSession(
 				message: safe,
 				createdAt: Date.now(),
 			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.chats.list, { documentId: null }).queryKey,
-			});
 		},
 	});
 
@@ -945,13 +928,9 @@ function PersistedChatSession(
 				role: safe.role,
 				message: safe,
 				createdAt: Date.now(),
-			}).then(() =>
-				queryClient.invalidateQueries({
-					queryKey: convexQuery(api.chats.list, { documentId: null }).queryKey,
-				}),
-			);
+			});
 		}
-	}, [chatId, messages, queryClient, upsertMessage]);
+	}, [chatId, messages, upsertMessage]);
 
 	const handleSend = (payload: string, question: string) => {
 		if (!payload || isLoading) return;
@@ -975,11 +954,7 @@ function PersistedChatSession(
 
 	const handleModelChange = (model: ChatModel) => {
 		setSelectedModel(model);
-		void setChatModel({ chatId, model: model.id }).then(() =>
-			queryClient.invalidateQueries({
-				queryKey: convexQuery(api.chats.list, { documentId: null }).queryKey,
-			}),
-		);
+		void setChatModel({ chatId, model: model.id });
 	};
 
 	return (
@@ -1077,7 +1052,6 @@ function DraftChatSession(
 		children,
 	} = props;
 
-	const queryClient = useQueryClient();
 	const createChat = useMutation(api.chats.create);
 	const upsertMessage = useMutation(api.chats.upsertMessage);
 	const setChatModel = useMutation(api.chats.setModel);
@@ -1118,9 +1092,6 @@ function DraftChatSession(
 			}
 
 			await setChatModel({ chatId: newChatId, model: selectedModel.id });
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.chats.list, { documentId: null }).queryKey,
-			});
 			await onDraftFinalized({
 				chatId: newChatId,
 				pending: {

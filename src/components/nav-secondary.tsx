@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
@@ -20,7 +19,7 @@ import {
 	useSidebar,
 } from "@/components/ui/sidebar";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
-import { api } from "../../convex/_generated/api";
+import { documentsQueries } from "@/queries";
 
 export function NavSecondary({
 	items,
@@ -48,11 +47,7 @@ export function NavSecondary({
 
 	const prefetchTrash = useCallback(() => {
 		void queryClient
-			.prefetchQuery(
-				convexQuery(api.documents.getTrash, {
-					workspaceId: activeWorkspaceId ?? undefined,
-				}),
-			)
+			.prefetchQuery(documentsQueries.getTrash(activeWorkspaceId ?? undefined))
 			.catch(() => {});
 	}, [activeWorkspaceId, queryClient]);
 

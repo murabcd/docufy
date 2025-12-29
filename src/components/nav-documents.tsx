@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import {
 	closestCenter,
 	DndContext,
@@ -16,11 +15,7 @@ import {
 	verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-	useQuery,
-	useQueryClient,
-	useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
@@ -67,6 +62,8 @@ import {
 	useSidebar,
 } from "@/components/ui/sidebar";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
+import { optimisticToggleFavorite } from "@/lib/optimistic-favorites";
+import { documentsQueries, favoritesQueries } from "@/queries";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -102,25 +99,31 @@ function DocumentItem({
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [isMounted, setIsMounted] = useState(false);
 
-	const queryClient = useQueryClient();
 	const archiveDocument = useMutation(api.documents.archive);
 	const duplicateDocument = useMutation(api.documents.duplicate);
-	const toggleFavorite = useMutation(api.favorites.toggle);
+	const toggleFavorite = useMutation(api.favorites.toggle).withOptimisticUpdate(
+		optimisticToggleFavorite,
+	);
 	const updateDocument = useMutation(api.documents.update);
 	const [, startTransition] = useTransition();
 
-	const { data: children = [] } = useSuspenseQuery(
-		convexQuery(api.documents.list, {
+	const childrenQuery = useQuery({
+		...documentsQueries.list({
 			parentId: document._id,
 			workspaceId: activeWorkspaceId ?? undefined,
 		}),
-	);
+		enabled: isExpanded,
+		gcTime: 10_000,
+		placeholderData: (prev) => prev ?? [],
+	});
+	const children = childrenQuery.data ?? [];
+	const isLoadingChildren = isExpanded && childrenQuery.isFetching;
 
 	const { data: isFavorite } = useQuery({
-		...convexQuery(api.favorites.isFavorite, { documentId: document._id }),
+		...favoritesQueries.isFavorite(document._id),
 	});
 
-	const hasChildren = children.length > 0;
+	const hasChildren = isLoadingChildren || children.length > 0;
 
 	const {
 		attributes,
@@ -168,32 +171,6 @@ function DocumentItem({
 		}
 		try {
 			await archiveDocument({ id: document._id });
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.getAll).queryKey.slice(0, 2),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.list).queryKey.slice(0, 2),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.listShared).queryKey.slice(0, 2),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.getTrash).queryKey.slice(0, 2),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.get, { id: document._id }).queryKey,
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
-					0,
-					2,
-				),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.favorites.isFavorite, {
-					documentId: document._id,
-				}).queryKey,
-			});
 			toast.success("Page moved to trash");
 		} catch (_error) {
 			toast.error("Failed to move page to trash");
@@ -214,17 +191,6 @@ function DocumentItem({
 	const handleToggleFavorite = async () => {
 		const added = await toggleFavorite({ documentId: document._id });
 		toast.success(added ? "Page starred" : "Page unstarred");
-		await queryClient.invalidateQueries({
-			queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
-				0,
-				2,
-			),
-		});
-		await queryClient.invalidateQueries({
-			queryKey: convexQuery(api.favorites.isFavorite, {
-				documentId: document._id,
-			}).queryKey,
-		});
 	};
 
 	const handleCopyLink = () => {
@@ -241,18 +207,6 @@ function DocumentItem({
 				isPublished,
 			});
 			toast.success(isPublished ? "Page shared" : "Page unshared");
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.list).queryKey.slice(0, 2),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.listShared).queryKey.slice(0, 2),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.get, { id: document._id }).queryKey,
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.getAll).queryKey.slice(0, 2),
-			});
 		} catch {
 			toast.error("Failed to update sharing settings");
 		}
@@ -376,24 +330,30 @@ function DocumentItem({
 				{isExpanded && (
 					<SidebarMenuSub>
 						{hasChildren ? (
-							<SortableContext
-								items={children.map((c) => c._id)}
-								strategy={verticalListSortingStrategy}
-							>
-								{children.map((child) => {
-									const childIsActive = currentDocumentId === child._id;
-									return (
-										<DocumentItem
-											key={child._id}
-											document={child}
-											isActive={childIsActive}
-											level={level + 1}
-											currentDocumentId={currentDocumentId}
-											onDragOver={onDragOver}
-										/>
-									);
-								})}
-							</SortableContext>
+							isLoadingChildren ? (
+								<p className="text-sidebar-foreground/50 text-xs px-2 py-1">
+									Loading...
+								</p>
+							) : (
+								<SortableContext
+									items={children.map((c) => c._id)}
+									strategy={verticalListSortingStrategy}
+								>
+									{children.map((child) => {
+										const childIsActive = currentDocumentId === child._id;
+										return (
+											<DocumentItem
+												key={child._id}
+												document={child}
+												isActive={childIsActive}
+												level={level + 1}
+												currentDocumentId={currentDocumentId}
+												onDragOver={onDragOver}
+											/>
+										);
+									})}
+								</SortableContext>
+							)
 						) : (
 							<p className="text-sidebar-foreground/50 text-xs px-2 py-1">
 								No pages inside
@@ -557,7 +517,7 @@ export function NavDocuments() {
 	const [, startTransition] = useTransition();
 
 	const { data: documents = [] } = useSuspenseQuery(
-		convexQuery(api.documents.list, {
+		documentsQueries.list({
 			parentId: null,
 			workspaceId: activeWorkspaceId ?? undefined,
 		}),

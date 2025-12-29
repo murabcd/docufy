@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 
 import * as React from "react";
@@ -17,16 +16,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
-import { api } from "../../../convex/_generated/api";
+import { authQueries } from "@/queries";
 
 export function DataControlsSettings() {
 	const [showDeleteAccountDialog, setShowDeleteAccountDialog] =
 		React.useState(false);
 	const [isDeleting, setIsDeleting] = React.useState(false);
 
-	const { data: currentUser } = useSuspenseQuery(
-		convexQuery(api.auth.getCurrentUser, {}),
-	);
+	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 
 	const handleDeleteAccount = async () => {
 		setIsDeleting(true);

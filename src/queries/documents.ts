@@ -1,0 +1,60 @@
+import { convexQuery } from "@convex-dev/react-query";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
+
+export const documentsQueries = {
+	get: (id: Id<"documents">) => convexQuery(api.documents.get, { id }),
+	getAncestors: (id: Id<"documents">) =>
+		convexQuery(api.documents.getAncestors, { id }),
+	getPublished: (id: Id<"documents">) =>
+		convexQuery(api.documents.getPublished, { id }),
+
+	list: (args: {
+		workspaceId?: Id<"workspaces">;
+		parentId?: Id<"documents"> | null;
+	}) =>
+		convexQuery(api.documents.list, {
+			workspaceId: args.workspaceId,
+			parentId: args.parentId ?? null,
+		}),
+
+	listShared: (args: {
+		workspaceId?: Id<"workspaces">;
+		parentId?: Id<"documents"> | null;
+	}) =>
+		convexQuery(api.documents.listShared, {
+			workspaceId: args.workspaceId,
+			parentId: args.parentId ?? null,
+		}),
+
+	getTrash: (workspaceId?: Id<"workspaces">) =>
+		convexQuery(api.documents.getTrash, { workspaceId }),
+
+	recentlyUpdated: (args: { workspaceId?: Id<"workspaces">; limit?: number }) =>
+		convexQuery(api.documents.getRecentlyUpdated, {
+			workspaceId: args.workspaceId,
+			limit: args.limit,
+		}),
+
+	listIndex: (args: {
+		workspaceId?: Id<"workspaces">;
+		includeArchived?: boolean;
+		limit?: number;
+	}) =>
+		convexQuery(api.documents.listIndex, {
+			workspaceId: args.workspaceId,
+			includeArchived: args.includeArchived,
+			limit: args.limit,
+		}),
+
+	search: (args: {
+		workspaceId?: Id<"workspaces">;
+		term: string;
+		limit?: number;
+	}) =>
+		convexQuery(api.documents.search, {
+			workspaceId: args.workspaceId,
+			term: args.term,
+			limit: args.limit,
+		}),
+};

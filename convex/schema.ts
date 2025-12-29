@@ -43,6 +43,17 @@ export default defineSchema({
 		.index("by_user_isArchived_updatedAt", ["userId", "isArchived", "updatedAt"])
 		.index("by_workspace", ["workspaceId"])
 		.index("by_workspace_parent", ["workspaceId", "parentId"])
+		.index("by_workspaceId_and_parentId_and_isArchived", [
+			"workspaceId",
+			"parentId",
+			"isArchived",
+		])
+		.index("by_workspaceId_and_parentId_and_isArchived_and_isPublished", [
+			"workspaceId",
+			"parentId",
+			"isArchived",
+			"isPublished",
+		])
 		.index("by_workspace_isArchived_updatedAt", [
 			"workspaceId",
 			"isArchived",
@@ -104,6 +115,7 @@ export default defineSchema({
 		previewText: v.optional(v.string()),
 		createdAt: v.number(),
 	})
+		.index("by_userId", ["userId"])
 		.index("by_chat_createdAt", ["chatId", "createdAt"])
 		.index("by_chat_messageId", ["chatId", "messageId"]),
 });

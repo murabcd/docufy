@@ -1,10 +1,5 @@
 import { useTiptapSync } from "@convex-dev/prosemirror-sync/tiptap";
-import { convexQuery } from "@convex-dev/react-query";
-import {
-	useQuery,
-	useQueryClient,
-	useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { AnyExtension, JSONContent } from "@tiptap/core";
 import type { Editor } from "@tiptap/react";
@@ -35,6 +30,7 @@ import { SidebarInset } from "@/components/ui/sidebar";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { getRandomCuratedCoverImageUrl } from "@/lib/cover-gallery";
 import { cn } from "@/lib/utils";
+import { documentsQueries } from "@/queries";
 import { nestedPagePluginKey } from "@/tiptap/extensions/nested-page/nested-page";
 import { EMPTY_DOCUMENT } from "@/tiptap/types";
 import { api } from "../../convex/_generated/api";
@@ -47,24 +43,20 @@ export const Route = createFileRoute("/documents/$documentId")({
 		const { queryClient } = context;
 		// Non-blocking prefetch - navigation happens immediately, data loads in background
 		void queryClient
-			.prefetchQuery(
-				convexQuery(api.documents.get, {
-					id: params.documentId as Id<"documents">,
-				}),
+			.ensureQueryData(
+				documentsQueries.get(params.documentId as Id<"documents">),
 			)
 			.catch(() => {});
 		void queryClient
-			.prefetchQuery(
-				convexQuery(api.documents.getAncestors, {
-					id: params.documentId as Id<"documents">,
-				}),
+			.ensureQueryData(
+				documentsQueries.getAncestors(params.documentId as Id<"documents">),
 			)
 			.catch(() => {});
 		void queryClient
-			.prefetchQuery(convexQuery(api.documents.list, { parentId: null }))
+			.ensureQueryData(documentsQueries.list({ parentId: null }))
 			.catch(() => {});
 		void queryClient
-			.prefetchQuery(convexQuery(api.documents.getAll))
+			.ensureQueryData(documentsQueries.listIndex({ includeArchived: true }))
 			.catch(() => {});
 	},
 });
@@ -72,21 +64,16 @@ export const Route = createFileRoute("/documents/$documentId")({
 function DocumentEditor() {
 	const { documentId } = Route.useParams();
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
 	const createDocument = useMutation(api.documents.create);
 	const updateDocumentTitle = useMutation(api.documents.update);
 	const editorRef = useRef<TiptapEditorHandle>(null);
 	const [, startTransition] = useTransition();
 	const { activeWorkspaceId, setActiveWorkspaceId } = useActiveWorkspace();
 	const { data: document } = useSuspenseQuery(
-		convexQuery(api.documents.get, {
-			id: documentId as Id<"documents">,
-		}),
+		documentsQueries.get(documentId as Id<"documents">),
 	);
 	const { data: ancestors = [] } = useSuspenseQuery(
-		convexQuery(api.documents.getAncestors, {
-			id: documentId as Id<"documents">,
-		}),
+		documentsQueries.getAncestors(documentId as Id<"documents">),
 	);
 
 	useEffect(() => {
@@ -96,14 +83,16 @@ function DocumentEditor() {
 	}, [activeWorkspaceId, document?.workspaceId, setActiveWorkspaceId]);
 
 	const { data: rootDocuments = [] } = useSuspenseQuery(
-		convexQuery(api.documents.list, {
+		documentsQueries.list({
 			parentId: null,
 			workspaceId: activeWorkspaceId ?? undefined,
 		}),
 	);
 	const { data: allDocuments = [] } = useQuery({
-		...convexQuery(api.documents.getAll, {
+		...documentsQueries.listIndex({
 			workspaceId: activeWorkspaceId ?? undefined,
+			includeArchived: true,
+			limit: 10_000,
 		}),
 		placeholderData: [],
 	});
@@ -158,13 +147,8 @@ function DocumentEditor() {
 				id: documentId as Id<"documents">,
 				title: newTitle || "New page",
 			});
-
-			// Ensure the title map used by inline subpage chips refreshes immediately.
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.getAll).queryKey.slice(0, 2),
-			});
 		},
-		[documentId, queryClient, updateDocumentTitle],
+		[documentId, updateDocumentTitle],
 	);
 
 	const removeIcon = useMutation(api.documents.update);
@@ -193,24 +177,8 @@ function DocumentEditor() {
 				id: documentId as Id<"documents">,
 				icon,
 			});
-
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.getAll).queryKey.slice(0, 2),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.list).queryKey.slice(0, 2),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.documents.getTrash).queryKey.slice(0, 2),
-			});
-			await queryClient.invalidateQueries({
-				queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
-					0,
-					2,
-				),
-			});
 		},
-		[documentId, queryClient, updateDocumentTitle],
+		[documentId, updateDocumentTitle],
 	);
 
 	const onRemoveIcon = useCallback(async () => {
@@ -218,23 +186,7 @@ function DocumentEditor() {
 			id: documentId as Id<"documents">,
 			icon: null,
 		});
-
-		await queryClient.invalidateQueries({
-			queryKey: convexQuery(api.documents.getAll).queryKey.slice(0, 2),
-		});
-		await queryClient.invalidateQueries({
-			queryKey: convexQuery(api.documents.list).queryKey.slice(0, 2),
-		});
-		await queryClient.invalidateQueries({
-			queryKey: convexQuery(api.documents.getTrash).queryKey.slice(0, 2),
-		});
-		await queryClient.invalidateQueries({
-			queryKey: convexQuery(api.favorites.listWithDocuments).queryKey.slice(
-				0,
-				2,
-			),
-		});
-	}, [documentId, queryClient, removeIcon]);
+	}, [documentId, removeIcon]);
 
 	const isEditorReady = useCallback((editor: Editor | null): boolean => {
 		return !!(editor && !editor.isDestroyed && editor.view && editor.view.dom);
