@@ -40,7 +40,6 @@ Use Bun (preferred; see `bun.lock`):
 ## Commit & Pull Request Guidelines
 
 - Commits: follow the existing conventional prefixes: `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `perf:`, `style:`.
-- PRs: include a clear description, link issues (if any), and add screenshots/gifs for UI changes.
 - Config/secrets: never commit `.env`; use `.env.example` for documenting required vars and configure secrets in Convex/Vercel.
 
 ## ExecPlans
