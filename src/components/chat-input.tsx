@@ -1,7 +1,19 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { ArrowUp, AtSign, FileText, X } from "lucide-react";
+import {
+	ArrowUp,
+	AtSign,
+	Book,
+	CirclePlus,
+	FileText,
+	Globe,
+	Grid3x3,
+	Paperclip,
+	Plus,
+	X,
+} from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
 	Command,
 	CommandEmpty,
@@ -15,7 +27,12 @@ import {
 	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
 	DropdownMenuGroup,
+	DropdownMenuItem,
 	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -29,11 +46,13 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import {
 	type ChatModel,
 	chatModels,
@@ -86,7 +105,9 @@ export function ChatInput({
 	const [mentions, setMentions] = useState<Id<"documents">[]>([]);
 	const [mentionPopoverOpen, setMentionPopoverOpen] = useState(false);
 	const [modelPopoverOpen, setModelPopoverOpen] = useState(false);
+	const [scopeMenuOpen, setScopeMenuOpen] = useState(false);
 	const [documentSearchTerm, setDocumentSearchTerm] = useState("");
+	const [sourceSearchTerm, setSourceSearchTerm] = useState("");
 	const [internalSelectedModel, setInternalSelectedModel] = useState<ChatModel>(
 		() => {
 			return (
@@ -129,7 +150,7 @@ export function ChatInput({
 			searchableText: doc.searchableText.slice(0, 2000),
 		}));
 		const payload =
-			mentionDetails.length > 0
+			mentionsWithContent.length > 0
 				? `${CONTEXT_PREFIX}${JSON.stringify({
 						mentions: mentionsWithContent,
 					})}${CONTEXT_SUFFIX}${trimmed}`
@@ -144,13 +165,32 @@ export function ChatInput({
 		}
 	};
 
-	const { data: documents } = useSuspenseQuery(
-		convexQuery(api.documents.getAll),
+	const { data: currentUser } = useSuspenseQuery(
+		convexQuery(api.auth.getCurrentUser, {}),
 	);
+	const { activeWorkspaceId } = useActiveWorkspace();
+	const { data: documents } = useSuspenseQuery(
+		convexQuery(api.documents.getAll, {
+			workspaceId: activeWorkspaceId ?? undefined,
+		}),
+	);
+
+	const accountName = currentUser?.name || currentUser?.email || "Guest";
+	const accountAvatarUrl = currentUser?.image ?? null;
+	const accountInitials = accountName
+		.split(" ")
+		.map((n) => n[0])
+		.join("")
+		.toUpperCase()
+		.slice(0, 2);
 
 	const deferredSearchTerm = useDeferredValue(documentSearchTerm);
 	const normalizedSearchTerm = deferredSearchTerm.trim();
 	const shouldSearchDocuments = normalizedSearchTerm.length > 0;
+
+	const deferredSourceSearchTerm = useDeferredValue(sourceSearchTerm);
+	const normalizedSourceSearchTerm = deferredSourceSearchTerm.trim();
+	const shouldSearchSources = normalizedSourceSearchTerm.length > 0;
 
 	const autoAddedMentionIdsRef = useRef<Set<Id<"documents">>>(new Set());
 	const autoMentionedDocumentIdRef = useRef<Id<"documents"> | null>(null);
@@ -194,17 +234,35 @@ export function ChatInput({
 		...convexQuery(api.documents.search, {
 			term: normalizedSearchTerm,
 			limit: 25,
+			workspaceId: activeWorkspaceId ?? undefined,
 		}),
 		enabled: shouldSearchDocuments,
 	});
 
 	const searchResults = documentSearchQuery.data ?? [];
 
+	const sourceSearchQuery = useQuery({
+		...convexQuery(api.documents.search, {
+			term: normalizedSourceSearchTerm,
+			limit: 25,
+			workspaceId: activeWorkspaceId ?? undefined,
+		}),
+		enabled: shouldSearchSources,
+	});
+
+	const sourceSearchResults = sourceSearchQuery.data ?? [];
+
 	useEffect(() => {
 		if (!mentionPopoverOpen) {
 			setDocumentSearchTerm("");
 		}
 	}, [mentionPopoverOpen]);
+
+	useEffect(() => {
+		if (!scopeMenuOpen) {
+			setSourceSearchTerm("");
+		}
+	}, [scopeMenuOpen]);
 
 	const defaultDocuments = useMemo(() => {
 		return documents.filter((doc) => !mentions.includes(doc._id));
@@ -226,6 +284,30 @@ export function ChatInput({
 	const emptyStateMessage = shouldSearchDocuments
 		? "No pages match your search"
 		: "No pages available";
+
+	const sourcesEmptyStateMessage = shouldSearchSources
+		? "No pages match your search"
+		: "No pages available";
+
+	const mentionableSourceDocuments = useMemo(() => {
+		if (shouldSearchSources) {
+			return sourceSearchResults;
+		}
+		return documents.slice(0, 8);
+	}, [documents, shouldSearchSources, sourceSearchResults]);
+
+	const addMention = (documentId: Id<"documents">) => {
+		autoAddedMentionIdsRef.current.delete(documentId);
+		onAutoMentionUndismiss?.(documentId);
+		setMentions((prev) => {
+			if (prev.includes(documentId)) {
+				return prev;
+			}
+			return [...prev, documentId];
+		});
+		setScopeMenuOpen(false);
+		setSourceSearchTerm("");
+	};
 
 	return (
 		<form className="[--radius:1.2rem] w-full max-w-[560px] mx-auto">
@@ -357,9 +439,8 @@ export function ChatInput({
 										</InputGroupButton>
 									</DropdownMenuTrigger>
 								</TooltipTrigger>
-								<TooltipContent>Select model</TooltipContent>
+								<TooltipContent>Select AI model</TooltipContent>
 							</Tooltip>
-
 							<DropdownMenuContent
 								side="top"
 								align="start"
@@ -367,7 +448,7 @@ export function ChatInput({
 							>
 								<DropdownMenuGroup className="w-42">
 									<DropdownMenuLabel className="text-muted-foreground text-xs">
-										Select model
+										Select Agent Mode
 									</DropdownMenuLabel>
 									{chatModels.map((model) => (
 										<DropdownMenuCheckboxItem
@@ -386,7 +467,107 @@ export function ChatInput({
 								</DropdownMenuGroup>
 							</DropdownMenuContent>
 						</DropdownMenu>
-
+						<DropdownMenu open={scopeMenuOpen} onOpenChange={setScopeMenuOpen}>
+							<DropdownMenuTrigger asChild>
+								<InputGroupButton size="sm" className="rounded-full">
+									<Globe /> Sources
+								</InputGroupButton>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent
+								side="top"
+								align="end"
+								className="[--radius:1rem]"
+							>
+								<DropdownMenuGroup>
+									<DropdownMenuItem
+										asChild
+										onSelect={(e) => e.preventDefault()}
+									>
+										<label htmlFor="web-search">
+											<Globe /> Web search{" "}
+											<Switch
+												id="web-search"
+												className="ml-auto"
+												defaultChecked
+											/>
+										</label>
+									</DropdownMenuItem>
+								</DropdownMenuGroup>
+								<DropdownMenuSeparator />
+								<DropdownMenuGroup>
+									<DropdownMenuItem
+										asChild
+										onSelect={(e) => e.preventDefault()}
+									>
+										<label htmlFor="apps">
+											<Grid3x3 /> Apps and integrations
+											<Switch id="apps" className="ml-auto" defaultChecked />
+										</label>
+									</DropdownMenuItem>
+									<DropdownMenuItem>
+										<CirclePlus /> All sources I can access
+									</DropdownMenuItem>
+									<DropdownMenuSub>
+										<DropdownMenuSubTrigger>
+											<Avatar className="size-4">
+												{accountAvatarUrl ? (
+													<AvatarImage src={accountAvatarUrl} />
+												) : null}
+												<AvatarFallback>{accountInitials}</AvatarFallback>
+											</Avatar>
+											{accountName}
+										</DropdownMenuSubTrigger>
+										<DropdownMenuSubContent className="w-72 p-0 [--radius:1rem]">
+											<Command>
+												<CommandInput
+													placeholder="Find or use knowledge in..."
+													autoFocus
+													value={sourceSearchTerm}
+													onValueChange={setSourceSearchTerm}
+												/>
+												<CommandList>
+													<CommandEmpty>
+														{sourcesEmptyStateMessage}
+													</CommandEmpty>
+													{mentionableSourceDocuments.length > 0 ? (
+														<CommandGroup
+															heading={
+																shouldSearchSources ? "Search results" : "Pages"
+															}
+														>
+															{mentionableSourceDocuments.map((document) => (
+																<CommandItem
+																	key={document._id}
+																	value={`${document._id} ${document.title}`}
+																	onSelect={() => {
+																		addMention(document._id);
+																	}}
+																>
+																	<MentionableIcon />
+																	{document.title}
+																</CommandItem>
+															))}
+														</CommandGroup>
+													) : null}
+												</CommandList>
+											</Command>
+										</DropdownMenuSubContent>
+									</DropdownMenuSub>
+									<DropdownMenuItem>
+										<Book /> Help Center
+									</DropdownMenuItem>
+								</DropdownMenuGroup>
+								<DropdownMenuSeparator />
+								<DropdownMenuGroup>
+									<DropdownMenuItem>
+										<Plus /> Connect apps
+									</DropdownMenuItem>
+									<DropdownMenuLabel className="text-muted-foreground text-xs">
+										We&apos;ll only search in the sources selected here.
+									</DropdownMenuLabel>
+								</DropdownMenuGroup>
+							</DropdownMenuContent>
+						</DropdownMenu>
 						<InputGroupButton
 							aria-label="Send"
 							className="ml-auto rounded-full"

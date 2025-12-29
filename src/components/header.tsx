@@ -19,7 +19,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useCreateDocumentNavigation } from "@/hooks/use-create-document-navigation";
+import { useCreateDocument } from "@/hooks/use-create-document";
 import type { Id } from "../../convex/_generated/dataModel";
 
 type HeaderProps = {
@@ -40,7 +40,7 @@ export function Header({
 	updatedAt,
 }: HeaderProps) {
 	const { toggleRightSidebar, state, isMobile } = useSidebar();
-	const { createAndNavigate, isCreating } = useCreateDocumentNavigation();
+	const { createAndNavigate, isCreating } = useCreateDocument();
 	const titleInputRef = useRef<HTMLInputElement>(null);
 	const [isEditingTitle, setIsEditingTitle] = useState(false);
 	const [titleValue, setTitleValue] = useState(

@@ -44,6 +44,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import {
 	type ChatModel,
 	chatModels,
@@ -177,6 +178,7 @@ export function AISidebar({
 		rightOpenMobile,
 	} = useSidebar();
 	const sidebarOpen = isMobile ? rightOpenMobile : rightOpen;
+	const { activeWorkspaceId } = useActiveWorkspace();
 
 	const { data: chats } = useSuspenseQuery(
 		convexQuery(api.chats.list, { documentId: null }),
@@ -224,6 +226,7 @@ export function AISidebar({
 			const documentId = await createDocumentFromAi({
 				title,
 				content,
+				workspaceId: activeWorkspaceId ?? undefined,
 			});
 			await queryClient.invalidateQueries({
 				queryKey: convexQuery(api.documents.getAll).queryKey.slice(0, 2),
@@ -233,7 +236,7 @@ export function AISidebar({
 			});
 			navigate({ to: "/documents/$documentId", params: { documentId } });
 		},
-		[createDocumentFromAi, navigate, queryClient],
+		[activeWorkspaceId, createDocumentFromAi, navigate, queryClient],
 	);
 
 	const [pendingSavedChatById, setPendingSavedChatById] = React.useState<
