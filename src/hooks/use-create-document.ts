@@ -3,20 +3,24 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { useCallback, useState } from "react";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
-export function useCreateDocumentNavigation() {
+export function useCreateDocument() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const createDocument = useMutation(api.documents.create);
+	const { activeWorkspaceId } = useActiveWorkspace();
 	const [isCreating, setIsCreating] = useState(false);
 
 	const createAndNavigate = useCallback(async () => {
 		if (isCreating) return;
 		setIsCreating(true);
 		try {
-			const documentId = await createDocument({});
+			const documentId = await createDocument({
+				workspaceId: activeWorkspaceId ?? undefined,
+			});
 
 			void queryClient
 				.prefetchQuery(
@@ -38,7 +42,7 @@ export function useCreateDocumentNavigation() {
 		} finally {
 			setIsCreating(false);
 		}
-	}, [createDocument, isCreating, navigate, queryClient]);
+	}, [activeWorkspaceId, createDocument, isCreating, navigate, queryClient]);
 
 	return { createAndNavigate, isCreating };
 }
