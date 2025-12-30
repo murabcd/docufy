@@ -2,11 +2,11 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Clock, FileText, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { AISidebar } from "@/components/ai-sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { DocumentSkeleton } from "@/components/document-skeleton";
-import { Header } from "@/components/header";
-import { RecentlyUpdatedCards } from "@/components/recently-updated-cards";
+import { RecentlyUpdatedCards } from "@/components/cards/recently-updated-cards";
+import { DocumentSkeleton } from "@/components/document/document-skeleton";
+import { Header } from "@/components/layout/header";
+import { AISidebar } from "@/components/sidebar/ai-sidebar";
+import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import { Button } from "@/components/ui/button";
 import {
 	Empty,

@@ -69,7 +69,7 @@ import {
 	DEFAULT_CHAT_MODEL,
 } from "@/lib/ai/models";
 import { authQueries, documentsQueries } from "@/queries";
-import type { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 const CONTEXT_PREFIX = "__DOCCTX__";
 const CONTEXT_SUFFIX = "__ENDDOCCTX__";

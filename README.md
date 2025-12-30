@@ -7,8 +7,6 @@
   Notion-like Platform Built with TanStack Start, TanStack AI and Convex.
 </p>
 
-> **⚠️ WARNING: This project is currently in early development.**  
-
 <p align="center">
   <a href="#features"><strong>Features</strong></a> ·
   <a href="#model-providers"><strong>Model providers</strong></a> ·
@@ -70,6 +68,7 @@ You will need to use the environment variables [defined in `.env.example`](.env.
 ```bash
 bun install
 bun dev
+bun convex dev
 ```
 
 Your app should now be running on [localhost:3000](http://localhost:3000/).

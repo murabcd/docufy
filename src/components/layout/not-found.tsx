@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
-import { AISidebar } from "@/components/ai-sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { Header } from "@/components/header";
+import { Header } from "@/components/layout/header";
+import { AISidebar } from "@/components/sidebar/ai-sidebar";
+import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import { Button } from "@/components/ui/button";
 import {
 	Empty,

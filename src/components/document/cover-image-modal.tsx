@@ -11,8 +11,8 @@ import {
 } from "@/lib/cover-gallery";
 import { optimisticUpdateDocument } from "@/lib/optimistic-documents";
 import { cn } from "@/lib/utils";
-import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 type CoverImageModalProps = {
 	documentId: Id<"documents">;

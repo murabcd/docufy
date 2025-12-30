@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Plus, WandSparkles } from "lucide-react";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { NavActions } from "@/components/nav-actions";
+import { NavActions } from "@/components/nav/nav-actions";
 import {
 	Breadcrumb,
 	BreadcrumbItem,
@@ -20,7 +20,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useCreateDocument } from "@/hooks/use-create-document";
-import type { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 type HeaderProps = {
 	title?: string;

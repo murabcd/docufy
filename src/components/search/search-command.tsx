@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/command";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { documentsQueries } from "@/queries";
-import type { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 interface SearchCommandProps {
 	open: boolean;

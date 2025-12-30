@@ -68,8 +68,8 @@ import {
 	optimisticUpdateDocument,
 } from "@/lib/optimistic-documents";
 import { documentsQueries, favoritesQueries } from "@/queries";
-import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 interface Document {
 	_id: Id<"documents">;

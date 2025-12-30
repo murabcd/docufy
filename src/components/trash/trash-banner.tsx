@@ -17,8 +17,8 @@ import {
 	optimisticRemoveDocument,
 	optimisticRestoreDocument,
 } from "@/lib/optimistic-documents";
-import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 interface TrashBannerProps {
 	documentId: Id<"documents">;

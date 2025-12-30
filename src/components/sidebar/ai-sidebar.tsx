@@ -20,12 +20,12 @@ import {
 	Plus,
 } from "lucide-react";
 import * as React from "react";
-import { ChatInput } from "@/components/chat-input";
-import { ChatMessages } from "@/components/chat-messages";
+import { ChatInput } from "@/components/chat/chat-input";
+import { ChatMessages } from "@/components/chat/chat-messages";
 import {
 	ChatSuggestions,
 	getDefaultChatSuggestions,
-} from "@/components/chat-suggestions";
+} from "@/components/chat/chat-suggestions";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -63,8 +63,8 @@ import {
 } from "@/lib/ai/models";
 import { cn } from "@/lib/utils";
 import { chatsQueries } from "@/queries";
-import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 type PersistedUIMessage = {
 	id: string;

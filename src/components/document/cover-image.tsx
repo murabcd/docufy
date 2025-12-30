@@ -1,6 +1,6 @@
 import { useMutation } from "convex/react";
 import { useState } from "react";
-import { CoverImageModal } from "@/components/cover-image-modal";
+import { CoverImageModal } from "@/components/document/cover-image-modal";
 import { Button } from "@/components/ui/button";
 import {
 	ButtonGroup,
@@ -14,8 +14,8 @@ import {
 } from "@/components/ui/popover";
 import { optimisticUpdateDocument } from "@/lib/optimistic-documents";
 import { cn } from "@/lib/utils";
-import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 type CoverImageProps = {
 	url?: string;

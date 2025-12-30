@@ -2,7 +2,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
-import { Icons } from "@/components/icons";
+import { Icons } from "@/components/icons/icons";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,

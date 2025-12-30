@@ -1,5 +1,5 @@
-import { AISidebar } from "@/components/ai-sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AISidebar } from "@/components/sidebar/ai-sidebar";
+import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 

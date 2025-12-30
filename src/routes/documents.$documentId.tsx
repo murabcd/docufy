@@ -14,17 +14,17 @@ import {
 	useTransition,
 } from "react";
 import { toast } from "sonner";
-import { AISidebar } from "@/components/ai-sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { CoverImage } from "@/components/cover-image";
-import { DocumentSkeleton } from "@/components/document-skeleton";
-import { DocumentTitle } from "@/components/document-title";
-import { Header } from "@/components/header";
-import { IconPicker } from "@/components/icon-picker";
+import { CoverImage } from "@/components/document/cover-image";
+import { DocumentSkeleton } from "@/components/document/document-skeleton";
+import { DocumentTitle } from "@/components/document/document-title";
+import { IconPicker } from "@/components/icons/icon-picker";
+import { Header } from "@/components/layout/header";
+import { AISidebar } from "@/components/sidebar/ai-sidebar";
+import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import TiptapEditor, {
 	type TiptapEditorHandle,
 } from "@/components/tiptap/tiptap-editor";
-import { TrashBanner } from "@/components/trash-banner";
+import { TrashBanner } from "@/components/trash/trash-banner";
 import { Button } from "@/components/ui/button";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";

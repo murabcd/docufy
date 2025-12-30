@@ -3,7 +3,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { TrashBoxPopover } from "@/components/trash-box";
+import { TrashBoxPopover } from "@/components/trash/trash-box";
 import {
 	Popover,
 	PopoverContent,

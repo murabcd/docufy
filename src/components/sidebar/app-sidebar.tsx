@@ -10,23 +10,23 @@ import {
 	Trash2,
 } from "lucide-react";
 import * as React from "react";
-import { NavDocuments } from "@/components/nav-documents";
-import { NavFavorites } from "@/components/nav-favorites";
-import { NavMain } from "@/components/nav-main";
-import { NavSecondary } from "@/components/nav-secondary";
-import { NavShared } from "@/components/nav-shared";
-import { NavTeamspaces } from "@/components/nav-teamspaces";
-import { SearchCommand } from "@/components/search-command";
-import { SettingsDialog } from "@/components/settings-dialog";
+import { NavDocuments } from "@/components/nav/nav-documents";
+import { NavFavorites } from "@/components/nav/nav-favorites";
+import { NavMain } from "@/components/nav/nav-main";
+import { NavSecondary } from "@/components/nav/nav-secondary";
+import { NavShared } from "@/components/nav/nav-shared";
+import { NavTeamspaces } from "@/components/nav/nav-teamspaces";
+import { SearchCommand } from "@/components/search/search-command";
+import { SettingsDialog } from "@/components/settings/settings-dialog";
 import {
 	Sidebar,
 	SidebarContent,
 	SidebarHeader,
 } from "@/components/ui/sidebar";
-import { WorkspaceSwitcher } from "@/components/workspace-switcher";
+import { WorkspaceSwitcher } from "@/components/workspaces/workspace-switcher";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { authQueries, favoritesQueries } from "@/queries";
-import type { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 export interface Team {
 	id?: string;
@@ -128,9 +128,6 @@ export function AppSidebar({
 		(currentUser as { isAnonymous?: boolean } | null)?.isAnonymous,
 	);
 	const firstName = fullName.trim().split(/\s+/)[0] || "Guest";
-	const possessiveFirstName = /s$/i.test(firstName)
-		? `${firstName}'`
-		: `${firstName}'s`;
 
 	const teams = React.useMemo((): Team[] => {
 		if (teamsProp) return teamsProp;
@@ -149,13 +146,13 @@ export function AppSidebar({
 		return [
 			{
 				id: "default",
-				name: isAnonymousUser ? "Guest" : `${possessiveFirstName} workspace`,
+				name: isAnonymousUser ? "Guest" : firstName,
 				logo: Command,
 				plan: "Free",
 				isPrivate: false,
 			},
 		];
-	}, [isAnonymousUser, possessiveFirstName, teamsProp, workspaces]);
+	}, [isAnonymousUser, firstName, teamsProp, workspaces]);
 
 	const pathname = location.pathname;
 	const isHomeActive = pathname === "/";
