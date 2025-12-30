@@ -1,0 +1,106 @@
+import { AlignLeft, ChartNoAxesColumn } from "lucide-react";
+import type * as React from "react";
+import { Badge } from "@/components/ui/badge";
+
+export interface ChatSuggestion {
+	id: "summarize" | "analyze";
+	title: string;
+	prompt: string;
+	badge?: string;
+	label?: string;
+	icon: React.ReactNode;
+}
+
+export function getDefaultChatSuggestions(opts: {
+	hasPageContext: boolean;
+}): ChatSuggestion[] {
+	if (opts.hasPageContext) {
+		return [
+			{
+				id: "summarize",
+				title: "Summarize this page",
+				prompt:
+					"Summarize the referenced page. Include key takeaways and action items.",
+				icon: <AlignLeft className="size-4" />,
+			},
+			{
+				id: "analyze",
+				title: "Analyze for insights",
+				badge: "New",
+				prompt:
+					"Analyze the referenced page for insights: themes, risks, open questions, and recommendations.",
+				icon: <ChartNoAxesColumn className="size-4" />,
+			},
+		];
+	}
+
+	return [
+		{
+			id: "summarize",
+			title: "Summarize a page",
+			prompt:
+				"Summarize the page(s) I mention. Include key takeaways and action items.",
+			icon: <AlignLeft className="size-4" />,
+		},
+		{
+			id: "analyze",
+			title: "Analyze for insights",
+			badge: "New",
+			prompt:
+				"Analyze the page(s) I mention for insights: themes, risks, open questions, and recommendations.",
+			icon: <ChartNoAxesColumn className="size-4" />,
+		},
+	];
+}
+
+export function ChatSuggestions({
+	title = "How can I help you today?",
+	suggestions,
+	onSelect,
+}: {
+	title?: string;
+	suggestions: ChatSuggestion[];
+	onSelect: (prompt: string) => void;
+}) {
+	return (
+		<div className="flex flex-col gap-3">
+			<div className="text-lg font-semibold">{title}</div>
+			<div className="flex flex-col">
+				{suggestions.map((suggestion) => (
+					<button
+						key={suggestion.id}
+						type="button"
+						className="w-full rounded-lg px-0 py-2 text-left transition-colors hover:bg-muted/60"
+						onClick={() => onSelect(suggestion.prompt)}
+					>
+						<div className="flex items-start gap-3">
+							<span className="mt-0.5 shrink-0 text-muted-foreground">
+								{suggestion.icon}
+							</span>
+							<div className="min-w-0 flex-1">
+								<div className="flex items-center gap-2 min-w-0">
+									<div className="truncate text-sm font-medium">
+										{suggestion.title}
+									</div>
+									{suggestion.badge ? (
+										<Badge
+											variant="secondary"
+											className="h-5 px-2 text-[10px] bg-primary/15 text-primary"
+										>
+											{suggestion.badge}
+										</Badge>
+									) : null}
+								</div>
+								{suggestion.label ? (
+									<div className="truncate text-xs text-muted-foreground">
+										{suggestion.label}
+									</div>
+								) : null}
+							</div>
+						</div>
+					</button>
+				))}
+			</div>
+		</div>
+	);
+}

@@ -15,7 +15,14 @@ import {
 	Plus,
 	X,
 } from "lucide-react";
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+	useDeferredValue,
+	useEffect,
+	useEffectEvent,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
 	Command,
@@ -81,6 +88,7 @@ interface ChatInputProps {
 	onSend?: (payload: string, question: string) => void;
 	placeholder?: string;
 	disabled?: boolean;
+	suggestionAction?: { id: string; text: string; submit?: boolean } | null;
 	selectedModel?: ChatModel;
 	onModelChange?: (model: ChatModel) => void;
 	sidebarOpen?: boolean;
@@ -96,6 +104,7 @@ export function ChatInput({
 	onSend: propOnSend,
 	placeholder = "Ask, search, or make anything...",
 	disabled = false,
+	suggestionAction = null,
 	selectedModel: propSelectedModel,
 	onModelChange,
 	sidebarOpen = false,
@@ -152,8 +161,8 @@ export function ChatInput({
 	const queryClient = useQueryClient();
 	const [isSending, setIsSending] = useState(false);
 
-	const handleSend = async () => {
-		const trimmed = value.trim();
+	const handleSend = async (overrideValue?: string) => {
+		const trimmed = (overrideValue ?? value).trim();
 		if (!trimmed || disabled || !propOnSend || isSending) {
 			return;
 		}
@@ -195,6 +204,26 @@ export function ChatInput({
 			void handleSend();
 		}
 	};
+
+	const lastSuggestionIdRef = useRef<string | null>(null);
+	const applySuggestionAction = useEffectEvent(
+		(action: NonNullable<typeof suggestionAction>) => {
+			onChange(action.text);
+			requestAnimationFrame(() => {
+				if (!textareaRef.current || textareaRef.current.disabled) return;
+				textareaRef.current.focus({ preventScroll: true });
+				if (action.submit) {
+					void handleSend(action.text);
+				}
+			});
+		},
+	);
+	useEffect(() => {
+		if (!suggestionAction) return;
+		if (suggestionAction.id === lastSuggestionIdRef.current) return;
+		lastSuggestionIdRef.current = suggestionAction.id;
+		applySuggestionAction(suggestionAction);
+	}, [suggestionAction]);
 
 	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 	const { activeWorkspaceId, workspaces } = useActiveWorkspace();
@@ -771,7 +800,9 @@ export function ChatInput({
 							className="ml-auto rounded-full"
 							variant="default"
 							size="icon-sm"
-							onClick={handleSend}
+							onClick={() => {
+								void handleSend();
+							}}
 							disabled={!value.trim() || disabled}
 						>
 							<ArrowUp />

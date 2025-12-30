@@ -22,6 +22,10 @@ import {
 import * as React from "react";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessages } from "@/components/chat-messages";
+import {
+	ChatSuggestions,
+	getDefaultChatSuggestions,
+} from "@/components/chat-suggestions";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -595,6 +599,26 @@ function ChatSessionChrome(
 		[onAddToDocument, onCreatePageFromAi, title],
 	);
 
+	const [suggestionAction, setSuggestionAction] = React.useState<{
+		id: string;
+		text: string;
+		submit?: boolean;
+	} | null>(null);
+
+	const hasPageContext = Boolean(contextDocumentId) && !isAutoMentionDismissed;
+	const suggestions = React.useMemo(
+		() => getDefaultChatSuggestions({ hasPageContext }),
+		[hasPageContext],
+	);
+
+	const handleSuggestionSelect = React.useCallback((prompt: string) => {
+		setSuggestionAction({ id: generateDraftId(), text: prompt, submit: true });
+	}, []);
+
+	const showSuggestions =
+		(messages.length === 0 || messages.every((m) => m.parts.length === 0)) &&
+		!isLoading;
+
 	return (
 		<>
 			<SidebarHeader className="flex flex-row items-center gap-2 p-3 min-w-0">
@@ -778,12 +802,21 @@ function ChatSessionChrome(
 			</SidebarContent>
 
 			<SidebarFooter className="p-3">
+				{showSuggestions ? (
+					<div className="pb-3">
+						<ChatSuggestions
+							suggestions={suggestions}
+							onSelect={handleSuggestionSelect}
+						/>
+					</div>
+				) : null}
 				<ChatInput
 					value={inputValue}
 					onChange={setInputValue}
 					onSend={onSendMessage}
 					placeholder={placeholder}
 					disabled={isLoading}
+					suggestionAction={suggestionAction}
 					selectedModel={selectedModel}
 					onModelChange={onModelChange}
 					sidebarOpen={sidebarOpen}
