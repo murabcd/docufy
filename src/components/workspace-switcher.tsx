@@ -1,17 +1,19 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import {
 	Check,
 	ChevronDown,
 	LogIn,
 	LogOut,
 	Plus,
-	Settings,
+	Settings2,
 	UserPlus,
 } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { LoginDialog } from "@/components/login-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -34,6 +36,7 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CreateWorkspaceDialog } from "@/components/workspaces/create-workspace-dialog";
+import { InviteMembersDialog } from "@/components/workspaces/invite-members-dialog";
 import { useCreateDocument } from "@/hooks/use-create-document";
 import { authClient } from "@/lib/auth-client";
 import { authQueries } from "@/queries";
@@ -49,6 +52,7 @@ export function WorkspaceSwitcher({
 		name: string;
 		logo: React.ElementType;
 		plan: string;
+		isPrivate?: boolean;
 	}[];
 	activeTeamId?: string;
 	onSelectTeamId?: (teamId: string) => void;
@@ -56,10 +60,14 @@ export function WorkspaceSwitcher({
 }) {
 	const { state, isMobile } = useSidebar();
 	const { createAndNavigate, isCreating } = useCreateDocument();
+	const queryClient = useQueryClient();
+	const router = useRouter();
 
+	const [menuOpen, setMenuOpen] = React.useState(false);
 	const [loginOpen, setLoginOpen] = React.useState(false);
 	const [logOutPending, setLogOutPending] = React.useState(false);
 	const [createWorkspaceOpen, setCreateWorkspaceOpen] = React.useState(false);
+	const [inviteMembersOpen, setInviteMembersOpen] = React.useState(false);
 
 	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 
@@ -71,10 +79,6 @@ export function WorkspaceSwitcher({
 		return teams[0];
 	}, [activeTeamId, teams]);
 
-	if (!activeTeam) {
-		return null;
-	}
-
 	const showPlusButton = state === "expanded" && !isMobile;
 
 	const handleCreateDocument = async () => {
@@ -82,33 +86,54 @@ export function WorkspaceSwitcher({
 	};
 
 	const handleLogin = () => {
+		setMenuOpen(false);
 		setLoginOpen(true);
 	};
 
 	const handleLogOut = async () => {
+		setMenuOpen(false);
+		setInviteMembersOpen(false);
+		setCreateWorkspaceOpen(false);
 		setLogOutPending(true);
 		try {
-			await authClient.signOut({
-				fetchOptions: {
-					onSuccess: () => {
-						location.reload();
-					},
-				},
+			queryClient.removeQueries({
+				predicate: (query) =>
+					query.queryKey[0] === "convexQuery" &&
+					query.queryKey[1] === "workspaces:listMembers",
 			});
+			await authClient.signOut();
+			localStorage.removeItem("docufy:activeWorkspaceId");
+			sessionStorage.removeItem("docufy:anonSignInAttemptedAt");
+			queryClient.clear();
+			await router.invalidate({ sync: true });
 		} catch (error) {
 			console.error(error);
 			toast.error("Log out failed");
+		} finally {
 			setLogOutPending(false);
 		}
 	};
 
 	const handleSettings = () => {
+		setMenuOpen(false);
 		onSettingsOpen?.();
 	};
 
 	const isAnonymousUser = Boolean(
 		(currentUser as { isAnonymous?: boolean } | null)?.isAnonymous,
 	);
+	const canInviteMembers =
+		!isAnonymousUser && Boolean(activeTeam?.id) && activeTeam?.id !== "default";
+
+	React.useEffect(() => {
+		if (!canInviteMembers) {
+			setInviteMembersOpen(false);
+		}
+	}, [canInviteMembers]);
+
+	if (!activeTeam) {
+		return null;
+	}
 	const guestAvatarUrl =
 		isAnonymousUser && currentUser?._id
 			? `https://avatar.vercel.sh/${encodeURIComponent(
@@ -139,10 +164,18 @@ export function WorkspaceSwitcher({
 					onSelectTeamId?.(String(workspaceId));
 				}}
 			/>
+			{canInviteMembers ? (
+				<InviteMembersDialog
+					open={inviteMembersOpen}
+					onOpenChange={setInviteMembersOpen}
+					workspaceId={activeTeam.id}
+					canInviteMembers={canInviteMembers}
+				/>
+			) : null}
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<div className="flex items-center gap-1 w-full relative">
-						<DropdownMenu>
+						<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
 							<DropdownMenuTrigger asChild>
 								<SidebarMenuButton className="w-full px-1.5">
 									<div className="bg-sidebar-primary dark:bg-sidebar-primary-foreground text-sidebar-primary-foreground dark:text-sidebar-primary flex aspect-square size-5 items-center justify-center rounded-md shrink-0">
@@ -184,20 +217,23 @@ export function WorkspaceSwitcher({
 											className="flex-1"
 											onClick={handleSettings}
 										>
-											<Settings className="size-4 mr-2" />
+											<Settings2 className="size-4 mr-2" />
 											Settings
 										</Button>
-										<Button
-											variant="outline"
-											size="sm"
-											className="flex-1"
-											onClick={() => {
-												// TODO: Implement invite members
-											}}
-										>
-											<UserPlus className="size-4 mr-2" />
-											Invite members
-										</Button>
+										{canInviteMembers ? (
+											<Button
+												variant="outline"
+												size="sm"
+												className="flex-1"
+												onClick={() => {
+													setMenuOpen(false);
+													setInviteMembersOpen(true);
+												}}
+											>
+												<UserPlus className="size-4 mr-2" />
+												Invite members
+											</Button>
+										) : null}
 									</div>
 								</div>
 								<DropdownMenuSeparator />
@@ -216,17 +252,28 @@ export function WorkspaceSwitcher({
 											<div className="flex size-6 items-center justify-center rounded-xs border">
 												<team.logo className="size-4 shrink-0" />
 											</div>
-											{team.name}
-											{activeKey === teamKey && (
+											<span className="truncate">{team.name}</span>
+											{team.isPrivate ? (
+												<Badge
+													variant="secondary"
+													className="h-5 px-2 text-[10px]"
+												>
+													Private
+												</Badge>
+											) : null}
+											{activeKey === teamKey ? (
 												<Check className="ml-auto size-4" />
-											)}
+											) : null}
 										</DropdownMenuItem>
 									);
 								})}
 								{!isAnonymousUser ? (
 									<DropdownMenuItem
 										className="gap-2"
-										onClick={() => setCreateWorkspaceOpen(true)}
+										onClick={() => {
+											setMenuOpen(false);
+											setCreateWorkspaceOpen(true);
+										}}
 									>
 										<div className="bg-background flex size-6 items-center justify-center rounded-md border">
 											<Plus className="size-4" />
