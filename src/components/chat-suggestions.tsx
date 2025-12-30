@@ -1,9 +1,9 @@
-import { AlignLeft, ChartNoAxesColumn } from "lucide-react";
+import { AlignLeft, ChartNoAxesColumn, Library, Search } from "lucide-react";
 import type * as React from "react";
 import { Badge } from "@/components/ui/badge";
 
 export interface ChatSuggestion {
-	id: "summarize" | "analyze";
+	id: "summarize" | "analyze" | "search" | "agenda";
 	title: string;
 	prompt: string;
 	badge?: string;
@@ -36,19 +36,19 @@ export function getDefaultChatSuggestions(opts: {
 
 	return [
 		{
-			id: "summarize",
-			title: "Summarize a page",
+			id: "search",
+			title: "Search for anything",
 			prompt:
-				"Summarize the page(s) I mention. Include key takeaways and action items.",
-			icon: <AlignLeft className="size-4" />,
+				"Search my workspace for the topic I provide. Return the top matches as a short list with page titles and 1–2 sentence summaries. Ask a follow-up question if the query is ambiguous.",
+			icon: <Search className="size-4" />,
 		},
 		{
-			id: "analyze",
-			title: "Analyze for insights",
+			id: "agenda",
+			title: "Write meeting agenda",
 			badge: "New",
 			prompt:
-				"Analyze the page(s) I mention for insights: themes, risks, open questions, and recommendations.",
-			icon: <ChartNoAxesColumn className="size-4" />,
+				"Write a meeting agenda for the topic I provide. Include: goal, attendees/roles, a time-boxed agenda (30–60 min), prep materials, key questions/decisions, and follow-ups.",
+			icon: <Library className="size-4" />,
 		},
 	];
 }
