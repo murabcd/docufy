@@ -12,6 +12,7 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/ui/popover";
+import { optimisticUpdateDocument } from "@/lib/optimistic-documents";
 import { cn } from "@/lib/utils";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -24,7 +25,9 @@ type CoverImageProps = {
 
 export function CoverImage({ url, preview, documentId }: CoverImageProps) {
 	const [isPickerOpen, setIsPickerOpen] = useState(false);
-	const removeCoverImage = useMutation(api.documents.update);
+	const removeCoverImage = useMutation(
+		api.documents.update,
+	).withOptimisticUpdate(optimisticUpdateDocument);
 
 	const onRemove = async () => {
 		await removeCoverImage({

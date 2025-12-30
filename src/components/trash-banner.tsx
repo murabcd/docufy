@@ -13,6 +13,10 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+	optimisticRemoveDocument,
+	optimisticRestoreDocument,
+} from "@/lib/optimistic-documents";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -22,8 +26,12 @@ interface TrashBannerProps {
 
 export function TrashBanner({ documentId }: TrashBannerProps) {
 	const navigate = useNavigate();
-	const restore = useMutation(api.documents.restore);
-	const remove = useMutation(api.documents.remove);
+	const restore = useMutation(api.documents.restore).withOptimisticUpdate(
+		optimisticRestoreDocument,
+	);
+	const remove = useMutation(api.documents.remove).withOptimisticUpdate(
+		optimisticRemoveDocument,
+	);
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
 	const onRestore = async () => {

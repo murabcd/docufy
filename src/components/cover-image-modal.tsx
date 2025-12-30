@@ -9,6 +9,7 @@ import {
 	getCoverGallerySwatchPreviewStyle,
 	getCoverGallerySwatchValue,
 } from "@/lib/cover-gallery";
+import { optimisticUpdateDocument } from "@/lib/optimistic-documents";
 import { cn } from "@/lib/utils";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -28,8 +29,12 @@ export function CoverImageModal({
 	coverUrl,
 	onClose,
 }: CoverImageModalProps) {
-	const update = useMutation(api.documents.update);
-	const removeCoverImage = useMutation(api.documents.update);
+	const update = useMutation(api.documents.update).withOptimisticUpdate(
+		optimisticUpdateDocument,
+	);
+	const removeCoverImage = useMutation(
+		api.documents.update,
+	).withOptimisticUpdate(optimisticUpdateDocument);
 	const [activeTab, setActiveTab] = useState<TabType>("gallery");
 	const [urlInput, setUrlInput] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);

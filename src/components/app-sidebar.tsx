@@ -33,6 +33,7 @@ export interface Team {
 	name: string;
 	logo: LucideIcon;
 	plan: string;
+	isPrivate?: boolean;
 }
 
 export interface NavMainItem {
@@ -141,7 +142,8 @@ export function AppSidebar({
 						? "Guest"
 						: workspace.name,
 				logo: Command,
-				plan: workspace.isPrivate ? "Private" : "Free",
+				plan: "Free",
+				isPrivate: workspace.isPrivate ?? false,
 			}));
 		}
 		return [
@@ -150,6 +152,7 @@ export function AppSidebar({
 				name: isAnonymousUser ? "Guest" : `${possessiveFirstName} workspace`,
 				logo: Command,
 				plan: "Free",
+				isPrivate: false,
 			},
 		];
 	}, [isAnonymousUser, possessiveFirstName, teamsProp, workspaces]);

@@ -7,6 +7,7 @@ import {
 	ArrowUp,
 	AtSign,
 	Book,
+	Check,
 	CirclePlus,
 	FileText,
 	Globe,
@@ -105,11 +106,18 @@ export function ChatInput({
 }: ChatInputProps = {}) {
 	const [internalValue, setInternalValue] = useState("");
 	const [mentions, setMentions] = useState<Id<"documents">[]>([]);
+	const [sourceDocScopes, setSourceDocScopes] = useState<Id<"documents">[]>([]);
+	const [mentionTitlesById, setMentionTitlesById] = useState<
+		Record<string, string>
+	>({});
 	const [mentionPopoverOpen, setMentionPopoverOpen] = useState(false);
 	const [modelPopoverOpen, setModelPopoverOpen] = useState(false);
 	const [scopeMenuOpen, setScopeMenuOpen] = useState(false);
 	const [documentSearchTerm, setDocumentSearchTerm] = useState("");
 	const [sourceSearchTerm, setSourceSearchTerm] = useState("");
+	const [workspaceScopes, setWorkspaceScopes] = useState<Id<"workspaces">[]>(
+		[],
+	);
 	const [internalSelectedModel, setInternalSelectedModel] = useState<ChatModel>(
 		() => {
 			return (
@@ -150,14 +158,20 @@ export function ChatInput({
 			return;
 		}
 		setIsSending(true);
+		const contextDocumentIds = Array.from(
+			new Set<Id<"documents">>([...mentions, ...sourceDocScopes]),
+		);
 		const mentionsWithContent = await Promise.all(
-			mentionDetails.map(async (doc) => {
+			contextDocumentIds.map(async (documentId) => {
 				const fullDoc = await queryClient.fetchQuery(
-					documentsQueries.get(doc._id),
+					documentsQueries.get(documentId),
 				);
 				return {
-					id: String(doc._id),
-					title: doc.title,
+					id: String(documentId),
+					title:
+						fullDoc?.title ??
+						mentionTitlesById[String(documentId)] ??
+						"Untitled",
 					searchableText: (fullDoc?.searchableText ?? "").slice(0, 2000),
 				};
 			}),
@@ -183,7 +197,7 @@ export function ChatInput({
 	};
 
 	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
-	const { activeWorkspaceId } = useActiveWorkspace();
+	const { activeWorkspaceId, workspaces } = useActiveWorkspace();
 	const { data: documents } = useSuspenseQuery(
 		documentsQueries.listIndex({
 			workspaceId: activeWorkspaceId ?? undefined,
@@ -259,15 +273,51 @@ export function ChatInput({
 	const searchResults = documentSearchQuery.data ?? [];
 
 	const sourceSearchQuery = useQuery({
-		...documentsQueries.search({
+		...documentsQueries.searchInWorkspaces({
 			term: normalizedSourceSearchTerm,
 			limit: 25,
-			workspaceId: activeWorkspaceId ?? undefined,
+			workspaceIds: workspaceScopes.length > 0 ? workspaceScopes : undefined,
 		}),
 		enabled: shouldSearchSources,
 	});
 
 	const sourceSearchResults = sourceSearchQuery.data ?? [];
+	const localTitleSearchResults = useMemo(() => {
+		if (!shouldSearchSources) return [];
+		const term = normalizedSourceSearchTerm.toLowerCase();
+		if (!term) return [];
+		return documents
+			.filter((doc) => doc.title.toLowerCase().includes(term))
+			.slice(0, 25);
+	}, [documents, normalizedSourceSearchTerm, shouldSearchSources]);
+	const combinedSourceSearchResults = useMemo(() => {
+		if (!shouldSearchSources) return [];
+		const byId = new Map<
+			string,
+			{ _id: Id<"documents">; title: string; workspaceId?: Id<"workspaces"> }
+		>();
+		for (const doc of sourceSearchResults) {
+			byId.set(String(doc._id), {
+				_id: doc._id,
+				title: doc.title,
+				workspaceId: doc.workspaceId,
+			});
+		}
+		for (const doc of localTitleSearchResults) {
+			if (byId.has(String(doc._id))) continue;
+			byId.set(String(doc._id), {
+				_id: doc._id,
+				title: doc.title,
+				workspaceId: activeWorkspaceId ?? undefined,
+			});
+		}
+		return Array.from(byId.values()).slice(0, 25);
+	}, [
+		activeWorkspaceId,
+		localTitleSearchResults,
+		shouldSearchSources,
+		sourceSearchResults,
+	]);
 
 	useEffect(() => {
 		if (!mentionPopoverOpen) {
@@ -285,12 +335,6 @@ export function ChatInput({
 		return documents.filter((doc) => !mentions.includes(doc._id));
 	}, [documents, mentions]);
 
-	const mentionDetails = useMemo(() => {
-		return mentions
-			.map((id) => documents.find((doc) => doc._id === id))
-			.filter((doc): doc is (typeof documents)[number] => !!doc);
-	}, [documents, mentions]);
-
 	const mentionableDocuments = useMemo(() => {
 		if (shouldSearchDocuments) {
 			return searchResults.filter((doc) => !mentions.includes(doc._id));
@@ -304,26 +348,70 @@ export function ChatInput({
 
 	const sourcesEmptyStateMessage = shouldSearchSources
 		? "No pages match your search"
-		: "No pages available";
+		: "No sources available";
 
-	const mentionableSourceDocuments = useMemo(() => {
-		if (shouldSearchSources) {
-			return sourceSearchResults;
+	const workspaceNameById = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const workspace of workspaces) {
+			map.set(String(workspace._id), workspace.name);
 		}
-		return documents.slice(0, 8);
-	}, [documents, shouldSearchSources, sourceSearchResults]);
+		return map;
+	}, [workspaces]);
+	const activeWorkspaceName = activeWorkspaceId
+		? (workspaceNameById.get(String(activeWorkspaceId)) ?? "Workspace")
+		: "Workspace";
 
-	const addMention = (documentId: Id<"documents">) => {
-		autoAddedMentionIdsRef.current.delete(documentId);
-		onAutoMentionUndismiss?.(documentId);
-		setMentions((prev) => {
-			if (prev.includes(documentId)) {
-				return prev;
+	const scopesLabel = useMemo(() => {
+		if (sourceDocScopes.length > 0) {
+			return sourceDocScopes.length === 1
+				? "1 scope"
+				: `${sourceDocScopes.length} scopes`;
+		}
+		if (workspaceScopes.length === 1) {
+			return workspaceNameById.get(String(workspaceScopes[0])) ?? "Workspace";
+		}
+		if (workspaceScopes.length > 1) {
+			return `${workspaceScopes.length} workspaces`;
+		}
+		return "Sources";
+	}, [sourceDocScopes.length, workspaceNameById, workspaceScopes]);
+
+	const documentScopesCountLabel =
+		sourceDocScopes.length === 0
+			? null
+			: sourceDocScopes.length === 1
+				? "1 scope"
+				: `${sourceDocScopes.length} scopes`;
+
+	const hasWorkspaceScopes = workspaceScopes.length > 0;
+	const isAllSourcesSelected =
+		workspaceScopes.length === 0 && sourceDocScopes.length === 0;
+	const hasSubTriggerMeta = hasWorkspaceScopes || sourceDocScopes.length > 0;
+
+	const toggleWorkspaceScope = (workspaceId: Id<"workspaces">) => {
+		setWorkspaceScopes((prev) => {
+			if (prev.some((id) => String(id) === String(workspaceId))) {
+				return prev.filter((id) => String(id) !== String(workspaceId));
 			}
-			return [...prev, documentId];
+			return [...prev, workspaceId];
 		});
-		setScopeMenuOpen(false);
-		setSourceSearchTerm("");
+	};
+
+	const toggleDocumentScope = (document: {
+		_id: Id<"documents">;
+		title: string;
+	}) => {
+		setSourceDocScopes((prev) => {
+			if (prev.includes(document._id)) {
+				return prev.filter((id) => id !== document._id);
+			}
+			return [...prev, document._id];
+		});
+		setMentionTitlesById((prev) => {
+			const key = String(document._id);
+			if (prev[key] === document.title) return prev;
+			return { ...prev, [key]: document.title };
+		});
 	};
 
 	return (
@@ -390,6 +478,14 @@ export function ChatInput({
 																document._id,
 															);
 															onAutoMentionUndismiss?.(document._id);
+															setMentionTitlesById((prev) => {
+																const key = String(document._id);
+																if (prev[key] === document.title) return prev;
+																return {
+																	...prev,
+																	[key]: document.title,
+																};
+															});
 															setMentions((prev) => [...prev, document._id]);
 															setDocumentSearchTerm("");
 															setMentionPopoverOpen(false);
@@ -409,10 +505,10 @@ export function ChatInput({
 						<div className="no-scrollbar -m-1.5 flex gap-1 overflow-y-auto p-1.5">
 							{mentions.map((mentionId) => {
 								const document = documents.find((doc) => doc._id === mentionId);
-
-								if (!document) {
-									return null;
-								}
+								const title =
+									document?.title ??
+									mentionTitlesById[String(mentionId)] ??
+									"Untitled";
 
 								return (
 									<InputGroupButton
@@ -432,10 +528,16 @@ export function ChatInput({
 											setMentions((prev) =>
 												prev.filter((m) => m !== mentionId),
 											);
+											setMentionTitlesById((prev) => {
+												const key = String(mentionId);
+												if (!(key in prev)) return prev;
+												const { [key]: _removed, ...rest } = prev;
+												return rest;
+											});
 										}}
 									>
 										<MentionableIcon />
-										{document.title}
+										{title}
 										<X />
 									</InputGroupButton>
 								);
@@ -485,11 +587,19 @@ export function ChatInput({
 							</DropdownMenuContent>
 						</DropdownMenu>
 						<DropdownMenu open={scopeMenuOpen} onOpenChange={setScopeMenuOpen}>
-							<DropdownMenuTrigger asChild>
-								<InputGroupButton size="sm" className="rounded-full">
-									<Globe /> Sources
-								</InputGroupButton>
-							</DropdownMenuTrigger>
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<DropdownMenuTrigger asChild>
+										<InputGroupButton size="sm" className="rounded-full">
+											<Globe />
+											<span className="max-w-[160px] truncate">
+												{scopesLabel}
+											</span>
+										</InputGroupButton>
+									</DropdownMenuTrigger>
+								</TooltipTrigger>
+								<TooltipContent>Select search scope</TooltipContent>
+							</Tooltip>
 							<DropdownMenuContent
 								side="top"
 								align="end"
@@ -521,23 +631,48 @@ export function ChatInput({
 											<Switch id="apps" className="ml-auto" defaultChecked />
 										</label>
 									</DropdownMenuItem>
-									<DropdownMenuItem>
+									<DropdownMenuCheckboxItem
+										checked={isAllSourcesSelected}
+										onCheckedChange={(checked) => {
+											if (checked) {
+												setWorkspaceScopes([]);
+												setSourceDocScopes([]);
+											}
+										}}
+										className="pl-2 *:[span:first-child]:right-2 *:[span:first-child]:left-auto"
+									>
 										<CirclePlus /> All sources I can access
-									</DropdownMenuItem>
+									</DropdownMenuCheckboxItem>
 									<DropdownMenuSub>
-										<DropdownMenuSubTrigger>
+										<DropdownMenuSubTrigger
+											className={
+												hasSubTriggerMeta ? "[&>svg:last-child]:ml-2!" : ""
+											}
+										>
 											<Avatar className="size-4">
 												{accountAvatarUrl ? (
 													<AvatarImage src={accountAvatarUrl} />
 												) : null}
 												<AvatarFallback>{accountInitials}</AvatarFallback>
 											</Avatar>
-											{accountName}
+											{activeWorkspaceName}
+											{hasSubTriggerMeta ? (
+												<span className="ml-auto flex items-center gap-2">
+													{documentScopesCountLabel ? (
+														<span className="text-xs text-muted-foreground tabular-nums">
+															{documentScopesCountLabel}
+														</span>
+													) : null}
+													{hasWorkspaceScopes ? (
+														<Check className="size-4 text-muted-foreground" />
+													) : null}
+												</span>
+											) : null}
 										</DropdownMenuSubTrigger>
 										<DropdownMenuSubContent className="w-72 p-0 [--radius:1rem]">
 											<Command>
 												<CommandInput
-													placeholder="Find or use knowledge in..."
+													placeholder="Select a workspace or page"
 													autoFocus
 													value={sourceSearchTerm}
 													onValueChange={setSourceSearchTerm}
@@ -546,24 +681,70 @@ export function ChatInput({
 													<CommandEmpty>
 														{sourcesEmptyStateMessage}
 													</CommandEmpty>
-													{mentionableSourceDocuments.length > 0 ? (
+													{workspaces.length > 0 ? (
 														<CommandGroup
 															heading={
-																shouldSearchSources ? "Search results" : "Pages"
+																shouldSearchSources
+																	? "Workspaces"
+																	: "Workspaces"
 															}
 														>
-															{mentionableSourceDocuments.map((document) => (
-																<CommandItem
-																	key={document._id}
-																	value={`${document._id} ${document.title}`}
-																	onSelect={() => {
-																		addMention(document._id);
-																	}}
-																>
-																	<MentionableIcon />
-																	{document.title}
-																</CommandItem>
-															))}
+															{workspaces.map((workspace) => {
+																const selected = workspaceScopes.some(
+																	(id) => String(id) === String(workspace._id),
+																);
+																return (
+																	<CommandItem
+																		key={workspace._id}
+																		value={`${workspace._id} ${workspace.name}`}
+																		onSelect={() =>
+																			toggleWorkspaceScope(workspace._id)
+																		}
+																		className="gap-2"
+																	>
+																		<Grid3x3 className="size-4" />
+																		<span className="truncate">
+																			{workspace.name}
+																		</span>
+																		{selected ? (
+																			<Check className="ml-auto size-4" />
+																		) : null}
+																	</CommandItem>
+																);
+															})}
+														</CommandGroup>
+													) : null}
+
+													{shouldSearchSources ? (
+														<CommandGroup heading="Pages">
+															{combinedSourceSearchResults.map((document) => {
+																const selected = sourceDocScopes.includes(
+																	document._id,
+																);
+																return (
+																	<CommandItem
+																		key={document._id}
+																		value={`${document._id} ${document.title}`}
+																		onSelect={() =>
+																			toggleDocumentScope({
+																				_id: document._id,
+																				title: document.title,
+																			})
+																		}
+																		className="gap-2"
+																	>
+																		<MentionableIcon />
+																		<div className="min-w-0 flex-1">
+																			<div className="truncate">
+																				{document.title}
+																			</div>
+																		</div>
+																		{selected ? (
+																			<Check className="ml-auto size-4" />
+																		) : null}
+																	</CommandItem>
+																);
+															})}
 														</CommandGroup>
 													) : null}
 												</CommandList>
@@ -571,7 +752,7 @@ export function ChatInput({
 										</DropdownMenuSubContent>
 									</DropdownMenuSub>
 									<DropdownMenuItem>
-										<Book /> Help Center
+										<Book /> Help center
 									</DropdownMenuItem>
 								</DropdownMenuGroup>
 								<DropdownMenuSeparator />

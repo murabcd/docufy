@@ -32,6 +32,10 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
+import {
+	optimisticRemoveDocument,
+	optimisticRestoreDocument,
+} from "@/lib/optimistic-documents";
 import { documentsQueries } from "@/queries";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -78,8 +82,12 @@ function TrashBoxContent({
 	documents,
 	isOpen = true,
 }: TrashBoxContentProps) {
-	const restore = useMutation(api.documents.restore);
-	const remove = useMutation(api.documents.remove);
+	const restore = useMutation(api.documents.restore).withOptimisticUpdate(
+		optimisticRestoreDocument,
+	);
+	const remove = useMutation(api.documents.remove).withOptimisticUpdate(
+		optimisticRemoveDocument,
+	);
 
 	const [search, setSearch] = useState("");
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -144,89 +152,93 @@ function TrashBoxContent({
 						value={search}
 						onChange={(e) => setSearch(e.target.value)}
 						className="h-8 bg-secondary pl-8 pr-2 focus-visible:ring-transparent"
-						placeholder="Search pages in Trash"
+						placeholder="Search pages..."
 					/>
 				</div>
 			</div>
 
 			<ScrollArea className="flex-1 min-h-0">
-				<div className="px-1 pb-1 space-y-1">
-					{documents.length === 0 ? (
-						<Empty className="h-full border-0 gap-3 p-6 md:p-6">
+				{documents.length === 0 ? (
+					<div className="flex h-full items-center justify-center p-6">
+						<Empty className="w-full border-0 gap-3 p-0">
 							<EmptyHeader className="gap-1">
 								<EmptyMedia variant="icon" className="text-muted-foreground">
 									<Trash2 />
 								</EmptyMedia>
 								<EmptyTitle>No results</EmptyTitle>
-								<EmptyDescription>
+								<EmptyDescription className="text-xs">
 									Deleted pages will appear here.
 								</EmptyDescription>
 							</EmptyHeader>
 						</Empty>
-					) : filteredDocuments.length === 0 ? (
-						<p className="text-xs text-center text-muted-foreground py-6">
-							No pages found.
-						</p>
-					) : (
-						filteredDocuments.map((document) => (
-							<div
-								key={document._id}
-								className="group rounded-md w-full hover:bg-accent grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 text-foreground px-2 py-1.5 text-left min-w-0 overflow-hidden"
-							>
-								<Link
-									to="/documents/$documentId"
-									params={{ documentId: document._id }}
-									onClick={() => onRequestClose?.()}
-									className="flex items-center gap-1 min-w-0 overflow-hidden"
+					</div>
+				) : (
+					<div className="px-1 pb-1 space-y-1">
+						{filteredDocuments.length === 0 ? (
+							<p className="text-xs text-center text-muted-foreground py-6">
+								No pages found.
+							</p>
+						) : (
+							filteredDocuments.map((document) => (
+								<div
+									key={document._id}
+									className="group rounded-md w-full hover:bg-accent grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 text-foreground px-2 py-1.5 text-left min-w-0 overflow-hidden"
 								>
-									{document.icon ? (
-										<span className="text-base leading-none shrink-0">
-											{document.icon}
-										</span>
-									) : (
-										<FileText className="size-4 shrink-0" />
-									)}
-									<div className="min-w-0 flex-1">
-										<span className="block truncate">{document.title}</span>
+									<Link
+										to="/documents/$documentId"
+										params={{ documentId: document._id }}
+										onClick={() => onRequestClose?.()}
+										className="flex items-center gap-1 min-w-0 overflow-hidden"
+									>
+										{document.icon ? (
+											<span className="text-base leading-none shrink-0">
+												{document.icon}
+											</span>
+										) : (
+											<FileText className="size-4 shrink-0" />
+										)}
+										<div className="min-w-0 flex-1">
+											<span className="block truncate">{document.title}</span>
+										</div>
+									</Link>
+									<div className="flex items-center gap-x-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<Button
+													variant="ghost"
+													size="sm"
+													className="h-6 w-6 p-0"
+													onClick={(e) => onRestore(e, document._id)}
+												>
+													<Undo2 className="size-4" />
+													<span className="sr-only">Restore</span>
+												</Button>
+											</TooltipTrigger>
+											<TooltipContent>Restore</TooltipContent>
+										</Tooltip>
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<Button
+													variant="ghost"
+													size="sm"
+													className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+													onClick={(e) => {
+														e.stopPropagation();
+														onRemove(document._id);
+													}}
+												>
+													<Trash2 className="size-4" />
+													<span className="sr-only">Delete</span>
+												</Button>
+											</TooltipTrigger>
+											<TooltipContent>Delete</TooltipContent>
+										</Tooltip>
 									</div>
-								</Link>
-								<div className="flex items-center gap-x-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-									<Tooltip>
-										<TooltipTrigger asChild>
-											<Button
-												variant="ghost"
-												size="sm"
-												className="h-6 w-6 p-0"
-												onClick={(e) => onRestore(e, document._id)}
-											>
-												<Undo2 className="size-4" />
-												<span className="sr-only">Restore</span>
-											</Button>
-										</TooltipTrigger>
-										<TooltipContent>Restore</TooltipContent>
-									</Tooltip>
-									<Tooltip>
-										<TooltipTrigger asChild>
-											<Button
-												variant="ghost"
-												size="sm"
-												className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-												onClick={(e) => {
-													e.stopPropagation();
-													onRemove(document._id);
-												}}
-											>
-												<Trash2 className="size-4" />
-												<span className="sr-only">Delete</span>
-											</Button>
-										</TooltipTrigger>
-										<TooltipContent>Delete</TooltipContent>
-									</Tooltip>
 								</div>
-							</div>
-						))
-					)}
-				</div>
+							))
+						)}
+					</div>
+				)}
 			</ScrollArea>
 
 			<div className="px-3 py-2 border-t">

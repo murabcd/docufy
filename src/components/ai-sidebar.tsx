@@ -11,6 +11,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
+	Bot,
 	Check,
 	ChevronDown,
 	Minus,
@@ -30,6 +31,13 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	Sidebar,
@@ -619,10 +627,21 @@ function ChatSessionChrome(
 							<ScrollArea className="h-[min(20rem,var(--radix-dropdown-menu-content-available-height))]">
 								<div className="p-1 pr-3">
 									{todayChats.length === 0 && previousChats.length === 0 ? (
-										<div className="px-2 py-2">
-											<div className="mt-1 text-xs text-muted-foreground">
-												Send a message to start a chat.
-											</div>
+										<div className="flex h-full items-center justify-center p-6">
+											<Empty className="w-full border-0 gap-3 p-0">
+												<EmptyHeader className="gap-1">
+													<EmptyMedia
+														variant="icon"
+														className="text-muted-foreground"
+													>
+														<Bot />
+													</EmptyMedia>
+													<EmptyTitle>No chats</EmptyTitle>
+													<EmptyDescription className="text-xs">
+														Send a message to start a conversation.
+													</EmptyDescription>
+												</EmptyHeader>
+											</Empty>
 										</div>
 									) : null}
 									{todayChats.length ? (
