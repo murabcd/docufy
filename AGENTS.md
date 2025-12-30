@@ -30,7 +30,25 @@ Use Bun (preferred; see `bun.lock`):
 - Generated files: avoid editing `src/routeTree.gen.ts` and `convex/_generated/*`.
 - Data fetching: wrap Convex calls with `convexQuery(...)` (`@convex-dev/react-query`).
   - Prefer `useSuspenseQuery` for always-on queries; use `useQuery` only when conditional (`enabled`).
+  - Convex queries via React Query are live subscriptions; avoid `queryClient.invalidateQueries(...)` by default (reactive updates handle it). Use invalidation only for non-Convex state (e.g. Better Auth profile updates) or when a query is proven non-reactive/derived.
+  - For bursty/expensive subscriptions (e.g. sidebar children, modal lists), set a smaller `gcTime` (commonly `10_000`) so subscriptions disconnect shortly after unmount.
+  - Convex subscriptions are never “stale” in TanStack Query (`isStale` is always false); `retry` and `refetch*` options are generally ignored (Convex has its own retry + pushes updates reactively).
+  - Avoid N+1 query patterns in UI trees: fetch children only when expanded (`enabled`) and use `placeholderData: (prev) => prev ?? []` for smooth transitions.
+  - Prefer lightweight/index queries (minimal fields) for lists/search/pickers; avoid fetching full document bodies when only IDs/titles/icons are needed.
+  - Prefer centralized query option factories in `src/queries/*` over inline `convexQuery(...)` calls; use the same factories in route loaders via `queryClient.ensureQueryData(...)`.
+  - It’s OK to mix `@convex-dev/react-query` queries with `convex/react` hooks/mutations in the same app (they share the same Convex client).
 - React effects: use `useEffectEvent` for event callbacks that shouldn’t retrigger effects.
+
+### Auth & Access Patterns
+
+- Auth gating: use Convex auth state (`<Authenticated/>`, `<Unauthenticated/>`, `<AuthLoading/>`, or `useConvexAuth()`) to decide whether to show UI / run authenticated queries; don’t rely on Better Auth session state for Convex call readiness.
+- Guest/anonymous UX: don’t render controls that would trigger authenticated Convex queries/mutations, and ensure conditional queries never run with placeholder IDs like `"default"`.
+
+### Convex Backend Conventions
+
+- Functions: use the “new function syntax” (`query({ args, returns, handler })`, `mutation({ ... })`) and include `returns:` validators.
+- Schema: add indexes for hot paths instead of `.filter(...)` when possible; name indexes as `by_<field1>_and_<field2>` in index field order.
+- After changing Convex functions/schema: run `bunx convex codegen` to regenerate types/bindings.
 
 ## Testing Guidelines
 
