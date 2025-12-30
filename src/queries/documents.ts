@@ -57,4 +57,15 @@ export const documentsQueries = {
 			term: args.term,
 			limit: args.limit,
 		}),
+
+	searchInWorkspaces: (args: {
+		term: string;
+		workspaceIds?: Id<"workspaces">[];
+		limit?: number;
+	}) =>
+		convexQuery(api.documents.searchInWorkspaces, {
+			term: args.term,
+			workspaceIds: args.workspaceIds,
+			limit: args.limit,
+		}),
 };
