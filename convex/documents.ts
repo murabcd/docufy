@@ -109,9 +109,12 @@ export const create = mutation({
 		const documentId = await ctx.db.insert("documents", {
 			userId,
 			workspaceId,
-			title: args.title || "New page",
+			title: (args.title || "New page").trim() || "New page",
 			content: JSON.stringify(EMPTY_DOCUMENT),
-			searchableText: "",
+			searchableText: ensureTitleInSearchableText(
+				(args.title || "New page").trim() || "New page",
+				"",
+			),
 			parentId: args.parentId ?? undefined,
 			order: maxOrder + 1,
 			icon: undefined,
@@ -133,6 +136,16 @@ export const create = mutation({
 
 const normalizePlainText = (text: string) => {
 	return text.replace(/\r\n/g, "\n").trim();
+};
+
+const ensureTitleInSearchableText = (title: string, searchableText: string) => {
+	const trimmedTitle = title.trim();
+	const trimmedText = normalizePlainText(searchableText);
+	if (!trimmedText) return trimmedTitle;
+	if (trimmedText === trimmedTitle || trimmedText.startsWith(`${trimmedTitle}\n`)) {
+		return trimmedText;
+	}
+	return `${trimmedTitle}\n${trimmedText}`;
 };
 
 const plainTextToSnapshot = (text: string): typeof EMPTY_DOCUMENT => {
@@ -187,7 +200,10 @@ export const createFromAi = mutation({
 		}, -1);
 
 		const snapshot = plainTextToSnapshot(args.content);
-		const searchableText = normalizePlainText(args.content);
+		const searchableText = ensureTitleInSearchableText(
+			args.title.trim() || "New page",
+			normalizePlainText(args.content),
+		);
 
 		const documentId = await ctx.db.insert("documents", {
 			userId,
@@ -293,6 +309,26 @@ export const update = mutation({
 		for (const [key, value] of Object.entries(updates)) {
 			if (value === undefined) continue;
 			patch[key] = value === null ? undefined : value;
+		}
+		const nextTitle =
+			updates.title !== undefined
+				? String(updates.title).trim() || "Untitled"
+				: existing.title;
+		const incomingSearchableText =
+			updates.searchableText !== undefined ? String(updates.searchableText) : null;
+
+		if (incomingSearchableText !== null) {
+			patch.searchableText = ensureTitleInSearchableText(
+				nextTitle,
+				incomingSearchableText,
+			);
+		} else if (updates.title !== undefined) {
+			let body = existing.searchableText ?? "";
+			const lines = body.split("\n");
+			if (lines[0] === existing.title) {
+				body = lines.slice(1).join("\n");
+			}
+			patch.searchableText = ensureTitleInSearchableText(nextTitle, body);
 		}
 		if ("content" in patch || "searchableText" in patch) {
 			patch.lastEditedAt = now;
