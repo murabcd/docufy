@@ -8,6 +8,13 @@ export const documentsQueries = {
 		convexQuery(api.documents.getAncestors, { id }),
 	getPublished: (id: Id<"documents">) =>
 		convexQuery(api.documents.getPublished, { id }),
+	getAll: (workspaceId?: Id<"workspaces">) =>
+		convexQuery(api.documents.getAll, { workspaceId }),
+	listSidebar: (args: { workspaceId?: Id<"workspaces">; limit?: number }) =>
+		convexQuery(api.documents.listSidebar, {
+			workspaceId: args.workspaceId,
+			limit: args.limit,
+		}),
 
 	list: (args: {
 		workspaceId?: Id<"workspaces">;
