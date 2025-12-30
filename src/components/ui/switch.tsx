@@ -27,4 +27,3 @@ function Switch({
 }
 
 export { Switch };
-

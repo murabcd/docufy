@@ -416,7 +416,7 @@ function DocumentEditor() {
 		if (document === null) {
 			if (!hasRedirectedFromDeletionRef.current) {
 				hasRedirectedFromDeletionRef.current = true;
-				toast.success("Page deleted");
+				toast.error("Page unavailable");
 			}
 			redirectFromMissingDocument();
 		} else {

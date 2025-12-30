@@ -91,7 +91,7 @@ function RootComponent() {
 			authClient={authClient}
 			initialToken={context.token}
 		>
-			<EnsureGuestSession />
+			<EnsureGuestSession hasInitialToken={Boolean(context.token)} />
 			<EnsureGuestWorkspace />
 			<MigrateAnonymousData />
 			{context.isAuthenticated ? (
@@ -103,13 +103,26 @@ function RootComponent() {
 	);
 }
 
-function EnsureGuestSession() {
-	const { data: session, isPending } = authClient.useSession();
+function EnsureGuestSession({ hasInitialToken }: { hasInitialToken: boolean }) {
+	const {
+		data: session,
+		error,
+		isPending,
+		isRefetching,
+	} = authClient.useSession();
 	const router = useRouter();
 
 	React.useEffect(() => {
 		if (typeof window === "undefined") return;
-		if (isPending) return;
+		if (isPending || isRefetching) return;
+		if (hasInitialToken) return;
+		if (error) {
+			console.warn(
+				"[auth] useSession failed; skipping anonymous sign-in",
+				error,
+			);
+			return;
+		}
 		if (session?.user) {
 			sessionStorage.removeItem("docufy:anonSignInAttemptedAt");
 			return;
@@ -129,7 +142,7 @@ function EnsureGuestSession() {
 				console.error(error);
 				sessionStorage.removeItem(key);
 			});
-	}, [isPending, router, session]);
+	}, [error, hasInitialToken, isPending, isRefetching, router, session]);
 
 	return null;
 }

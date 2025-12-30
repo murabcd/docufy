@@ -64,13 +64,13 @@ export function ChatSuggestions({
 }) {
 	return (
 		<div className="flex flex-col gap-3">
-			<div className="text-lg font-semibold">{title}</div>
+			<div className="font-semibold px-2">{title}</div>
 			<div className="flex flex-col">
 				{suggestions.map((suggestion) => (
 					<button
 						key={suggestion.id}
 						type="button"
-						className="w-full rounded-lg px-0 py-2 text-left transition-colors hover:bg-muted/60"
+						className="w-full rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/60"
 						onClick={() => onSelect(suggestion.prompt)}
 					>
 						<div className="flex items-start gap-3">
