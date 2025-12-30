@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { getRandomCuratedCoverImageUrl } from "@/lib/cover-gallery";
+import { optimisticUpdateDocument } from "@/lib/optimistic-documents";
 import { cn } from "@/lib/utils";
 import { documentsQueries } from "@/queries";
 import { nestedPagePluginKey } from "@/tiptap/extensions/nested-page/nested-page";
@@ -65,7 +66,9 @@ function DocumentEditor() {
 	const { documentId } = Route.useParams();
 	const navigate = useNavigate();
 	const createDocument = useMutation(api.documents.create);
-	const updateDocumentTitle = useMutation(api.documents.update);
+	const updateDocumentTitle = useMutation(
+		api.documents.update,
+	).withOptimisticUpdate(optimisticUpdateDocument);
 	const editorRef = useRef<TiptapEditorHandle>(null);
 	const [, startTransition] = useTransition();
 	const { activeWorkspaceId, setActiveWorkspaceId } = useActiveWorkspace();
@@ -153,7 +156,9 @@ function DocumentEditor() {
 		[documentId, updateDocumentTitle],
 	);
 
-	const removeIcon = useMutation(api.documents.update);
+	const removeIcon = useMutation(api.documents.update).withOptimisticUpdate(
+		optimisticUpdateDocument,
+	);
 
 	const onAddCover = useCallback(async () => {
 		const coverUrl = getRandomCuratedCoverImageUrl();

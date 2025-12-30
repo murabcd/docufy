@@ -8,6 +8,7 @@ import {
 	Outlet,
 	Scripts,
 	useRouteContext,
+	useRouter,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
@@ -104,6 +105,7 @@ function RootComponent() {
 
 function EnsureGuestSession() {
 	const { data: session, isPending } = authClient.useSession();
+	const router = useRouter();
 
 	React.useEffect(() => {
 		if (typeof window === "undefined") return;
@@ -121,28 +123,32 @@ function EnsureGuestSession() {
 		authClient.signIn
 			.anonymous()
 			.then(() => {
-				location.reload();
+				router.invalidate();
 			})
 			.catch((error) => {
 				console.error(error);
 				sessionStorage.removeItem(key);
 			});
-	}, [isPending, session]);
+	}, [isPending, router, session]);
 
 	return null;
 }
 
 function MigrateAnonymousData() {
 	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
+	const context = useRouteContext({ from: Route.id });
 	const migrateAnonymousData = useMutation(api.auth.migrateAnonymousData);
+	const startedRef = React.useRef(false);
 
 	React.useEffect(() => {
 		if (typeof window === "undefined") return;
 		if (!currentUser) return;
+		if (startedRef.current) return;
 
 		const key = "docufy:migrateFromUserId";
 		const fromUserId = localStorage.getItem(key);
 		if (!fromUserId) return;
+		startedRef.current = true;
 
 		const toUserId = String((currentUser as { _id?: unknown })._id);
 		if (!toUserId || fromUserId === toUserId) {
@@ -153,12 +159,14 @@ function MigrateAnonymousData() {
 		migrateAnonymousData({ fromUserId })
 			.then(() => {
 				localStorage.removeItem(key);
-				location.reload();
+				// Keep UI stable (no full reload), but make sure any user-scoped
+				// Convex subscriptions are refreshed under the new identity.
+				context.queryClient.invalidateQueries();
 			})
 			.catch((error) => {
 				console.error(error);
 			});
-	}, [currentUser, migrateAnonymousData]);
+	}, [context.queryClient, currentUser, migrateAnonymousData]);
 
 	return null;
 }
