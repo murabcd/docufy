@@ -72,9 +72,10 @@ function DocumentEditor() {
 	const { data: document } = useSuspenseQuery(
 		documentsQueries.get(documentId as Id<"documents">),
 	);
-	const { data: ancestors = [] } = useSuspenseQuery(
-		documentsQueries.getAncestors(documentId as Id<"documents">),
-	);
+	const { data: ancestors = [] } = useQuery({
+		...documentsQueries.getAncestors(documentId as Id<"documents">),
+		placeholderData: [],
+	});
 
 	useEffect(() => {
 		if (!document?.workspaceId) return;
@@ -82,12 +83,13 @@ function DocumentEditor() {
 		setActiveWorkspaceId(document.workspaceId);
 	}, [activeWorkspaceId, document?.workspaceId, setActiveWorkspaceId]);
 
-	const { data: rootDocuments = [] } = useSuspenseQuery(
-		documentsQueries.list({
+	const { data: rootDocuments = [] } = useQuery({
+		...documentsQueries.list({
 			parentId: null,
 			workspaceId: activeWorkspaceId ?? undefined,
 		}),
-	);
+		placeholderData: [],
+	});
 	const { data: allDocuments = [] } = useQuery({
 		...documentsQueries.listIndex({
 			workspaceId: activeWorkspaceId ?? undefined,

@@ -456,7 +456,7 @@ export function ChatInput({
 										</InputGroupButton>
 									</DropdownMenuTrigger>
 								</TooltipTrigger>
-								<TooltipContent>Select AI model</TooltipContent>
+								<TooltipContent>Select model</TooltipContent>
 							</Tooltip>
 							<DropdownMenuContent
 								side="top"
@@ -465,7 +465,7 @@ export function ChatInput({
 							>
 								<DropdownMenuGroup className="w-42">
 									<DropdownMenuLabel className="text-muted-foreground text-xs">
-										Select Agent Mode
+										Select model
 									</DropdownMenuLabel>
 									{chatModels.map((model) => (
 										<DropdownMenuCheckboxItem
