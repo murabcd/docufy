@@ -1,43 +1,38 @@
 import {
-	closestCenter,
-	DndContext,
-	type DragEndEvent,
-	KeyboardSensor,
-	PointerSensor,
-	useDroppable,
-	useSensor,
-	useSensors,
-} from "@dnd-kit/core";
-import {
-	SortableContext,
-	sortableKeyboardCoordinates,
-	useSortable,
-	verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+	dragAndDropFeature,
+	isOrderedDragTarget,
+	syncDataLoaderFeature,
+} from "@headless-tree/core";
+import { useTree } from "@headless-tree/react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
+	ArrowUpRight,
 	Check,
 	ChevronRight,
 	Copy,
+	CornerUpRight,
 	FileText,
 	Globe,
 	Link as LinkIcon,
 	Lock,
 	MoreHorizontal,
+	Plus,
 	Share2,
 	Star,
 	Trash2,
 } from "lucide-react";
-import { useEffect, useEffectEvent, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+	Command,
+	CommandEmpty,
+	CommandGroup,
+	CommandInput,
+	CommandItem,
+	CommandList,
+} from "@/components/ui/command";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -53,12 +48,8 @@ import {
 	SidebarGroupContent,
 	SidebarGroupLabel,
 	SidebarMenu,
-	SidebarMenuAction,
 	SidebarMenuButton,
 	SidebarMenuItem,
-	SidebarMenuSub,
-	SidebarMenuSubButton,
-	SidebarMenuSubItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
@@ -71,444 +62,103 @@ import { documentsQueries, favoritesQueries } from "@/queries";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
-interface Document {
+type SidebarDocument = {
 	_id: Id<"documents">;
 	_creationTime: number;
 	title: string;
-	content?: string;
 	parentId?: Id<"documents">;
 	order?: number;
 	icon?: string;
 	isPublished: boolean;
 	createdAt: number;
 	updatedAt: number;
+};
+
+type TreeItemPayload = {
+	itemName: string;
+	isFolder: boolean;
+	childrenIds: string[];
+	documentId?: Id<"documents">;
+	icon?: string;
+	isPublished?: boolean;
+};
+
+const INDENT = 18;
+const MAX_VISIBLE_ROOTS = 5;
+
+function compareSidebarDocuments(a: SidebarDocument, b: SidebarDocument) {
+	const orderA = a.order ?? 0;
+	const orderB = b.order ?? 0;
+	if (orderA !== orderB) return orderA - orderB;
+	return a.createdAt - b.createdAt;
 }
 
-function DocumentItem({
-	document,
-	isActive,
-	level = 0,
-	currentDocumentId,
-	onDragOver,
+function buildTreeData({
+	documents,
+	limitRootItems,
 }: {
-	document: Document;
-	isActive: boolean;
-	level?: number;
-	currentDocumentId: Id<"documents"> | null;
-	onDragOver?: (documentId: Id<"documents">) => void;
-}) {
-	const navigate = useNavigate();
-	const { isMobile } = useSidebar();
-	const { activeWorkspaceId } = useActiveWorkspace();
-	const [isExpanded, setIsExpanded] = useState(false);
-	const [isMounted, setIsMounted] = useState(false);
+	documents: SidebarDocument[];
+	limitRootItems: number | null;
+}): Record<string, TreeItemPayload> {
+	const byParent = new Map<string, SidebarDocument[]>();
 
-	const archiveDocument = useMutation(
-		api.documents.archive,
-	).withOptimisticUpdate(optimisticArchiveDocument);
-	const duplicateDocument = useMutation(api.documents.duplicate);
-	const toggleFavorite = useMutation(api.favorites.toggle).withOptimisticUpdate(
-		optimisticToggleFavorite,
-	);
-	const updateDocument = useMutation(api.documents.update).withOptimisticUpdate(
-		optimisticUpdateDocument,
-	);
-	const [, startTransition] = useTransition();
-
-	const childrenQuery = useQuery({
-		...documentsQueries.list({
-			parentId: document._id,
-			workspaceId: activeWorkspaceId ?? undefined,
-		}),
-		enabled: isExpanded,
-		gcTime: 10_000,
-		placeholderData: (prev) => prev ?? [],
-	});
-	const children = childrenQuery.data ?? [];
-	const isLoadingChildren = isExpanded && childrenQuery.isFetching;
-
-	const { data: isFavorite } = useQuery({
-		...favoritesQueries.isFavorite(document._id),
-	});
-
-	const hasChildren = isLoadingChildren || children.length > 0;
-
-	const {
-		attributes,
-		listeners,
-		setNodeRef,
-		transform,
-		transition,
-		isDragging,
-	} = useSortable({
-		id: document._id,
-		disabled: false,
-	});
-
-	const { setNodeRef: setDroppableRef, isOver } = useDroppable({
-		id: `drop-${document._id}`,
-		disabled: isDragging,
-	});
-
-	useEffect(() => {
-		setIsMounted(true);
-	}, []);
-
-	const onDragOverEvent = useEffectEvent((documentId: Id<"documents">) => {
-		onDragOver?.(documentId);
-	});
-
-	useEffect(() => {
-		if (isOver && !isExpanded && hasChildren && onDragOver) {
-			setIsExpanded(true);
-			onDragOverEvent(document._id);
-		}
-	}, [isOver, isExpanded, hasChildren, document._id, onDragOver]); // onDragOverEvent is an Effect Event, doesn't need to be in dependencies
-
-	const style = {
-		transform: CSS.Transform.toString(transform),
-		transition,
-		opacity: isDragging ? 0.5 : 1,
-		backgroundColor: isOver ? "var(--sidebar-accent)" : undefined,
-	};
-
-	const handleMoveToTrash = async () => {
-		const isCurrent = currentDocumentId === document._id;
-		if (isCurrent) {
-			navigate({ to: "/", replace: true });
-		}
-		try {
-			await archiveDocument({ id: document._id });
-			toast.success("Page moved to trash");
-		} catch (_error) {
-			toast.error("Failed to move page to trash");
-		}
-	};
-
-	const handleDuplicate = async () => {
-		startTransition(async () => {
-			const newId = await duplicateDocument({ id: document._id });
-			toast.success("Page duplicated");
-			navigate({
-				to: "/documents/$documentId",
-				params: { documentId: newId },
-			});
-		});
-	};
-
-	const handleToggleFavorite = async () => {
-		const added = await toggleFavorite({ documentId: document._id });
-		toast.success(added ? "Page starred" : "Page unstarred");
-	};
-
-	const handleCopyLink = () => {
-		const path = document.isPublished ? "share" : "documents";
-		const url = `${window.location.origin}/${path}/${document._id}`;
-		navigator.clipboard.writeText(url);
-		toast.success(document.isPublished ? "Share link copied" : "Link copied");
-	};
-
-	const handleSetVisibility = async (isPublished: boolean) => {
-		try {
-			await updateDocument({
-				id: document._id,
-				isPublished,
-			});
-			toast.success(isPublished ? "Page shared" : "Page unshared");
-		} catch {
-			toast.error("Failed to update sharing settings");
-		}
-	};
-
-	if (level > 0) {
-		return (
-			<>
-				<SidebarMenuSubItem
-					ref={(node) => {
-						setNodeRef(node);
-						setDroppableRef(node);
-					}}
-					style={style}
-					className="group"
-				>
-					<div
-						className="flex w-full min-w-0 items-center gap-1 cursor-grab active:cursor-grabbing"
-						{...(isMounted ? attributes : {})}
-						{...(isMounted ? listeners : {})}
-						suppressHydrationWarning
-					>
-						<Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-							<CollapsibleTrigger asChild>
-								<button
-									type="button"
-									className="size-4 p-0 flex items-center justify-center hover:bg-sidebar-accent rounded"
-									onClick={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										setIsExpanded(!isExpanded);
-									}}
-								>
-									<ChevronRight
-										className={`size-3 transition-transform ${isExpanded ? "rotate-90" : ""} ${hasChildren ? "" : "opacity-30"}`}
-									/>
-								</button>
-							</CollapsibleTrigger>
-						</Collapsible>
-						<SidebarMenuSubButton
-							asChild
-							isActive={isActive}
-							className="flex-1 min-w-0 pr-8"
-							onPointerDown={(e) => {
-								e.stopPropagation();
-							}}
-						>
-							<Link
-								to="/documents/$documentId"
-								params={{ documentId: document._id }}
-							>
-								{document.icon ? (
-									<span className="text-base leading-none">
-										{document.icon}
-									</span>
-								) : (
-									<FileText className="size-4" />
-								)}
-								<span className="truncate">{document.title}</span>
-							</Link>
-						</SidebarMenuSubButton>
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<button
-									type="button"
-									className="absolute right-0.5 top-0.5 opacity-0 group-hover:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
-								>
-									<MoreHorizontal className="size-4" />
-									<span className="sr-only">More</span>
-								</button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent
-								className="w-56 rounded-lg"
-								side={isMobile ? "bottom" : "right"}
-								align={isMobile ? "end" : "start"}
-							>
-								<DropdownMenuSub>
-									<DropdownMenuSubTrigger>
-										<Share2 className="text-muted-foreground" />
-										<span>Share</span>
-									</DropdownMenuSubTrigger>
-									<DropdownMenuSubContent className="w-56 rounded-lg">
-										<DropdownMenuItem
-											onClick={() => handleSetVisibility(false)}
-										>
-											<Lock className="text-muted-foreground" />
-											<span>Private</span>
-											{!document.isPublished && <Check className="ml-auto" />}
-										</DropdownMenuItem>
-										<DropdownMenuItem onClick={() => handleSetVisibility(true)}>
-											<Globe className="text-muted-foreground" />
-											<span>Public</span>
-											{document.isPublished && <Check className="ml-auto" />}
-										</DropdownMenuItem>
-									</DropdownMenuSubContent>
-								</DropdownMenuSub>
-								<DropdownMenuItem onClick={handleDuplicate}>
-									<Copy className="text-muted-foreground" />
-									<span>Duplicate</span>
-								</DropdownMenuItem>
-								<DropdownMenuItem onClick={handleCopyLink}>
-									<LinkIcon className="text-muted-foreground" />
-									<span>Copy link</span>
-								</DropdownMenuItem>
-								<DropdownMenuItem onClick={handleToggleFavorite}>
-									<Star className="text-muted-foreground" />
-									<span>{isFavorite ? "Unstar" : "Star"}</span>
-								</DropdownMenuItem>
-								<DropdownMenuSeparator />
-								<DropdownMenuItem
-									onClick={handleMoveToTrash}
-									className="text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"
-								>
-									<Trash2 className="text-destructive dark:text-red-500" />
-									<span>Move to trash</span>
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</div>
-				</SidebarMenuSubItem>
-				{isExpanded && (
-					<SidebarMenuSub>
-						{hasChildren ? (
-							isLoadingChildren ? (
-								<p className="text-sidebar-foreground/50 text-xs px-2 py-1">
-									Loading...
-								</p>
-							) : (
-								<SortableContext
-									items={children.map((c) => c._id)}
-									strategy={verticalListSortingStrategy}
-								>
-									{children.map((child) => {
-										const childIsActive = currentDocumentId === child._id;
-										return (
-											<DocumentItem
-												key={child._id}
-												document={child}
-												isActive={childIsActive}
-												level={level + 1}
-												currentDocumentId={currentDocumentId}
-												onDragOver={onDragOver}
-											/>
-										);
-									})}
-								</SortableContext>
-							)
-						) : (
-							<p className="text-sidebar-foreground/50 text-xs px-2 py-1">
-								No pages inside
-							</p>
-						)}
-					</SidebarMenuSub>
-				)}
-			</>
-		);
+	for (const doc of documents) {
+		const parentKey = doc.parentId ? String(doc.parentId) : "root";
+		const list = byParent.get(parentKey) ?? [];
+		list.push(doc);
+		byParent.set(parentKey, list);
 	}
 
-	return (
-		<>
-			<SidebarMenuItem
-				ref={(node) => {
-					setNodeRef(node);
-					setDroppableRef(node);
-				}}
-				style={style}
-			>
-				<div
-					className="flex items-center gap-1 cursor-grab active:cursor-grabbing"
-					{...(isMounted ? attributes : {})}
-					{...(isMounted ? listeners : {})}
-					suppressHydrationWarning
-				>
-					<Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-						<CollapsibleTrigger asChild>
-							<button
-								type="button"
-								className="size-4 p-0 flex items-center justify-center hover:bg-sidebar-accent rounded"
-								onClick={(e) => {
-									e.preventDefault();
-									e.stopPropagation();
-									setIsExpanded(!isExpanded);
-								}}
-							>
-								<ChevronRight
-									className={`size-3 transition-transform ${isExpanded ? "rotate-90" : ""} ${hasChildren ? "" : "opacity-30"}`}
-								/>
-							</button>
-						</CollapsibleTrigger>
-					</Collapsible>
-					<SidebarMenuButton
-						asChild
-						isActive={isActive}
-						className="flex-1"
-						onPointerDown={(e) => {
-							e.stopPropagation();
-						}}
-					>
-						<Link
-							to="/documents/$documentId"
-							params={{ documentId: document._id }}
-						>
-							{document.icon ? (
-								<span className="text-base leading-none">{document.icon}</span>
-							) : (
-								<FileText className="size-4" />
-							)}
-							<span className="truncate">{document.title}</span>
-						</Link>
-					</SidebarMenuButton>
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<SidebarMenuAction showOnHover>
-								<MoreHorizontal className="size-4" />
-								<span className="sr-only">More</span>
-							</SidebarMenuAction>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent
-							className="w-56 rounded-lg"
-							side={isMobile ? "bottom" : "right"}
-							align={isMobile ? "end" : "start"}
-						>
-							<DropdownMenuSub>
-								<DropdownMenuSubTrigger>
-									<Share2 className="text-muted-foreground" />
-									<span>Share</span>
-								</DropdownMenuSubTrigger>
-								<DropdownMenuSubContent className="w-56 rounded-lg">
-									<DropdownMenuItem onClick={() => handleSetVisibility(false)}>
-										<Lock className="text-muted-foreground" />
-										<span>Private</span>
-										{!document.isPublished && <Check className="ml-auto" />}
-									</DropdownMenuItem>
-									<DropdownMenuItem onClick={() => handleSetVisibility(true)}>
-										<Globe className="text-muted-foreground" />
-										<span>Public</span>
-										{document.isPublished && <Check className="ml-auto" />}
-									</DropdownMenuItem>
-								</DropdownMenuSubContent>
-							</DropdownMenuSub>
-							<DropdownMenuItem onClick={handleDuplicate}>
-								<Copy className="text-muted-foreground" />
-								<span>Duplicate</span>
-							</DropdownMenuItem>
-							<DropdownMenuItem onClick={handleCopyLink}>
-								<LinkIcon className="text-muted-foreground" />
-								<span>Copy link</span>
-							</DropdownMenuItem>
-							<DropdownMenuItem onClick={handleToggleFavorite}>
-								<Star className="text-muted-foreground" />
-								<span>{isFavorite ? "Unstar" : "Star"}</span>
-							</DropdownMenuItem>
-							<DropdownMenuSeparator />
-							<DropdownMenuItem
-								onClick={handleMoveToTrash}
-								className="text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"
-							>
-								<Trash2 className="text-destructive dark:text-red-500" />
-								<span>Move to trash</span>
-							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
-				</div>
-			</SidebarMenuItem>
-			{isExpanded && (
-				<SidebarMenuSub>
-					{hasChildren ? (
-						<SortableContext
-							items={children.map((c) => c._id)}
-							strategy={verticalListSortingStrategy}
-						>
-							{children.map((child) => {
-								const childIsActive = currentDocumentId === child._id;
-								return (
-									<DocumentItem
-										key={child._id}
-										document={child}
-										isActive={childIsActive}
-										level={level + 1}
-										currentDocumentId={currentDocumentId}
-										onDragOver={onDragOver}
-									/>
-								);
-							})}
-						</SortableContext>
-					) : (
-						<p className="text-sidebar-foreground/50 text-xs px-2 py-1">
-							No pages inside
-						</p>
-					)}
-				</SidebarMenuSub>
-			)}
-		</>
-	);
+	for (const [key, list] of byParent) {
+		list.sort(compareSidebarDocuments);
+		byParent.set(key, list);
+	}
+
+	const rootChildren = (byParent.get("root") ?? []).map((d) => d._id);
+	const rootChildrenLimited =
+		limitRootItems === null
+			? rootChildren
+			: rootChildren.slice(0, limitRootItems);
+
+	const treeData: Record<string, TreeItemPayload> = {
+		root: {
+			itemName: "root",
+			isFolder: true,
+			childrenIds: rootChildrenLimited.map(String),
+		},
+	};
+
+	for (const doc of documents) {
+		const childrenIds = (byParent.get(String(doc._id)) ?? []).map((d) => d._id);
+		treeData[String(doc._id)] = {
+			itemName: doc.title || "Untitled",
+			// Notion-style: any page can contain children, even if it has none yet.
+			isFolder: true,
+			childrenIds: childrenIds.map(String),
+			documentId: doc._id,
+			icon: doc.icon,
+			isPublished: doc.isPublished,
+		};
+	}
+
+	return treeData;
+}
+
+function collectDescendantIds(
+	startId: string,
+	treeData: Record<string, TreeItemPayload>,
+) {
+	const visited = new Set<string>();
+	const stack = [...(treeData[startId]?.childrenIds ?? [])];
+	while (stack.length > 0) {
+		const next = stack.pop();
+		if (!next) continue;
+		if (visited.has(next)) continue;
+		visited.add(next);
+		const children = treeData[next]?.childrenIds ?? [];
+		for (const child of children) stack.push(child);
+	}
+	return visited;
 }
 
 export function NavDocuments() {
@@ -520,140 +170,617 @@ export function NavDocuments() {
 
 	const { activeWorkspaceId } = useActiveWorkspace();
 	const [isCollapsed, setIsCollapsed] = useState(false);
-	const [isExpanded, setIsExpanded] = useState(false);
-	const reorderDocument = useMutation(api.documents.reorder);
-	const [, startTransition] = useTransition();
+	const [showAllRoots, setShowAllRoots] = useState(false);
 
 	const { data: documents = [] } = useSuspenseQuery(
-		documentsQueries.list({
-			parentId: null,
+		documentsQueries.listSidebar({
 			workspaceId: activeWorkspaceId ?? undefined,
 		}),
 	);
 
-	const MAX_VISIBLE = 5;
-	const visibleDocuments = isExpanded
-		? documents
-		: documents.slice(0, MAX_VISIBLE);
-	const hasMore = documents.length > MAX_VISIBLE;
-
-	const sensors = useSensors(
-		useSensor(PointerSensor, {
-			activationConstraint: {
-				distance: 8,
-			},
-		}),
-		useSensor(KeyboardSensor, {
-			coordinateGetter: sortableKeyboardCoordinates,
-		}),
-	);
-
-	const handleDragOver = (_documentId: Id<"documents">) => {};
-
-	const handleDragEnd = async (event: DragEndEvent) => {
-		const { active, over } = event;
-
-		if (!over) {
-			return;
-		}
-
-		const activeId = active.id as Id<"documents">;
-		const overId = over.id as Id<"documents">;
-
-		if (typeof overId === "string" && overId.startsWith("drop-")) {
-			const targetId = overId.replace("drop-", "") as Id<"documents">;
-
-			if (activeId === targetId) {
-				return;
-			}
-
-			const newOrder = 999999;
-
-			startTransition(async () => {
-				await reorderDocument({
-					id: activeId,
-					newOrder,
-					newParentId: targetId,
-				});
-			});
-			return;
-		}
-
-		if (activeId === overId) {
-			return;
-		}
-
-		const oldIndex = documents.findIndex((d) => d._id === activeId);
-		const newIndex = documents.findIndex((d) => d._id === overId);
-
-		if (oldIndex !== -1 && newIndex !== -1) {
-			startTransition(async () => {
-				await reorderDocument({
-					id: activeId,
-					newOrder: newIndex,
-					newParentId: null,
-				});
-			});
-		}
-	};
+	const hasMore =
+		(documents as SidebarDocument[]).filter((d) => !d.parentId).length >
+		MAX_VISIBLE_ROOTS;
 
 	return (
 		<SidebarGroup>
-			<Collapsible
-				open={!isCollapsed}
-				onOpenChange={(open) => setIsCollapsed(!open)}
+			<button
+				type="button"
+				className="w-full"
+				onClick={() => setIsCollapsed((prev) => !prev)}
 			>
-				<CollapsibleTrigger asChild>
-					<SidebarGroupLabel className="cursor-pointer select-none">
-						Private
-					</SidebarGroupLabel>
-				</CollapsibleTrigger>
-				<CollapsibleContent>
+				<SidebarGroupLabel className="cursor-pointer select-none">
+					Private
+				</SidebarGroupLabel>
+			</button>
+
+			{!isCollapsed && (
+				<>
 					{documents.length === 0 && (
 						<p className="text-sidebar-foreground/50 text-xs px-2 pb-2">
 							Create a page to get started
 						</p>
 					)}
 					<SidebarGroupContent>
-						<DndContext
-							sensors={sensors}
-							collisionDetection={closestCenter}
-							onDragEnd={handleDragEnd}
-						>
-							<SortableContext
-								items={documents.map((d) => d._id)}
-								strategy={verticalListSortingStrategy}
-							>
-								<SidebarMenu>
-									{visibleDocuments.map((document) => {
-										const isActive = currentDocumentId === document._id;
-										return (
-											<DocumentItem
-												key={document._id}
-												document={document}
-												isActive={isActive}
-												currentDocumentId={currentDocumentId}
-												onDragOver={handleDragOver}
-											/>
-										);
-									})}
-									{hasMore && (
-										<SidebarMenuItem>
-											<SidebarMenuButton
-												className="text-sidebar-foreground/70"
-												onClick={() => setIsExpanded(!isExpanded)}
-											>
-												<MoreHorizontal />
-												<span>{isExpanded ? "Show less" : "More"}</span>
-											</SidebarMenuButton>
-										</SidebarMenuItem>
-									)}
-								</SidebarMenu>
-							</SortableContext>
-						</DndContext>
+						<TreeDocuments
+							documents={documents as SidebarDocument[]}
+							currentDocumentId={currentDocumentId}
+							workspaceId={activeWorkspaceId ?? undefined}
+							maxVisibleRoots={MAX_VISIBLE_ROOTS}
+							showAllRoots={showAllRoots}
+						/>
+
+						{hasMore && (
+							<SidebarMenu>
+								<SidebarMenuItem>
+									<SidebarMenuButton
+										className="text-sidebar-foreground/70"
+										onClick={() => setShowAllRoots((prev) => !prev)}
+									>
+										<MoreHorizontal />
+										<span>{showAllRoots ? "Show less" : "More"}</span>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
+							</SidebarMenu>
+						)}
 					</SidebarGroupContent>
-				</CollapsibleContent>
-			</Collapsible>
+				</>
+			)}
 		</SidebarGroup>
+	);
+}
+
+function TreeDocuments({
+	documents,
+	currentDocumentId,
+	workspaceId,
+	maxVisibleRoots,
+	showAllRoots,
+}: {
+	documents: SidebarDocument[];
+	currentDocumentId: Id<"documents"> | null;
+	workspaceId?: Id<"workspaces">;
+	maxVisibleRoots: number;
+	showAllRoots: boolean;
+}) {
+	const navigate = useNavigate();
+	const { isMobile } = useSidebar();
+	const [expandedItems, setExpandedItems] = useState<string[]>([]);
+	const [openMenuId, setOpenMenuId] = useState<Id<"documents"> | null>(null);
+
+	const archiveDocument = useMutation(
+		api.documents.archive,
+	).withOptimisticUpdate(optimisticArchiveDocument);
+	const duplicateDocument = useMutation(api.documents.duplicate);
+	const createDocument = useMutation(api.documents.create);
+	const toggleFavorite = useMutation(api.favorites.toggle).withOptimisticUpdate(
+		optimisticToggleFavorite,
+	);
+	const updateDocument = useMutation(api.documents.update).withOptimisticUpdate(
+		optimisticUpdateDocument,
+	);
+	const reorderDocument = useMutation(
+		api.documents.reorder,
+	).withOptimisticUpdate((localStore, args) => {
+		const { id, newParentId, newOrder } = args;
+		const queryArgs = { workspaceId };
+		const existing = localStore.getQuery(api.documents.listSidebar, queryArgs);
+		if (existing === undefined) return;
+
+		const moved = existing.find((d) => d._id === id);
+		if (!moved) return;
+
+		const oldParentId = moved.parentId ?? null;
+		const nextParentId = newParentId ?? null;
+
+		const withoutMoved = existing.filter((d) => d._id !== id);
+
+		const sortDocs = (
+			a: (typeof existing)[number],
+			b: (typeof existing)[number],
+		) => {
+			const orderA = a.order ?? 0;
+			const orderB = b.order ?? 0;
+			if (orderA !== orderB) return orderA - orderB;
+			return a.createdAt - b.createdAt;
+		};
+
+		const buildGroup = (parentId: Id<"documents"> | null) => {
+			return withoutMoved
+				.filter((d) => (d.parentId ?? null) === parentId)
+				.sort(sortDocs);
+		};
+
+		const oldSiblings = buildGroup(oldParentId);
+		const newSiblings = buildGroup(nextParentId);
+
+		const clampedIndex = Math.max(0, Math.min(newOrder, newSiblings.length));
+		const inserted = [
+			...newSiblings.slice(0, clampedIndex),
+			{
+				...moved,
+				parentId: nextParentId ?? undefined,
+				order: clampedIndex,
+				updatedAt: Date.now(),
+			},
+			...newSiblings.slice(clampedIndex),
+		];
+
+		const renumber = (list: (typeof existing)[number][]) => {
+			return list.map((d, index) => ({ ...d, order: index }));
+		};
+
+		const nextOld = oldParentId === nextParentId ? [] : renumber(oldSiblings);
+		const nextNew = renumber(inserted);
+		const untouched = withoutMoved.filter(
+			(d) =>
+				(d.parentId ?? null) !== oldParentId &&
+				(d.parentId ?? null) !== nextParentId,
+		);
+
+		localStore.setQuery(api.documents.listSidebar, queryArgs, [
+			...untouched,
+			...(oldParentId === nextParentId ? nextNew : [...nextOld, ...nextNew]),
+		]);
+	});
+	const [, startTransition] = useTransition();
+
+	const { data: favoritesData = [] } = useSuspenseQuery(
+		favoritesQueries.listWithDocuments(workspaceId),
+	);
+	const favoriteIds = useMemo(() => {
+		return new Set(favoritesData.map((f) => String(f.documentId)));
+	}, [favoritesData]);
+
+	const treeData = useMemo(() => {
+		return buildTreeData({
+			documents,
+			limitRootItems: showAllRoots ? null : maxVisibleRoots,
+		});
+	}, [documents, maxVisibleRoots, showAllRoots]);
+
+	useEffect(() => {
+		setExpandedItems((prev) => prev.filter((id) => treeData[id]));
+		setOpenMenuId((prev) => (prev && treeData[String(prev)] ? prev : null));
+	}, [treeData]);
+
+	const tree = useTree<TreeItemPayload>({
+		rootItemId: "root",
+		indent: INDENT,
+		canReorder: true,
+		reorderAreaPercentage: 0.25,
+		openOnDropDelay: 600,
+		state: { expandedItems },
+		setExpandedItems,
+		getItemName: (item) => item.getItemData().itemName,
+		isItemFolder: (item) => item.getItemData().isFolder,
+		dataLoader: {
+			// During reactive updates (e.g. delete cascades), the tree may briefly
+			// reference item IDs that are no longer present in `treeData`.
+			// Headless Tree requires a defined payload for every requested ID.
+			getItem: (itemId) =>
+				treeData[itemId] ?? {
+					itemName: "Untitled",
+					isFolder: true,
+					childrenIds: [],
+				},
+			getChildren: (itemId) => treeData[itemId]?.childrenIds ?? [],
+		},
+		onDrop: async (items, target) => {
+			const movedItems = items.filter((i) => i.getId() !== "root");
+			if (movedItems.length === 0) return;
+
+			const targetId = target.item.getId();
+			const isOrdered = isOrderedDragTarget(target);
+
+			const newParentId = isOrdered
+				? targetId === "root"
+					? null
+					: (targetId as Id<"documents">)
+				: targetId === "root"
+					? null
+					: (targetId as Id<"documents">);
+
+			if (newParentId) {
+				setExpandedItems((prev) => {
+					if (prev.includes(String(newParentId))) return prev;
+					return [...prev, String(newParentId)];
+				});
+			}
+
+			if (newParentId) {
+				for (const moved of movedItems) {
+					if (target.item.isDescendentOf(moved.getId())) {
+						toast.error("You can't move a page into its own subtree");
+						return;
+					}
+				}
+			}
+
+			const baseIndex = isOrdered
+				? target.insertionIndex
+				: (treeData[targetId]?.childrenIds.length ?? 0);
+
+			startTransition(async () => {
+				try {
+					for (const [index, movedItem] of movedItems.entries()) {
+						await reorderDocument({
+							id: movedItem.getId() as Id<"documents">,
+							newParentId,
+							newOrder: baseIndex + index,
+						});
+					}
+				} catch (_error) {
+					toast.error("Failed to move page");
+				}
+			});
+		},
+		features: [syncDataLoaderFeature, dragAndDropFeature],
+	});
+
+	useEffect(() => {
+		void treeData;
+		tree.rebuildTree();
+	}, [tree, treeData]);
+
+	const items = tree
+		.getItems()
+		.filter((item) => item.getId() !== "root")
+		.map((item) => {
+			const id = item.getId() as Id<"documents">;
+			const data = treeData[String(id)];
+			if (!data) return null;
+			const hasChildren = (data.childrenIds?.length ?? 0) > 0;
+			const isActive = currentDocumentId === id;
+			const isFavorite = favoriteIds.has(String(id));
+			const level = item.getItemMeta().level;
+			const itemProps = item.getProps();
+
+			return (
+				<div key={item.getKey()}>
+					<SidebarMenuItem
+						className={[
+							"group/menu-item relative",
+							item.isDraggingOver() ? "bg-sidebar-accent rounded-md" : "",
+						]
+							.filter(Boolean)
+							.join(" ")}
+					>
+						<div className="flex items-center gap-1">
+							<div style={{ width: level * INDENT }} />
+							<SidebarMenuButton
+								{...itemProps}
+								isActive={isActive}
+								className="flex-1 min-w-0 pr-14"
+								onClick={(e) => {
+									e.preventDefault();
+									e.stopPropagation();
+									item.setFocused();
+									tree.updateDomFocus();
+									navigate({
+										to: "/documents/$documentId",
+										params: { documentId: id },
+									});
+								}}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										e.preventDefault();
+										e.stopPropagation();
+										item.setFocused();
+										tree.updateDomFocus();
+										navigate({
+											to: "/documents/$documentId",
+											params: { documentId: id },
+										});
+										return;
+									}
+									itemProps.onKeyDown?.(e);
+								}}
+							>
+								<button
+									type="button"
+									className="relative size-4 shrink-0"
+									onClick={(e) => {
+										e.preventDefault();
+										e.stopPropagation();
+										if (item.isExpanded()) item.collapse();
+										else item.expand();
+									}}
+									onPointerDown={(e) => {
+										e.stopPropagation();
+									}}
+								>
+									<span
+										className={[
+											"absolute inset-0 flex items-center justify-center transition-opacity",
+											"opacity-100 group-hover/menu-item:opacity-0",
+										].join(" ")}
+									>
+										{data.icon ? (
+											<span className="text-base leading-none">
+												{data.icon}
+											</span>
+										) : (
+											<FileText className="size-4" />
+										)}
+									</span>
+									<ChevronRight
+										className={[
+											"absolute inset-0 m-auto size-4 transition-[opacity,transform]",
+											item.isExpanded() ? "rotate-90" : "",
+											"text-sidebar-foreground/30",
+											"opacity-0 group-hover/menu-item:opacity-100",
+										].join(" ")}
+									/>
+								</button>
+								<span className="truncate">{data.itemName}</span>
+							</SidebarMenuButton>
+
+							<DropdownMenu
+								open={openMenuId === id}
+								onOpenChange={(open) => {
+									setOpenMenuId(open ? id : null);
+								}}
+							>
+								<DropdownMenuTrigger asChild>
+									<button
+										type="button"
+										className="absolute right-7 top-1/2 -translate-y-1/2 opacity-0 group-hover/menu-item:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
+										onPointerDown={(e) => {
+											e.stopPropagation();
+										}}
+									>
+										<MoreHorizontal className="size-4" />
+										<span className="sr-only">More</span>
+									</button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent
+									className="w-56 rounded-lg"
+									side={isMobile ? "bottom" : "right"}
+									align={isMobile ? "end" : "start"}
+								>
+									<DropdownMenuSub>
+										<DropdownMenuSubTrigger>
+											<Share2 className="text-muted-foreground" />
+											<span>Share</span>
+										</DropdownMenuSubTrigger>
+										<DropdownMenuSubContent className="w-56 rounded-lg">
+											<DropdownMenuItem
+												onClick={() => {
+													startTransition(async () => {
+														try {
+															await updateDocument({ id, isPublished: false });
+															toast.success("Page unshared");
+														} catch {
+															toast.error("Failed to update sharing settings");
+														}
+													});
+												}}
+											>
+												<Lock className="text-muted-foreground" />
+												<span>Private</span>
+												{!data.isPublished && <Check className="ml-auto" />}
+											</DropdownMenuItem>
+											<DropdownMenuItem
+												onClick={() => {
+													startTransition(async () => {
+														try {
+															await updateDocument({ id, isPublished: true });
+															toast.success("Page shared");
+														} catch {
+															toast.error("Failed to update sharing settings");
+														}
+													});
+												}}
+											>
+												<Globe className="text-muted-foreground" />
+												<span>Public</span>
+												{data.isPublished && <Check className="ml-auto" />}
+											</DropdownMenuItem>
+										</DropdownMenuSubContent>
+									</DropdownMenuSub>
+									<DropdownMenuItem
+										onClick={() => {
+											startTransition(async () => {
+												const newId = await duplicateDocument({ id });
+												toast.success("Page duplicated");
+												navigate({
+													to: "/documents/$documentId",
+													params: { documentId: newId },
+												});
+											});
+										}}
+									>
+										<Copy className="text-muted-foreground" />
+										<span>Duplicate</span>
+									</DropdownMenuItem>
+									<DropdownMenuItem
+										onClick={() => {
+											const path = data.isPublished ? "share" : "documents";
+											const url = `${window.location.origin}/${path}/${id}`;
+											navigator.clipboard.writeText(url);
+											toast.success(
+												data.isPublished ? "Share link copied" : "Link copied",
+											);
+										}}
+									>
+										<LinkIcon className="text-muted-foreground" />
+										<span>Copy link</span>
+									</DropdownMenuItem>
+									<DropdownMenuItem
+										onClick={() => {
+											startTransition(async () => {
+												const added = await toggleFavorite({ documentId: id });
+												toast.success(
+													added ? "Page starred" : "Page unstarred",
+												);
+											});
+										}}
+									>
+										<Star className="text-muted-foreground" />
+										<span>{isFavorite ? "Unstar" : "Star"}</span>
+									</DropdownMenuItem>
+									<DropdownMenuSub>
+										<DropdownMenuSubTrigger>
+											<CornerUpRight className="text-muted-foreground" />
+											<span>Move to</span>
+										</DropdownMenuSubTrigger>
+										<DropdownMenuSubContent className="w-80 rounded-lg p-0">
+											<Command className="rounded-none bg-transparent">
+												<CommandInput placeholder="Move page to..." autoFocus />
+												<CommandList className="max-h-[360px]">
+													<CommandEmpty>No results found.</CommandEmpty>
+													<CommandGroup heading="Locations">
+														{(() => {
+															const descendants = collectDescendantIds(
+																String(id),
+																treeData,
+															);
+															const candidates = [...documents]
+																.filter(
+																	(d) =>
+																		d._id !== id &&
+																		!descendants.has(String(d._id)),
+																)
+																.sort(compareSidebarDocuments);
+
+															return candidates.map((target) => (
+																<CommandItem
+																	key={String(target._id)}
+																	value={`${target.title || "Untitled"} ${String(target._id)}`}
+																	onSelect={() => {
+																		const newParentId = target._id;
+																		const newOrder = documents.filter(
+																			(d) =>
+																				String(d.parentId ?? null) ===
+																					String(newParentId) && d._id !== id,
+																		).length;
+																		setExpandedItems((prev) => {
+																			const key = String(newParentId);
+																			if (prev.includes(key)) return prev;
+																			return [...prev, key];
+																		});
+																		setOpenMenuId(null);
+																		startTransition(async () => {
+																			try {
+																				await reorderDocument({
+																					id,
+																					newParentId,
+																					newOrder,
+																				});
+																				toast.success("Page moved");
+																			} catch {
+																				toast.error("Failed to move page");
+																			}
+																		});
+																	}}
+																>
+																	{target.icon ? (
+																		<span className="text-base leading-none">
+																			{target.icon}
+																		</span>
+																	) : (
+																		<FileText className="text-muted-foreground" />
+																	)}
+																	<span className="truncate">
+																		{target.title || "Untitled"}
+																	</span>
+																</CommandItem>
+															));
+														})()}
+													</CommandGroup>
+												</CommandList>
+											</Command>
+										</DropdownMenuSubContent>
+									</DropdownMenuSub>
+									<DropdownMenuItem
+										onClick={() => {
+											const url = `${window.location.origin}/documents/${id}`;
+											window.open(url, "_blank", "noopener,noreferrer");
+										}}
+									>
+										<ArrowUpRight className="text-muted-foreground" />
+										<span>Open in new tab</span>
+									</DropdownMenuItem>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem
+										onClick={() => {
+											startTransition(async () => {
+												if (isActive) {
+													navigate({ to: "/", replace: true });
+												}
+												try {
+													await archiveDocument({ id });
+													toast.success("Page moved to trash");
+												} catch (_error) {
+													toast.error("Failed to move page to trash");
+												}
+											});
+										}}
+										className="text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"
+									>
+										<Trash2 className="text-destructive dark:text-red-500" />
+										<span>Move to trash</span>
+									</DropdownMenuItem>
+								</DropdownMenuContent>
+							</DropdownMenu>
+							<button
+								type="button"
+								className="absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/menu-item:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
+								onPointerDown={(e) => {
+									e.stopPropagation();
+								}}
+								onClick={(e) => {
+									e.preventDefault();
+									e.stopPropagation();
+									startTransition(async () => {
+										try {
+											const newId = await createDocument({
+												workspaceId,
+												parentId: id,
+											});
+											setExpandedItems((prev) => {
+												const key = String(id);
+												if (prev.includes(key)) return prev;
+												return [...prev, key];
+											});
+											navigate({
+												to: "/documents/$documentId",
+												params: { documentId: newId },
+											});
+										} catch {
+											toast.error("Failed to create page");
+										}
+									});
+								}}
+							>
+								<Plus className="size-4" />
+								<span className="sr-only">Add page inside</span>
+							</button>
+						</div>
+					</SidebarMenuItem>
+					{item.isExpanded() && !hasChildren && (
+						<SidebarMenuItem>
+							<div
+								className="text-sidebar-foreground/50 text-xs px-2 py-1"
+								style={{ paddingLeft: (level + 1) * INDENT + 18 }}
+							>
+								No pages inside
+							</div>
+						</SidebarMenuItem>
+					)}
+				</div>
+			);
+		})
+		.filter(Boolean);
+
+	return (
+		<div {...tree.getContainerProps("Documents")} className="relative">
+			<SidebarMenu>{items}</SidebarMenu>
+			<div
+				className="pointer-events-none absolute left-0 right-0 h-0.5 bg-sidebar-ring"
+				style={tree.getDragLineStyle()}
+			/>
+		</div>
 	);
 }
