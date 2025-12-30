@@ -5,7 +5,7 @@
     "": {
       "name": "docufy",
       "dependencies": {
-        "@convex-dev/better-auth": "^0.10.6",
+        "@convex-dev/better-auth": "^0.10.9",
         "@convex-dev/crons": "^0.2.0",
         "@convex-dev/prosemirror-sync": "^0.2.0",
         "@convex-dev/react-query": "^0.1.0",
@@ -14,6 +14,8 @@
         "@dnd-kit/utilities": "^3.2.2",
         "@ferrucc-io/emoji-picker": "^0.0.48",
         "@floating-ui/dom": "^1.7.4",
+        "@headless-tree/core": "^1.6.1",
+        "@headless-tree/react": "^1.6.1",
         "@radix-ui/react-alert-dialog": "^1.1.15",
         "@radix-ui/react-avatar": "^1.1.11",
         "@radix-ui/react-collapsible": "^1.1.12",
@@ -35,13 +37,13 @@
         "@tanstack/pacer": "^0.16.4",
         "@tanstack/react-devtools": "^0.7.11",
         "@tanstack/react-pacer": "^0.17.4",
-        "@tanstack/react-query": "^5.90.12",
-        "@tanstack/react-router": "^1.143.3",
-        "@tanstack/react-router-devtools": "^1.143.3",
-        "@tanstack/react-router-ssr-query": "^1.143.3",
+        "@tanstack/react-query": "^5.90.15",
+        "@tanstack/react-router": "^1.144.0",
+        "@tanstack/react-router-devtools": "^1.144.0",
+        "@tanstack/react-router-ssr-query": "^1.144.0",
         "@tanstack/react-router-with-query": "^1.130.17",
-        "@tanstack/react-start": "^1.143.3",
-        "@tanstack/router-plugin": "^1.143.3",
+        "@tanstack/react-start": "^1.145.0",
+        "@tanstack/router-plugin": "^1.144.0",
         "@tiptap/core": "^3.14.0",
         "@tiptap/extension-bubble-menu": "^3.14.0",
         "@tiptap/extension-code-block-lowlight": "^3.14.0",
@@ -84,7 +86,7 @@
         "prosemirror-schema-basic": "^1.2.4",
         "prosemirror-schema-list": "^1.5.1",
         "prosemirror-state": "^1.4.4",
-        "prosemirror-tables": "^1.8.4",
+        "prosemirror-tables": "^1.8.5",
         "prosemirror-transform": "^1.10.5",
         "prosemirror-view": "^1.41.4",
         "react": "^19.2.3",
@@ -112,7 +114,7 @@
         "@types/react": "^19.2.7",
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^5.1.2",
-        "jsdom": "^27.3.0",
+        "jsdom": "^27.4.0",
         "typescript": "^5.9.3",
         "vite": "^7.3.0",
         "vitest": "^3.2.4",
@@ -318,6 +320,10 @@
     "@floating-ui/react-dom": ["@floating-ui/react-dom@2.1.6", "", { "dependencies": { "@floating-ui/dom": "^1.7.4" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-4JX6rEatQEvlmgU80wZyq9RT96HZJa88q8hp0pBd+LrczeDI4o6uA2M+uvxngVHo4Ihr8uibXxH6+70zhAFrVw=="],
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.10", "", {}, "sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ=="],
+
+    "@headless-tree/core": ["@headless-tree/core@1.6.1", "", {}, "sha512-67de8m/50/4l7qgDvJBFjG6wMMWGkEFWBtbk0kwKGVGZPW3kiPM+2uQmEFGaHugegVbNI/vNjLUJAqG6oegj5g=="],
+
+    "@headless-tree/react": ["@headless-tree/react@1.6.1", "", { "peerDependencies": { "@headless-tree/core": "*", "react": "*", "react-dom": "*" } }, "sha512-uY4FS7xvkCjeqrtrMRRju+91N/95NRiX8iSq4L0vX2mGVlJvi6ZbH4o/yZXEnSkC14Qk78JYDw1wcrtj8w9L7w=="],
 
     "@hexagon/base64": ["@hexagon/base64@1.1.28", "", {}, "sha512-lhqDEAvWixy3bZ+UOYbPwUbBkwBq5C1LAJ/xPC8Oi+lL54oyakv/npbA0aU2hgCsx/1NUd4IBvV03+aUBWxerw=="],
 
