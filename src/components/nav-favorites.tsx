@@ -29,7 +29,7 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
-import { optimisticRemoveFavorite } from "@/lib/optimistic-favorites";
+import { optimisticRemoveFavorite } from "@/lib/optimistic-documents";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 

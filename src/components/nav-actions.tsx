@@ -36,7 +36,10 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { optimisticToggleFavorite } from "@/lib/optimistic-favorites";
+import {
+	optimisticArchiveDocument,
+	optimisticToggleFavorite,
+} from "@/lib/optimistic-documents";
 import { favoritesQueries } from "@/queries";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -60,7 +63,9 @@ export function NavActions({
 		optimisticToggleFavorite,
 	);
 	const duplicateDocument = useMutation(api.documents.duplicate);
-	const archiveDocument = useMutation(api.documents.archive);
+	const archiveDocument = useMutation(
+		api.documents.archive,
+	).withOptimisticUpdate(optimisticArchiveDocument);
 	const navigate = useNavigate();
 	const { data: isFavorite } = useQuery({
 		...(documentId

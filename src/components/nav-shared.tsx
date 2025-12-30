@@ -59,7 +59,10 @@ import {
 	useSidebar,
 } from "@/components/ui/sidebar";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
-import { optimisticToggleFavorite } from "@/lib/optimistic-favorites";
+import {
+	optimisticToggleFavorite,
+	optimisticUpdateDocument,
+} from "@/lib/optimistic-documents";
 import { documentsQueries, favoritesQueries } from "@/queries";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -99,7 +102,9 @@ function DocumentItem({
 	const toggleFavorite = useMutation(api.favorites.toggle).withOptimisticUpdate(
 		optimisticToggleFavorite,
 	);
-	const updateDocument = useMutation(api.documents.update);
+	const updateDocument = useMutation(api.documents.update).withOptimisticUpdate(
+		optimisticUpdateDocument,
+	);
 	const [, startTransition] = useTransition();
 
 	const childrenQuery = useQuery({

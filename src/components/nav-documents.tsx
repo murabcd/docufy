@@ -62,7 +62,11 @@ import {
 	useSidebar,
 } from "@/components/ui/sidebar";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
-import { optimisticToggleFavorite } from "@/lib/optimistic-favorites";
+import {
+	optimisticArchiveDocument,
+	optimisticToggleFavorite,
+	optimisticUpdateDocument,
+} from "@/lib/optimistic-documents";
 import { documentsQueries, favoritesQueries } from "@/queries";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -99,12 +103,16 @@ function DocumentItem({
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [isMounted, setIsMounted] = useState(false);
 
-	const archiveDocument = useMutation(api.documents.archive);
+	const archiveDocument = useMutation(
+		api.documents.archive,
+	).withOptimisticUpdate(optimisticArchiveDocument);
 	const duplicateDocument = useMutation(api.documents.duplicate);
 	const toggleFavorite = useMutation(api.favorites.toggle).withOptimisticUpdate(
 		optimisticToggleFavorite,
 	);
-	const updateDocument = useMutation(api.documents.update);
+	const updateDocument = useMutation(api.documents.update).withOptimisticUpdate(
+		optimisticUpdateDocument,
+	);
 	const [, startTransition] = useTransition();
 
 	const childrenQuery = useQuery({
