@@ -48,7 +48,14 @@ export function CoverImage({ url, preview, documentId }: CoverImageProps) {
 				<img src={url} alt="Cover" className="w-full h-full object-cover" />
 			)}
 			{url && !preview && (
-				<div className="absolute top-4 right-4">
+				<div
+					className={cn(
+						"absolute top-4 right-4 opacity-0 pointer-events-none transition-opacity",
+						"group-hover:opacity-100 group-hover:pointer-events-auto",
+						"group-focus-within:opacity-100 group-focus-within:pointer-events-auto",
+						isPickerOpen && "opacity-100 pointer-events-auto",
+					)}
+				>
 					<Popover open={isPickerOpen} onOpenChange={setIsPickerOpen}>
 						<PopoverAnchor asChild>
 							<ButtonGroup className="overflow-hidden rounded-md border border-border bg-background/70 backdrop-blur-sm shadow-xs">

@@ -10,7 +10,7 @@ import {
 	Plus,
 	Replace,
 	RotateCcw,
-	Trash,
+	Trash2,
 } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -275,13 +275,13 @@ const TiptapDragHandle = memo(({ editor }: { editor: Editor }) => {
 						<DropdownMenuSeparator />
 
 						<DropdownMenuItem
-							variant="destructive"
 							onSelect={() => {
 								deleteNode(editor);
 								setDropdownOpened(false);
 							}}
+							className="text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"
 						>
-							<Trash {...iconProps} />
+							<Trash2 className="text-destructive dark:text-red-500" />
 							Delete
 						</DropdownMenuItem>
 					</DropdownMenuContent>
