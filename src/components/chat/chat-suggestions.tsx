@@ -45,7 +45,6 @@ export function getDefaultChatSuggestions(opts: {
 		{
 			id: "agenda",
 			title: "Write meeting agenda",
-			badge: "New",
 			prompt:
 				"Write a meeting agenda for the topic I provide. Include: goal, attendees/roles, a time-boxed agenda (30–60 min), prep materials, key questions/decisions, and follow-ups.",
 			icon: <Library className="size-4" />,

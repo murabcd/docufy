@@ -59,6 +59,11 @@ import {
 	SidebarMenuItem,
 	useSidebar,
 } from "@/components/ui/sidebar";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import {
 	optimisticArchiveDocument,
@@ -492,6 +497,7 @@ function TreeDocuments({
 								<div className="flex items-center gap-1">
 									<div style={{ width: level * INDENT }} />
 									<SidebarMenuButton
+										asChild
 										{...itemProps}
 										isActive={isActive}
 										className="flex-1 min-w-0 pr-14"
@@ -522,43 +528,47 @@ function TreeDocuments({
 											itemProps.onKeyDown?.(e);
 										}}
 									>
-										<button
-											type="button"
-											className="relative size-4 shrink-0"
-											onClick={(e) => {
-												e.preventDefault();
-												e.stopPropagation();
-												if (item.isExpanded()) item.collapse();
-												else item.expand();
-											}}
-											onPointerDown={(e) => {
-												e.stopPropagation();
-											}}
-										>
-											<span
-												className={[
-													"absolute inset-0 flex items-center justify-center transition-opacity",
-													"opacity-100 group-hover/menu-item:opacity-0",
-												].join(" ")}
+										<div>
+											<button
+												type="button"
+												className="relative size-4 shrink-0"
+												aria-label={item.isExpanded() ? "Collapse" : "Expand"}
+												aria-expanded={item.isExpanded()}
+												onClick={(e) => {
+													e.preventDefault();
+													e.stopPropagation();
+													if (item.isExpanded()) item.collapse();
+													else item.expand();
+												}}
+												onPointerDown={(e) => {
+													e.stopPropagation();
+												}}
 											>
-												{data.icon ? (
-													<span className="text-base leading-none">
-														{data.icon}
-													</span>
-												) : (
-													<FileText className="size-4" />
-												)}
-											</span>
-											<ChevronRight
-												className={[
-													"absolute inset-0 m-auto size-4 transition-[opacity,transform]",
-													item.isExpanded() ? "rotate-90" : "",
-													"text-sidebar-foreground/30",
-													"opacity-0 group-hover/menu-item:opacity-100",
-												].join(" ")}
-											/>
-										</button>
-										<span className="truncate">{data.itemName}</span>
+												<span
+													className={[
+														"absolute inset-0 flex items-center justify-center transition-opacity",
+														"opacity-100 group-hover/menu-item:opacity-0",
+													].join(" ")}
+												>
+													{data.icon ? (
+														<span className="text-base leading-none">
+															{data.icon}
+														</span>
+													) : (
+														<FileText className="size-4" />
+													)}
+												</span>
+												<ChevronRight
+													className={[
+														"absolute inset-0 m-auto size-4 transition-[opacity,transform]",
+														item.isExpanded() ? "rotate-90" : "",
+														"text-sidebar-foreground/30",
+														"opacity-0 group-hover/menu-item:opacity-100",
+													].join(" ")}
+												/>
+											</button>
+											<span className="truncate">{data.itemName}</span>
+										</div>
 									</SidebarMenuButton>
 
 									<DropdownMenu
@@ -805,39 +815,46 @@ function TreeDocuments({
 											</DropdownMenuItem>
 										</DropdownMenuContent>
 									</DropdownMenu>
-									<button
-										type="button"
-										className="absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/menu-item:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
-										onPointerDown={(e) => {
-											e.stopPropagation();
-										}}
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											startTransition(async () => {
-												try {
-													const newId = await createDocument({
-														workspaceId,
-														parentId: id,
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<button
+												type="button"
+												className="absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/menu-item:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
+												onPointerDown={(e) => {
+													e.stopPropagation();
+												}}
+												onClick={(e) => {
+													e.preventDefault();
+													e.stopPropagation();
+													startTransition(async () => {
+														try {
+															const newId = await createDocument({
+																workspaceId,
+																parentId: id,
+															});
+															setExpandedItems((prev) => {
+																const key = String(id);
+																if (prev.includes(key)) return prev;
+																return [...prev, key];
+															});
+															navigate({
+																to: "/documents/$documentId",
+																params: { documentId: newId },
+															});
+														} catch {
+															toast.error("Failed to create page");
+														}
 													});
-													setExpandedItems((prev) => {
-														const key = String(id);
-														if (prev.includes(key)) return prev;
-														return [...prev, key];
-													});
-													navigate({
-														to: "/documents/$documentId",
-														params: { documentId: newId },
-													});
-												} catch {
-													toast.error("Failed to create page");
-												}
-											});
-										}}
-									>
-										<Plus className="size-4" />
-										<span className="sr-only">Add page inside</span>
-									</button>
+												}}
+											>
+												<Plus className="size-4" />
+												<span className="sr-only">Add page inside</span>
+											</button>
+										</TooltipTrigger>
+										<TooltipContent side="right" sideOffset={8}>
+											Add page inside
+										</TooltipContent>
+									</Tooltip>
 								</div>
 							</PopoverAnchor>
 							<PopoverContent

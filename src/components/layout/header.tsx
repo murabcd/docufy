@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { FileText, Plus, WandSparkles } from "lucide-react";
 import { Fragment, useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { TitleEditInput } from "@/components/document/title-edit-input";
 import { NavActions } from "@/components/nav/nav-actions";
 import {
@@ -33,7 +34,7 @@ type HeaderProps = {
 	documentTitle?: string;
 	documentIcon?: string;
 	ancestors?: Array<{ _id: Id<"documents">; title: string }>;
-	onTitleChange?: (title: string) => void;
+	onTitleChange?: (title: string) => void | Promise<void>;
 	updatedAt?: number;
 };
 
@@ -68,7 +69,7 @@ export function Header({
 		}
 	}, [documentTitle, title, isEditingTitle]);
 
-	const commitTitleChange = useCallback(() => {
+	const commitTitleChange = useCallback(async () => {
 		if (!canEditTitle) {
 			return;
 		}
@@ -77,13 +78,18 @@ export function Header({
 			return;
 		}
 		setTitleValue(normalizedTitle);
-		onTitleChange?.(normalizedTitle);
+		try {
+			await onTitleChange?.(normalizedTitle);
+			toast.success("Page renamed");
+		} catch {
+			toast.error("Failed to rename page");
+		}
 	}, [canEditTitle, documentTitle, onTitleChange, titleValue]);
 
 	const exitTitleEdit = useCallback(
 		(commit = true) => {
 			if (commit) {
-				commitTitleChange();
+				void commitTitleChange();
 			} else {
 				setTitleValue(documentTitle || title || "Untitled");
 			}
@@ -195,7 +201,7 @@ export function Header({
 														</button>
 													</PopoverAnchor>
 												</TooltipTrigger>
-												<TooltipContent>Edit title</TooltipContent>
+												<TooltipContent>Rename page</TooltipContent>
 											</Tooltip>
 											<PopoverContent
 												align="start"
@@ -258,7 +264,7 @@ export function Header({
 													</button>
 												</PopoverAnchor>
 											</TooltipTrigger>
-											<TooltipContent>Edit title</TooltipContent>
+											<TooltipContent>Rename page</TooltipContent>
 										</Tooltip>
 										<PopoverContent
 											align="start"

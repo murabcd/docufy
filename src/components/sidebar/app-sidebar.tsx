@@ -90,14 +90,14 @@ const defaultNavMain: NavMainItem[] = [
 
 const defaultNavSecondary: NavSecondaryItem[] = [
 	{
-		title: "Trash",
-		url: "/trash",
-		icon: Trash2,
-	},
-	{
 		title: "Settings",
 		url: "/settings",
 		icon: Settings2,
+	},
+	{
+		title: "Trash",
+		url: "/trash",
+		icon: Trash2,
 	},
 ];
 
