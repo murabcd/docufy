@@ -417,7 +417,49 @@ export const addOrUpdateLink = (editor: Editor, url: string) => {
 		return;
 	}
 
-	editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+	const normalizedHref = normalizeHref(url);
+	if (!normalizedHref) return;
+
+	editor
+		.chain()
+		.focus()
+		.extendMarkRange("link")
+		.setLink({ href: normalizedHref })
+		.run();
+
+	// Prevent newly typed text (e.g. after pressing Space) from inheriting the link mark
+	// without removing the link mark from the just-linked text.
+	const cursorPos = editor.state.selection.to;
+	editor.commands.setTextSelection(cursorPos);
+	editor.commands.unsetMark("link");
+};
+
+export const normalizeHref = (rawHref: string) => {
+	const href = rawHref.trim();
+	if (!href) return "";
+
+	if (href.startsWith("/") || href.startsWith("#")) return href;
+
+	const schemeMatch = href.match(/^([a-z][a-z0-9+.-]*):/i);
+	if (schemeMatch) {
+		const scheme = schemeMatch[1]?.toLowerCase();
+		if (
+			scheme === "http" ||
+			scheme === "https" ||
+			scheme === "mailto" ||
+			scheme === "tel"
+		) {
+			return href;
+		}
+		return "";
+	}
+
+	// If it looks like a bare domain (e.g. example.com), assume https:// so it opens correctly.
+	if (href.startsWith("www.") || /^[^\s]+\.[^\s]+$/.test(href)) {
+		return `https://${href}`;
+	}
+
+	return href;
 };
 
 export const unsetLink = (editor: Editor) => {

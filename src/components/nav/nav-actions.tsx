@@ -16,7 +16,6 @@ import {
 	MoreHorizontal,
 	Settings2,
 	Star,
-	Trash,
 	Trash2,
 } from "lucide-react";
 import * as React from "react";
@@ -168,7 +167,7 @@ export function NavActions({
 				},
 				{
 					label: "Show delete pages",
-					icon: Trash,
+					icon: Trash2,
 					onClick: handleShowTrash,
 				},
 				{

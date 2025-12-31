@@ -175,9 +175,7 @@ function TrashBoxContent({
 				) : (
 					<div className="px-1 pb-1 space-y-1">
 						{filteredDocuments.length === 0 ? (
-							<p className="text-xs text-center text-muted-foreground py-6">
-								No pages found.
-							</p>
+							<p className="py-6 text-center text-sm">No pages found.</p>
 						) : (
 							filteredDocuments.map((document) => (
 								<div
@@ -221,7 +219,7 @@ function TrashBoxContent({
 												<Button
 													variant="ghost"
 													size="sm"
-													className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+													className="h-6 w-6 p-0 text-destructive hover:text-destructive dark:text-red-500"
 													onClick={(e) => {
 														e.stopPropagation();
 														onRemove(document._id);

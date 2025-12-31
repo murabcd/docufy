@@ -236,7 +236,11 @@
 
 	/* Link styles */
 	a {
-		@apply text-primary cursor-pointer underline;
+		@apply text-muted-foreground cursor-pointer underline decoration-muted-foreground underline-offset-4;
+
+		&:hover {
+			@apply text-foreground decoration-foreground;
+		}
 	}
 
 	/* Image Node View styles */

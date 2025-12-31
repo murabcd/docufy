@@ -11,6 +11,7 @@ import { EditorContent, useEditor, type useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
 	forwardRef,
+	useCallback,
 	useEffect,
 	useEffectEvent,
 	useImperativeHandle,
@@ -28,6 +29,9 @@ import TiptapEmoji from "@/tiptap/extensions/emoji/tiptap-emoji";
 import { ImageUploader } from "@/tiptap/extensions/image/image-uploader";
 import ImageUploaderExtension from "@/tiptap/extensions/image/image-uploader-extension";
 import { NestedPage } from "@/tiptap/extensions/nested-page/nested-page";
+import PageMention from "@/tiptap/extensions/page-mention/page-mention";
+import PageMentionSuggestion from "@/tiptap/extensions/page-mention/page-mention-suggestion";
+import { normalizeHref } from "@/tiptap/helpers";
 import type { TiptapEditorProps } from "@/tiptap/types";
 
 export interface TiptapEditorHandle {
@@ -90,6 +94,9 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
 					imgUploadResponseKey: editorOptions.imgUploadResponseKey,
 				}),
 				NestedPage,
+				PageMention.configure({
+					suggestion: PageMentionSuggestion,
+				}),
 				SlashCommand.configure({
 					suggestion: SlashCommandSuggestion,
 				}),
@@ -172,8 +179,47 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
 			[editor],
 		);
 
+		const handleLinkClick = useCallback(
+			(e: React.MouseEvent) => {
+				if (!editor) return;
+				if (e.button !== 0) return;
+
+				const target = e.target;
+				if (!(target instanceof HTMLElement)) return;
+
+				const anchor = target.closest("a[href]");
+				if (!(anchor instanceof HTMLAnchorElement)) return;
+
+				const isModifiedClick = e.metaKey || e.ctrlKey;
+				const hasBlankTarget = anchor.target === "_blank";
+
+				if (editor.isEditable && !isModifiedClick && !hasBlankTarget) return;
+
+				const rawHref = anchor.getAttribute("href") ?? "";
+				const normalized = normalizeHref(rawHref);
+				if (!normalized) {
+					e.preventDefault();
+					e.stopPropagation();
+					return;
+				}
+
+				e.preventDefault();
+				e.stopPropagation();
+
+				const shouldOpenInNewTab = hasBlankTarget || isModifiedClick;
+
+				if (shouldOpenInNewTab) {
+					window.open(normalized, "_blank", "noopener,noreferrer,nofollow");
+					return;
+				}
+
+				window.location.assign(normalized);
+			},
+			[editor],
+		);
+
 		return (
-			<div className="w-full overflow-visible">
+			<div className="w-full overflow-visible" onClickCapture={handleLinkClick}>
 				{editor?.isEditable && (
 					<>
 						<TiptapDragHandle editor={editor} />

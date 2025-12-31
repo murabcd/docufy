@@ -33,6 +33,7 @@ import { optimisticUpdateDocument } from "@/lib/optimistic-documents";
 import { cn } from "@/lib/utils";
 import { documentsQueries } from "@/queries";
 import { nestedPagePluginKey } from "@/tiptap/extensions/nested-page/nested-page";
+import { pageMentionPluginKey } from "@/tiptap/extensions/page-mention/page-mention";
 import { EMPTY_DOCUMENT } from "@/tiptap/types";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -242,7 +243,9 @@ function DocumentEditor() {
 			}
 
 			editor.view.dispatch(
-				editor.state.tr.setMeta(nestedPagePluginKey, { titlesById }),
+				editor.state.tr
+					.setMeta(nestedPagePluginKey, { titlesById })
+					.setMeta(pageMentionPluginKey, { documents: allDocuments }),
 			);
 		};
 
@@ -251,7 +254,7 @@ function DocumentEditor() {
 		return () => {
 			if (timeoutId) clearTimeout(timeoutId);
 		};
-	}, [documentId, isEditorReady, titlesById]);
+	}, [allDocuments, documentId, isEditorReady, titlesById]);
 
 	const onCreateNestedPage = useEffectEvent(async (event: Event) => {
 		event.preventDefault();
