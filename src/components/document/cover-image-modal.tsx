@@ -1,8 +1,10 @@
+import { upload } from "@vercel/blob/client";
 import { useMutation } from "convex/react";
 import { Image as ImageIcon, Link as LinkIcon, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { buildBlobPathname } from "@/lib/blob";
 import {
 	COVER_GALLERY_SWATCHES,
 	CURATED_COVER_SECTIONS,
@@ -48,13 +50,18 @@ export function CoverImageModal({
 		}
 	}, [open]);
 
-	const readFileAsDataUrl = (file: File) =>
-		new Promise<string>((resolve, reject) => {
-			const reader = new FileReader();
-			reader.onloadend = () => resolve(reader.result as string);
-			reader.onerror = () => reject(new Error("Failed to read image file"));
-			reader.readAsDataURL(file);
-		});
+	const uploadCoverImage = async (file: File) => {
+		const blob = await upload(
+			buildBlobPathname({ kind: "cover", fileName: file.name }),
+			file,
+			{
+				access: "public",
+				handleUploadUrl: "/api/upload",
+			},
+		);
+
+		return blob.url;
+	};
 
 	const handleSelectCover = async (value: string) => {
 		setIsSubmitting(true);
@@ -83,10 +90,10 @@ export function CoverImageModal({
 
 		setIsSubmitting(true);
 		try {
-			const dataUrl = await readFileAsDataUrl(file);
+			const url = await uploadCoverImage(file);
 			await update({
 				id: documentId,
-				coverImage: dataUrl,
+				coverImage: url,
 			});
 			onClose();
 		} catch (error) {

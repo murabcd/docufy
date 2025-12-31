@@ -32,6 +32,9 @@
 - [Better Auth](https://www.better-auth.com/)
   - Secure authentication with [Better Auth for Convex](https://labs.convex.dev/better-auth)
   - GitHub OAuth integration
+- [Vercel Blob](https://vercel.com/docs/vercel-blob)
+  - Scalable file storage for images, documents, and other media
+  - Built on Amazon S3 with 99.99% availability and global CDN distribution
 - [Shadcn/UI](https://ui.shadcn.com)
   - Styling with [Tailwind CSS](https://tailwindcss.com)
   - Component primitives from [Radix UI](https://radix-ui.com) for accessibility and flexibility

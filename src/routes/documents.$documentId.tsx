@@ -509,6 +509,7 @@ function DocumentEditor() {
 				editorOptions={{
 					content: initialContentRef.current ?? EMPTY_DOCUMENT,
 					editable: !document.isArchived,
+					imgUploadUrl: "/api/upload",
 				}}
 				extraExtensions={extraExtensionsRef.current}
 			/>

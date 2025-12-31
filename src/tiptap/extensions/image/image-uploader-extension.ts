@@ -1,10 +1,7 @@
 import { type Editor, Extension } from "@tiptap/core";
 import FileHandler from "@tiptap/extension-file-handler";
-import {
-	showToast,
-	updateNodeByPos,
-	uploadWithProgress,
-} from "@/tiptap/helpers";
+import { buildBlobPathname } from "@/lib/blob";
+import { showToast, updateNodeByPos } from "@/tiptap/helpers";
 import type {
 	ImageUploaderExtensionOptions,
 	ImageUploaderExtensionStorage,
@@ -86,12 +83,7 @@ export const ImageUploaderExtension = Extension.create<
 				updateExisting?: boolean,
 				pos?: number,
 			) => {
-				const {
-					imgUploadUrl,
-					imgUploadResponseKey,
-					allowedMimeTypes,
-					maxFileSize,
-				} = this.options;
+				const { imgUploadUrl, allowedMimeTypes, maxFileSize } = this.options;
 
 				if (!file) return;
 
@@ -261,12 +253,26 @@ export const ImageUploaderExtension = Extension.create<
 							},
 						});
 
-						const response = await uploadWithProgress({
+						const { upload } = await import("@vercel/blob/client");
+						const blob = await upload(
+							buildBlobPathname({ kind: "editor", fileName: file.name }),
 							file,
-							url: imgUploadUrl,
-							onProgress: handleProgress,
-							signal: abortController.signal,
-						});
+							{
+								access: "public",
+								handleUploadUrl: imgUploadUrl,
+								multipart: file.size > 4.5 * 1024 * 1024,
+								abortSignal: abortController.signal,
+								onUploadProgress: ({ percentage }) => {
+									const shouldContinue = handleProgress(
+										Math.round(percentage),
+										file,
+									);
+									if (!shouldContinue) {
+										abortController.abort();
+									}
+								},
+							},
+						);
 
 						// Check if cancelled after upload completes
 						const token = uploadCancelTokens.get(id);
@@ -275,17 +281,7 @@ export const ImageUploaderExtension = Extension.create<
 							return;
 						}
 
-						if (!imgUploadResponseKey)
-							throw new Error(
-								"You need to specify a key for the upload response, using the parameter *imgUploadResponseKey* of editorOptions !",
-							);
-
-						const uploadedUrl =
-							response?.[imgUploadResponseKey as keyof typeof response];
-
-						if (!uploadedUrl) throw new Error("No URL returned from server");
-
-						handleSuccess(uploadedUrl);
+						handleSuccess(blob.url);
 					} catch (error: unknown) {
 						// Check if error was due to cancellation
 						if (error instanceof Error) {
