@@ -85,7 +85,7 @@ export function NavActions({
 		if (!documentId) return;
 		const url = `${window.location.origin}/documents/${documentId}`;
 		await navigator.clipboard.writeText(url);
-		toast.success("Link copied");
+		toast.success("Page link copied");
 		setIsOpen(false);
 	}, [documentId]);
 
@@ -121,7 +121,7 @@ export function NavActions({
 		() => [
 			[
 				{
-					label: "Customize Page",
+					label: "Customize page",
 					icon: Settings2,
 				},
 				{
@@ -147,7 +147,7 @@ export function NavActions({
 					icon: CornerUpRight,
 				},
 				{
-					label: "Move to Trash",
+					label: "Move to trash",
 					icon: Trash2,
 					onClick: handleMoveToTrash,
 					disabled: !documentId,

@@ -172,7 +172,7 @@ function DocumentItem({
 	const handleCopyLink = () => {
 		const url = `${window.location.origin}/share/${document._id}`;
 		navigator.clipboard.writeText(url);
-		toast.success("Share link copied");
+		toast.success("Page share link copied");
 	};
 
 	const handleSetVisibility = async (isPublished: boolean) => {

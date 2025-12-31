@@ -388,7 +388,7 @@ function Sidebar({
 				className={cn(
 					"relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
 					"group-data-[collapsible=offcanvas]:w-0",
-					// Right sidebars don't need gap when open - SidebarInset margin handles spacing
+					// Right sidebars don't need a gap when open - SidebarInset padding handles spacing
 					"group-data-[side=right]:group-data-[state=expanded]:w-0",
 					"group-data-[side=right]:rotate-180",
 					variant === "floating" || variant === "inset"
@@ -507,14 +507,14 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
 			data-slot="sidebar-inset"
 			data-right-sidebar-open={rightOpen}
 			className={cn(
-				"bg-background relative flex w-full flex-1 flex-col transition-[margin] duration-200 ease-linear",
+				"bg-background relative flex min-w-0 flex-1 flex-col transition-[padding] duration-200 ease-linear",
 				"md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
 				className,
 			)}
 			style={
 				rightOpen && !isMobile && rightMode === "sidebar"
 					? ({
-							marginRight: SIDEBAR_RIGHT_WIDTH,
+							paddingRight: SIDEBAR_RIGHT_WIDTH,
 						} as React.CSSProperties)
 					: undefined
 			}

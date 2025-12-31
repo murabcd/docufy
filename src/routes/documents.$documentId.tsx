@@ -522,6 +522,7 @@ function DocumentEditor() {
 				<Header
 					documentId={documentId as Id<"documents">}
 					documentTitle={document?.title}
+					documentIcon={document?.icon}
 					ancestors={ancestors}
 					onTitleChange={onTitleChangeIfEditable}
 					updatedAt={document?.updatedAt}

@@ -18,13 +18,15 @@ import {
 	Link as LinkIcon,
 	Lock,
 	MoreHorizontal,
+	Pencil,
 	Plus,
 	Share2,
 	Star,
 	Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { TitleEditInput } from "@/components/document/title-edit-input";
 import {
 	Command,
 	CommandEmpty,
@@ -43,6 +45,11 @@ import {
 	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+	Popover,
+	PopoverAnchor,
+	PopoverContent,
+} from "@/components/ui/popover";
 import {
 	SidebarGroup,
 	SidebarGroupContent,
@@ -247,6 +254,13 @@ function TreeDocuments({
 	const { isMobile } = useSidebar();
 	const [expandedItems, setExpandedItems] = useState<string[]>([]);
 	const [openMenuId, setOpenMenuId] = useState<Id<"documents"> | null>(null);
+	const [renameOpenId, setRenameOpenId] = useState<Id<"documents"> | null>(
+		null,
+	);
+	const [renameOriginalValue, setRenameOriginalValue] = useState("");
+	const [renameValue, setRenameValue] = useState("");
+	const renameInputRef = useRef<HTMLInputElement>(null);
+	const preventMenuCloseAutoFocusIdRef = useRef<Id<"documents"> | null>(null);
 
 	const archiveDocument = useMutation(
 		api.documents.archive,
@@ -435,6 +449,24 @@ function TreeDocuments({
 			const isFavorite = favoriteIds.has(String(id));
 			const level = item.getItemMeta().level;
 			const itemProps = item.getProps();
+			const isRenaming = renameOpenId === id;
+
+			const commitRename = () => {
+				if (renameOpenId !== id) return;
+				const nextTitle = renameValue.trim() || "Untitled";
+				setRenameOpenId(null);
+				setRenameOriginalValue("");
+				setRenameValue("");
+				if (nextTitle === renameOriginalValue) return;
+				startTransition(async () => {
+					try {
+						await updateDocument({ id, title: nextTitle });
+						toast.success("Page renamed");
+					} catch {
+						toast.error("Failed to rename page");
+					}
+				});
+			};
 
 			return (
 				<div key={item.getKey()}>
@@ -446,318 +478,400 @@ function TreeDocuments({
 							.filter(Boolean)
 							.join(" ")}
 					>
-						<div className="flex items-center gap-1">
-							<div style={{ width: level * INDENT }} />
-							<SidebarMenuButton
-								{...itemProps}
-								isActive={isActive}
-								className="flex-1 min-w-0 pr-14"
-								onClick={(e) => {
-									e.preventDefault();
-									e.stopPropagation();
-									item.setFocused();
-									tree.updateDomFocus();
-									navigate({
-										to: "/documents/$documentId",
-										params: { documentId: id },
-									});
-								}}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === " ") {
-										e.preventDefault();
-										e.stopPropagation();
-										item.setFocused();
-										tree.updateDomFocus();
-										navigate({
-											to: "/documents/$documentId",
-											params: { documentId: id },
-										});
-										return;
-									}
-									itemProps.onKeyDown?.(e);
-								}}
-							>
-								<button
-									type="button"
-									className="relative size-4 shrink-0"
-									onClick={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										if (item.isExpanded()) item.collapse();
-										else item.expand();
-									}}
-									onPointerDown={(e) => {
-										e.stopPropagation();
-									}}
-								>
-									<span
-										className={[
-											"absolute inset-0 flex items-center justify-center transition-opacity",
-											"opacity-100 group-hover/menu-item:opacity-0",
-										].join(" ")}
+						<Popover
+							open={isRenaming}
+							onOpenChange={(open) => {
+								setRenameOpenId(open ? id : null);
+								if (!open) {
+									setRenameOriginalValue("");
+									setRenameValue("");
+								}
+							}}
+						>
+							<PopoverAnchor asChild>
+								<div className="flex items-center gap-1">
+									<div style={{ width: level * INDENT }} />
+									<SidebarMenuButton
+										{...itemProps}
+										isActive={isActive}
+										className="flex-1 min-w-0 pr-14"
+										onClick={(e) => {
+											if (isRenaming) return;
+											e.preventDefault();
+											e.stopPropagation();
+											item.setFocused();
+											tree.updateDomFocus();
+											navigate({
+												to: "/documents/$documentId",
+												params: { documentId: id },
+											});
+										}}
+										onKeyDown={(e) => {
+											if (isRenaming) return;
+											if (e.key === "Enter" || e.key === " ") {
+												e.preventDefault();
+												e.stopPropagation();
+												item.setFocused();
+												tree.updateDomFocus();
+												navigate({
+													to: "/documents/$documentId",
+													params: { documentId: id },
+												});
+												return;
+											}
+											itemProps.onKeyDown?.(e);
+										}}
 									>
-										{data.icon ? (
-											<span className="text-base leading-none">
-												{data.icon}
+										<button
+											type="button"
+											className="relative size-4 shrink-0"
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												if (item.isExpanded()) item.collapse();
+												else item.expand();
+											}}
+											onPointerDown={(e) => {
+												e.stopPropagation();
+											}}
+										>
+											<span
+												className={[
+													"absolute inset-0 flex items-center justify-center transition-opacity",
+													"opacity-100 group-hover/menu-item:opacity-0",
+												].join(" ")}
+											>
+												{data.icon ? (
+													<span className="text-base leading-none">
+														{data.icon}
+													</span>
+												) : (
+													<FileText className="size-4" />
+												)}
 											</span>
-										) : (
-											<FileText className="size-4" />
-										)}
-									</span>
-									<ChevronRight
-										className={[
-											"absolute inset-0 m-auto size-4 transition-[opacity,transform]",
-											item.isExpanded() ? "rotate-90" : "",
-											"text-sidebar-foreground/30",
-											"opacity-0 group-hover/menu-item:opacity-100",
-										].join(" ")}
-									/>
-								</button>
-								<span className="truncate">{data.itemName}</span>
-							</SidebarMenuButton>
+											<ChevronRight
+												className={[
+													"absolute inset-0 m-auto size-4 transition-[opacity,transform]",
+													item.isExpanded() ? "rotate-90" : "",
+													"text-sidebar-foreground/30",
+													"opacity-0 group-hover/menu-item:opacity-100",
+												].join(" ")}
+											/>
+										</button>
+										<span className="truncate">{data.itemName}</span>
+									</SidebarMenuButton>
 
-							<DropdownMenu
-								open={openMenuId === id}
-								onOpenChange={(open) => {
-									setOpenMenuId(open ? id : null);
-								}}
-							>
-								<DropdownMenuTrigger asChild>
+									<DropdownMenu
+										open={openMenuId === id}
+										onOpenChange={(open) => {
+											setOpenMenuId(open ? id : null);
+										}}
+									>
+										<DropdownMenuTrigger asChild>
+											<button
+												type="button"
+												className="absolute right-7 top-1/2 -translate-y-1/2 opacity-0 group-hover/menu-item:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
+												onPointerDown={(e) => {
+													e.stopPropagation();
+												}}
+											>
+												<MoreHorizontal className="size-4" />
+												<span className="sr-only">More</span>
+											</button>
+										</DropdownMenuTrigger>
+										<DropdownMenuContent
+											className="w-56 rounded-lg"
+											side={isMobile ? "bottom" : "right"}
+											align={isMobile ? "end" : "start"}
+											onCloseAutoFocus={(e) => {
+												if (preventMenuCloseAutoFocusIdRef.current === id) {
+													e.preventDefault();
+													preventMenuCloseAutoFocusIdRef.current = null;
+												}
+											}}
+										>
+											<DropdownMenuSub>
+												<DropdownMenuSubTrigger>
+													<Share2 className="text-muted-foreground" />
+													<span>Share</span>
+												</DropdownMenuSubTrigger>
+												<DropdownMenuSubContent className="w-56 rounded-lg">
+													<DropdownMenuItem
+														onClick={() => {
+															startTransition(async () => {
+																try {
+																	await updateDocument({
+																		id,
+																		isPublished: false,
+																	});
+																	toast.success("Page unshared");
+																} catch {
+																	toast.error(
+																		"Failed to update sharing settings",
+																	);
+																}
+															});
+														}}
+													>
+														<Lock className="text-muted-foreground" />
+														<span>Private</span>
+														{!data.isPublished && <Check className="ml-auto" />}
+													</DropdownMenuItem>
+													<DropdownMenuItem
+														onClick={() => {
+															startTransition(async () => {
+																try {
+																	await updateDocument({
+																		id,
+																		isPublished: true,
+																	});
+																	toast.success("Page shared");
+																} catch {
+																	toast.error(
+																		"Failed to update sharing settings",
+																	);
+																}
+															});
+														}}
+													>
+														<Globe className="text-muted-foreground" />
+														<span>Public</span>
+														{data.isPublished && <Check className="ml-auto" />}
+													</DropdownMenuItem>
+												</DropdownMenuSubContent>
+											</DropdownMenuSub>
+											<DropdownMenuItem
+												onClick={() => {
+													startTransition(async () => {
+														const newId = await duplicateDocument({ id });
+														toast.success("Page duplicated");
+														navigate({
+															to: "/documents/$documentId",
+															params: { documentId: newId },
+														});
+													});
+												}}
+											>
+												<Copy className="text-muted-foreground" />
+												<span>Duplicate</span>
+											</DropdownMenuItem>
+											<DropdownMenuItem
+												onClick={() => {
+													setOpenMenuId(null);
+													preventMenuCloseAutoFocusIdRef.current = id;
+													setRenameOriginalValue(data.itemName);
+													setRenameValue(data.itemName);
+													setRenameOpenId(id);
+												}}
+											>
+												<Pencil className="text-muted-foreground" />
+												<span>Rename</span>
+											</DropdownMenuItem>
+											<DropdownMenuItem
+												onClick={() => {
+													const path = data.isPublished ? "share" : "documents";
+													const url = `${window.location.origin}/${path}/${id}`;
+													navigator.clipboard.writeText(url);
+													toast.success(
+														data.isPublished
+															? "Page share link copied"
+															: "Page link copied",
+													);
+												}}
+											>
+												<LinkIcon className="text-muted-foreground" />
+												<span>Copy link</span>
+											</DropdownMenuItem>
+											<DropdownMenuItem
+												onClick={() => {
+													startTransition(async () => {
+														const added = await toggleFavorite({
+															documentId: id,
+														});
+														toast.success(
+															added ? "Page starred" : "Page unstarred",
+														);
+													});
+												}}
+											>
+												<Star className="text-muted-foreground" />
+												<span>{isFavorite ? "Unstar" : "Star"}</span>
+											</DropdownMenuItem>
+											<DropdownMenuSub>
+												<DropdownMenuSubTrigger>
+													<CornerUpRight className="text-muted-foreground" />
+													<span>Move to</span>
+												</DropdownMenuSubTrigger>
+												<DropdownMenuSubContent className="w-80 rounded-lg p-0">
+													<Command className="rounded-none bg-transparent">
+														<CommandInput
+															placeholder="Move page to..."
+															autoFocus
+														/>
+														<CommandList className="max-h-[360px]">
+															<CommandEmpty>No results found.</CommandEmpty>
+															<CommandGroup heading="Locations">
+																{(() => {
+																	const descendants = collectDescendantIds(
+																		String(id),
+																		treeData,
+																	);
+																	const candidates = [...documents]
+																		.filter(
+																			(d) =>
+																				d._id !== id &&
+																				!descendants.has(String(d._id)),
+																		)
+																		.sort(compareSidebarDocuments);
+
+																	return candidates.map((target) => (
+																		<CommandItem
+																			key={String(target._id)}
+																			value={`${target.title || "Untitled"} ${String(target._id)}`}
+																			onSelect={() => {
+																				const newParentId = target._id;
+																				const newOrder = documents.filter(
+																					(d) =>
+																						String(d.parentId ?? null) ===
+																							String(newParentId) &&
+																						d._id !== id,
+																				).length;
+																				setExpandedItems((prev) => {
+																					const key = String(newParentId);
+																					if (prev.includes(key)) return prev;
+																					return [...prev, key];
+																				});
+																				setOpenMenuId(null);
+																				startTransition(async () => {
+																					try {
+																						await reorderDocument({
+																							id,
+																							newParentId,
+																							newOrder,
+																						});
+																						toast.success("Page moved");
+																					} catch {
+																						toast.error("Failed to move page");
+																					}
+																				});
+																			}}
+																		>
+																			{target.icon ? (
+																				<span className="text-base leading-none">
+																					{target.icon}
+																				</span>
+																			) : (
+																				<FileText className="text-muted-foreground" />
+																			)}
+																			<span className="truncate">
+																				{target.title || "Untitled"}
+																			</span>
+																		</CommandItem>
+																	));
+																})()}
+															</CommandGroup>
+														</CommandList>
+													</Command>
+												</DropdownMenuSubContent>
+											</DropdownMenuSub>
+											<DropdownMenuItem
+												onClick={() => {
+													const url = `${window.location.origin}/documents/${id}`;
+													window.open(url, "_blank", "noopener,noreferrer");
+												}}
+											>
+												<ArrowUpRight className="text-muted-foreground" />
+												<span>Open in new tab</span>
+											</DropdownMenuItem>
+											<DropdownMenuSeparator />
+											<DropdownMenuItem
+												onClick={() => {
+													startTransition(async () => {
+														if (isActive) {
+															navigate({ to: "/", replace: true });
+														}
+														try {
+															await archiveDocument({ id });
+															toast.success("Page moved to trash");
+														} catch (_error) {
+															toast.error("Failed to move page to trash");
+														}
+													});
+												}}
+												className="text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"
+											>
+												<Trash2 className="text-destructive dark:text-red-500" />
+												<span>Move to trash</span>
+											</DropdownMenuItem>
+										</DropdownMenuContent>
+									</DropdownMenu>
 									<button
 										type="button"
-										className="absolute right-7 top-1/2 -translate-y-1/2 opacity-0 group-hover/menu-item:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
+										className="absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/menu-item:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
 										onPointerDown={(e) => {
 											e.stopPropagation();
 										}}
-									>
-										<MoreHorizontal className="size-4" />
-										<span className="sr-only">More</span>
-									</button>
-								</DropdownMenuTrigger>
-								<DropdownMenuContent
-									className="w-56 rounded-lg"
-									side={isMobile ? "bottom" : "right"}
-									align={isMobile ? "end" : "start"}
-								>
-									<DropdownMenuSub>
-										<DropdownMenuSubTrigger>
-											<Share2 className="text-muted-foreground" />
-											<span>Share</span>
-										</DropdownMenuSubTrigger>
-										<DropdownMenuSubContent className="w-56 rounded-lg">
-											<DropdownMenuItem
-												onClick={() => {
-													startTransition(async () => {
-														try {
-															await updateDocument({ id, isPublished: false });
-															toast.success("Page unshared");
-														} catch {
-															toast.error("Failed to update sharing settings");
-														}
-													});
-												}}
-											>
-												<Lock className="text-muted-foreground" />
-												<span>Private</span>
-												{!data.isPublished && <Check className="ml-auto" />}
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												onClick={() => {
-													startTransition(async () => {
-														try {
-															await updateDocument({ id, isPublished: true });
-															toast.success("Page shared");
-														} catch {
-															toast.error("Failed to update sharing settings");
-														}
-													});
-												}}
-											>
-												<Globe className="text-muted-foreground" />
-												<span>Public</span>
-												{data.isPublished && <Check className="ml-auto" />}
-											</DropdownMenuItem>
-										</DropdownMenuSubContent>
-									</DropdownMenuSub>
-									<DropdownMenuItem
-										onClick={() => {
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
 											startTransition(async () => {
-												const newId = await duplicateDocument({ id });
-												toast.success("Page duplicated");
-												navigate({
-													to: "/documents/$documentId",
-													params: { documentId: newId },
-												});
-											});
-										}}
-									>
-										<Copy className="text-muted-foreground" />
-										<span>Duplicate</span>
-									</DropdownMenuItem>
-									<DropdownMenuItem
-										onClick={() => {
-											const path = data.isPublished ? "share" : "documents";
-											const url = `${window.location.origin}/${path}/${id}`;
-											navigator.clipboard.writeText(url);
-											toast.success(
-												data.isPublished ? "Share link copied" : "Link copied",
-											);
-										}}
-									>
-										<LinkIcon className="text-muted-foreground" />
-										<span>Copy link</span>
-									</DropdownMenuItem>
-									<DropdownMenuItem
-										onClick={() => {
-											startTransition(async () => {
-												const added = await toggleFavorite({ documentId: id });
-												toast.success(
-													added ? "Page starred" : "Page unstarred",
-												);
-											});
-										}}
-									>
-										<Star className="text-muted-foreground" />
-										<span>{isFavorite ? "Unstar" : "Star"}</span>
-									</DropdownMenuItem>
-									<DropdownMenuSub>
-										<DropdownMenuSubTrigger>
-											<CornerUpRight className="text-muted-foreground" />
-											<span>Move to</span>
-										</DropdownMenuSubTrigger>
-										<DropdownMenuSubContent className="w-80 rounded-lg p-0">
-											<Command className="rounded-none bg-transparent">
-												<CommandInput placeholder="Move page to..." autoFocus />
-												<CommandList className="max-h-[360px]">
-													<CommandEmpty>No results found.</CommandEmpty>
-													<CommandGroup heading="Locations">
-														{(() => {
-															const descendants = collectDescendantIds(
-																String(id),
-																treeData,
-															);
-															const candidates = [...documents]
-																.filter(
-																	(d) =>
-																		d._id !== id &&
-																		!descendants.has(String(d._id)),
-																)
-																.sort(compareSidebarDocuments);
-
-															return candidates.map((target) => (
-																<CommandItem
-																	key={String(target._id)}
-																	value={`${target.title || "Untitled"} ${String(target._id)}`}
-																	onSelect={() => {
-																		const newParentId = target._id;
-																		const newOrder = documents.filter(
-																			(d) =>
-																				String(d.parentId ?? null) ===
-																					String(newParentId) && d._id !== id,
-																		).length;
-																		setExpandedItems((prev) => {
-																			const key = String(newParentId);
-																			if (prev.includes(key)) return prev;
-																			return [...prev, key];
-																		});
-																		setOpenMenuId(null);
-																		startTransition(async () => {
-																			try {
-																				await reorderDocument({
-																					id,
-																					newParentId,
-																					newOrder,
-																				});
-																				toast.success("Page moved");
-																			} catch {
-																				toast.error("Failed to move page");
-																			}
-																		});
-																	}}
-																>
-																	{target.icon ? (
-																		<span className="text-base leading-none">
-																			{target.icon}
-																		</span>
-																	) : (
-																		<FileText className="text-muted-foreground" />
-																	)}
-																	<span className="truncate">
-																		{target.title || "Untitled"}
-																	</span>
-																</CommandItem>
-															));
-														})()}
-													</CommandGroup>
-												</CommandList>
-											</Command>
-										</DropdownMenuSubContent>
-									</DropdownMenuSub>
-									<DropdownMenuItem
-										onClick={() => {
-											const url = `${window.location.origin}/documents/${id}`;
-											window.open(url, "_blank", "noopener,noreferrer");
-										}}
-									>
-										<ArrowUpRight className="text-muted-foreground" />
-										<span>Open in new tab</span>
-									</DropdownMenuItem>
-									<DropdownMenuSeparator />
-									<DropdownMenuItem
-										onClick={() => {
-											startTransition(async () => {
-												if (isActive) {
-													navigate({ to: "/", replace: true });
-												}
 												try {
-													await archiveDocument({ id });
-													toast.success("Page moved to trash");
-												} catch (_error) {
-													toast.error("Failed to move page to trash");
+													const newId = await createDocument({
+														workspaceId,
+														parentId: id,
+													});
+													setExpandedItems((prev) => {
+														const key = String(id);
+														if (prev.includes(key)) return prev;
+														return [...prev, key];
+													});
+													navigate({
+														to: "/documents/$documentId",
+														params: { documentId: newId },
+													});
+												} catch {
+													toast.error("Failed to create page");
 												}
 											});
 										}}
-										className="text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"
 									>
-										<Trash2 className="text-destructive dark:text-red-500" />
-										<span>Move to trash</span>
-									</DropdownMenuItem>
-								</DropdownMenuContent>
-							</DropdownMenu>
-							<button
-								type="button"
-								className="absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/menu-item:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
-								onPointerDown={(e) => {
-									e.stopPropagation();
-								}}
-								onClick={(e) => {
-									e.preventDefault();
-									e.stopPropagation();
-									startTransition(async () => {
-										try {
-											const newId = await createDocument({
-												workspaceId,
-												parentId: id,
-											});
-											setExpandedItems((prev) => {
-												const key = String(id);
-												if (prev.includes(key)) return prev;
-												return [...prev, key];
-											});
-											navigate({
-												to: "/documents/$documentId",
-												params: { documentId: newId },
-											});
-										} catch {
-											toast.error("Failed to create page");
-										}
-									});
-								}}
+										<Plus className="size-4" />
+										<span className="sr-only">Add page inside</span>
+									</button>
+								</div>
+							</PopoverAnchor>
+							<PopoverContent
+								align="start"
+								side="right"
+								sideOffset={10}
+								className="w-96 rounded-xl p-2"
 							>
-								<Plus className="size-4" />
-								<span className="sr-only">Add page inside</span>
-							</button>
-						</div>
+								<div className="flex items-center gap-2">
+									<div className="bg-muted/30 flex size-10 items-center justify-center rounded-lg border">
+										{data.icon ? (
+											<span className="text-lg leading-none">{data.icon}</span>
+										) : (
+											<FileText className="text-muted-foreground size-5" />
+										)}
+									</div>
+									<TitleEditInput
+										autoFocus
+										inputRef={renameInputRef}
+										value={renameValue}
+										onValueChange={setRenameValue}
+										onCommit={() => {
+											if (!renameOriginalValue && !renameValue) return;
+											commitRename();
+										}}
+										onCancel={() => {
+											setRenameOpenId(null);
+											setRenameOriginalValue("");
+											setRenameValue("");
+										}}
+									/>
+								</div>
+							</PopoverContent>
+						</Popover>
 					</SidebarMenuItem>
 					{item.isExpanded() && !hasChildren && (
 						<SidebarMenuItem>

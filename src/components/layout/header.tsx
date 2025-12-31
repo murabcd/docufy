@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { Plus, WandSparkles } from "lucide-react";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { FileText, Plus, WandSparkles } from "lucide-react";
+import { Fragment, useCallback, useEffect, useState } from "react";
+import { TitleEditInput } from "@/components/document/title-edit-input";
 import { NavActions } from "@/components/nav/nav-actions";
 import {
 	Breadcrumb,
@@ -11,7 +12,11 @@ import {
 	BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+	Popover,
+	PopoverAnchor,
+	PopoverContent,
+} from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import {
@@ -26,6 +31,7 @@ type HeaderProps = {
 	title?: string;
 	documentId?: Id<"documents">;
 	documentTitle?: string;
+	documentIcon?: string;
 	ancestors?: Array<{ _id: Id<"documents">; title: string }>;
 	onTitleChange?: (title: string) => void;
 	updatedAt?: number;
@@ -35,13 +41,13 @@ export function Header({
 	title,
 	documentId,
 	documentTitle,
+	documentIcon,
 	ancestors = [],
 	onTitleChange,
 	updatedAt,
 }: HeaderProps) {
 	const { toggleRightSidebar, state, isMobile } = useSidebar();
 	const { createAndNavigate, isCreating } = useCreateDocument();
-	const titleInputRef = useRef<HTMLInputElement>(null);
 	const [isEditingTitle, setIsEditingTitle] = useState(false);
 	const [titleValue, setTitleValue] = useState(
 		documentTitle || title || "Untitled",
@@ -90,38 +96,11 @@ export function Header({
 	const enableTitleEdit = useCallback(() => {
 		if (!canEditTitle) return; // Can't edit simple title mode
 		setIsEditingTitle(true);
-		setTimeout(() => {
-			titleInputRef.current?.focus();
-			titleInputRef.current?.setSelectionRange(
-				0,
-				titleInputRef.current.value.length,
-			);
-		}, 0);
 	}, [canEditTitle]);
 
 	const disableTitleEdit = useCallback(() => {
 		exitTitleEdit(true);
 	}, [exitTitleEdit]);
-
-	const onTitleChangeHandler = useCallback(
-		(event: React.ChangeEvent<HTMLInputElement>) => {
-			setTitleValue(event.target.value);
-		},
-		[],
-	);
-
-	const onTitleKeyDown = useCallback(
-		(event: React.KeyboardEvent<HTMLInputElement>) => {
-			if (event.key === "Enter") {
-				event.preventDefault();
-				exitTitleEdit(true);
-			} else if (event.key === "Escape") {
-				event.preventDefault();
-				exitTitleEdit(false);
-			}
-		},
-		[exitTitleEdit],
-	);
 
 	const displayTitle = documentTitle || title || "Untitled";
 
@@ -190,28 +169,60 @@ export function Header({
 									</Fragment>
 								))}
 								<BreadcrumbItem>
-									{isEditingTitle && canEditTitle ? (
-										<Input
-											ref={titleInputRef}
-											onBlur={disableTitleEdit}
-											onChange={onTitleChangeHandler}
-											onKeyDown={onTitleKeyDown}
-											value={titleValue}
-											className="h-auto px-1 py-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 border-0 bg-transparent dark:bg-transparent shadow-none rounded outline-none"
-											style={{ minWidth: "100px", maxWidth: "300px" }}
-										/>
-									) : canEditTitle ? (
-										<Tooltip>
-											<TooltipTrigger asChild>
-												<BreadcrumbPage
-													className="line-clamp-1 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors"
-													onClick={enableTitleEdit}
-												>
-													{displayTitle}
-												</BreadcrumbPage>
-											</TooltipTrigger>
-											<TooltipContent>Edit title</TooltipContent>
-										</Tooltip>
+									{canEditTitle ? (
+										<Popover
+											open={isEditingTitle}
+											onOpenChange={(open) => {
+												if (open) {
+													enableTitleEdit();
+													return;
+												}
+												setIsEditingTitle(false);
+											}}
+										>
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<PopoverAnchor asChild>
+														<button
+															type="button"
+															aria-current="page"
+															className="line-clamp-1 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors"
+															onClick={enableTitleEdit}
+														>
+															<BreadcrumbPage className="line-clamp-1">
+																{displayTitle}
+															</BreadcrumbPage>
+														</button>
+													</PopoverAnchor>
+												</TooltipTrigger>
+												<TooltipContent>Edit title</TooltipContent>
+											</Tooltip>
+											<PopoverContent
+												align="start"
+												side="bottom"
+												sideOffset={8}
+												className="w-96 rounded-xl p-2"
+											>
+												<div className="flex items-center gap-2">
+													<div className="bg-muted/30 flex size-10 items-center justify-center rounded-lg border">
+														{documentIcon ? (
+															<span className="text-lg leading-none">
+																{documentIcon}
+															</span>
+														) : (
+															<FileText className="text-muted-foreground size-5" />
+														)}
+													</div>
+													<TitleEditInput
+														autoFocus
+														value={titleValue}
+														onValueChange={setTitleValue}
+														onCommit={disableTitleEdit}
+														onCancel={() => exitTitleEdit(false)}
+													/>
+												</div>
+											</PopoverContent>
+										</Popover>
 									) : (
 										<BreadcrumbPage className="line-clamp-1">
 											{displayTitle}
@@ -221,28 +232,60 @@ export function Header({
 							</>
 						) : (
 							<BreadcrumbItem>
-								{isEditingTitle && canEditTitle ? (
-									<Input
-										ref={titleInputRef}
-										onBlur={disableTitleEdit}
-										onChange={onTitleChangeHandler}
-										onKeyDown={onTitleKeyDown}
-										value={titleValue}
-										className="h-auto px-1 py-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 border-0 bg-transparent dark:bg-transparent shadow-none rounded outline-none"
-										style={{ minWidth: "100px", maxWidth: "300px" }}
-									/>
-								) : canEditTitle ? (
-									<Tooltip>
-										<TooltipTrigger asChild>
-											<BreadcrumbPage
-												className="line-clamp-1 cursor-pointer rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors"
-												onClick={enableTitleEdit}
-											>
-												{displayTitle}
-											</BreadcrumbPage>
-										</TooltipTrigger>
-										<TooltipContent>Edit title</TooltipContent>
-									</Tooltip>
+								{canEditTitle ? (
+									<Popover
+										open={isEditingTitle}
+										onOpenChange={(open) => {
+											if (open) {
+												enableTitleEdit();
+												return;
+											}
+											setIsEditingTitle(false);
+										}}
+									>
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<PopoverAnchor asChild>
+													<button
+														type="button"
+														aria-current="page"
+														className="line-clamp-1 cursor-pointer rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors"
+														onClick={enableTitleEdit}
+													>
+														<BreadcrumbPage className="line-clamp-1">
+															{displayTitle}
+														</BreadcrumbPage>
+													</button>
+												</PopoverAnchor>
+											</TooltipTrigger>
+											<TooltipContent>Edit title</TooltipContent>
+										</Tooltip>
+										<PopoverContent
+											align="start"
+											side="bottom"
+											sideOffset={8}
+											className="w-96 rounded-xl p-2"
+										>
+											<div className="flex items-center gap-2">
+												<div className="bg-muted/30 flex size-10 items-center justify-center rounded-lg border">
+													{documentIcon ? (
+														<span className="text-lg leading-none">
+															{documentIcon}
+														</span>
+													) : (
+														<FileText className="text-muted-foreground size-5" />
+													)}
+												</div>
+												<TitleEditInput
+													autoFocus
+													value={titleValue}
+													onValueChange={setTitleValue}
+													onCommit={disableTitleEdit}
+													onCancel={() => exitTitleEdit(false)}
+												/>
+											</div>
+										</PopoverContent>
+									</Popover>
 								) : (
 									<BreadcrumbPage className="line-clamp-1">
 										{displayTitle}

@@ -71,7 +71,7 @@ export function NavFavorites({
 
 	const handleCopyLink = async (url: string) => {
 		await navigator.clipboard.writeText(url);
-		toast.success("Link copied");
+		toast.success("Page link copied");
 	};
 
 	return (
