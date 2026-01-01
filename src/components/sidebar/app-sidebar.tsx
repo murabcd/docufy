@@ -2,7 +2,6 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
 	Command,
-	FileText,
 	Home,
 	type LucideIcon,
 	Search,
@@ -166,28 +165,6 @@ export function AppSidebar({
 		});
 	}, [navMain, isHomeActive]);
 
-	// Transform favorites data to match Favorite interface
-	const favorites: Favorite[] = React.useMemo(() => {
-		if (propFavorites) {
-			return propFavorites;
-		}
-		if (!favoritesData) {
-			return [];
-		}
-		return favoritesData
-			.filter((fav) => fav.document !== null)
-			.map((fav) => {
-				const document = fav.document;
-				if (!document) return null;
-				return {
-					name: document.title ?? "Untitled",
-					url: `/documents/${fav.documentId}`,
-					icon: document.icon ?? FileText,
-				};
-			})
-			.filter((fav): fav is Favorite => fav !== null);
-	}, [favoritesData, propFavorites]);
-
 	const handleSelectDocument = (documentId: Id<"documents">) => {
 		setSearchOpen(false);
 		navigate({ to: "/documents/$documentId", params: { documentId } });
@@ -218,7 +195,10 @@ export function AppSidebar({
 					/>
 				</SidebarHeader>
 				<SidebarContent>
-					<NavFavorites favorites={favorites} />
+					<NavFavorites
+						favorites={propFavorites ?? []}
+						favoritesData={favoritesData ?? []}
+					/>
 					<NavTeamspaces teamspaces={teamspaces} />
 					<NavDocuments />
 					<NavShared />

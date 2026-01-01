@@ -61,7 +61,7 @@ export function TrashBanner({ documentId }: TrashBannerProps) {
 	return (
 		<>
 			<div className="w-full bg-destructive/10 text-center text-sm p-2 text-foreground flex items-center gap-x-2 justify-center">
-				<p>This page is in the Trash.</p>
+				<p>This page is in the Trash</p>
 				<Button size="sm" variant="outline" onClick={onRestore}>
 					Restore page
 				</Button>

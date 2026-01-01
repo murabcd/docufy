@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { CoverImage } from "@/components/document/cover-image";
 import { DocumentSkeleton } from "@/components/document/document-skeleton";
 import { DocumentTitle } from "@/components/document/document-title";
+import { PublishedBanner } from "@/components/document/published-banner";
 import { IconPicker } from "@/components/icons/icon-picker";
 import { Header } from "@/components/layout/header";
 import { AISidebar } from "@/components/sidebar/ai-sidebar";
@@ -531,6 +532,9 @@ function DocumentEditor() {
 					onTitleChange={onTitleChangeIfEditable}
 					updatedAt={document?.updatedAt}
 				/>
+				{document?.isPublished && !document.isArchived && (
+					<PublishedBanner documentId={documentId as Id<"documents">} />
+				)}
 				{document?.isArchived && (
 					<TrashBanner documentId={documentId as Id<"documents">} />
 				)}

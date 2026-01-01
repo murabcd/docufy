@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { FileText, Plus, WandSparkles } from "lucide-react";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ShareDialogModal } from "@/components/document/share-dialog-modal";
 import { TitleEditInput } from "@/components/document/title-edit-input";
 import { NavActions } from "@/components/nav/nav-actions";
 import {
@@ -50,6 +51,7 @@ export function Header({
 	const { toggleRightSidebar, state, isMobile } = useSidebar();
 	const { createAndNavigate, isCreating } = useCreateDocument();
 	const [isEditingTitle, setIsEditingTitle] = useState(false);
+	const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
 	const [titleValue, setTitleValue] = useState(
 		documentTitle || title || "Untitled",
 	);
@@ -325,6 +327,18 @@ export function Header({
 						</div>
 					</TooltipContent>
 				</Tooltip>
+				{documentId && (
+					<ShareDialogModal
+						open={isShareDialogOpen}
+						onOpenChange={setIsShareDialogOpen}
+						documentId={documentId}
+						trigger={
+							<Button variant="ghost" size="sm" className="h-8">
+								Share
+							</Button>
+						}
+					/>
+				)}
 				{documentId && (
 					<NavActions documentId={documentId} updatedAt={updatedAt} />
 				)}

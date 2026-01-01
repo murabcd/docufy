@@ -198,7 +198,7 @@ export function ProfileSettings({ onClose }: { onClose?: () => void }) {
 
 	return (
 		<div className="flex flex-col h-full">
-			<div className="grid gap-6 py-4 px-3 flex-grow">
+			<div className="grid gap-6 py-4 px-3 grow">
 				<div className="grid gap-2 items-center">
 					<Label htmlFor="avatar">Avatar</Label>
 					<div className="flex items-center gap-4">
@@ -260,7 +260,7 @@ export function ProfileSettings({ onClose }: { onClose?: () => void }) {
 					/>
 				</div>
 			</div>
-			<div className="flex justify-end gap-2 py-4 px-3 flex-shrink-0">
+			<div className="flex justify-end gap-2 py-4 px-3 shrink-0">
 				<Button
 					variant="outline"
 					onClick={() => {
