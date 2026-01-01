@@ -59,6 +59,12 @@ export default defineSchema({
 			"isArchived",
 			"updatedAt",
 		])
+		.index("by_workspace_isArchived_isPublished_updatedAt", [
+			"workspaceId",
+			"isArchived",
+			"isPublished",
+			"updatedAt",
+		])
 		.index("by_createdAt", ["createdAt"])
 		.index("by_parentId", ["parentId"])
 		.index("by_parentId_and_order", ["parentId", "order"])

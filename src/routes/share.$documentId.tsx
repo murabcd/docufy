@@ -13,6 +13,25 @@ import type { Id } from "../../convex/_generated/dataModel";
 export const Route = createFileRoute("/share/$documentId")({
 	component: ShareDocument,
 	pendingComponent: DocumentSkeleton,
+	validateSearch: (search: Record<string, unknown>) => {
+		const embedRaw = search.embed;
+		const titleRaw = search.title;
+		const embed =
+			embedRaw === "1" ||
+			embedRaw === "true" ||
+			embedRaw === 1 ||
+			embedRaw === true;
+		const title =
+			titleRaw === undefined ||
+			titleRaw === null ||
+			!(
+				titleRaw === "0" ||
+				titleRaw === "false" ||
+				titleRaw === 0 ||
+				titleRaw === false
+			);
+		return { embed, title };
+	},
 	loader: async ({ context, params }) => {
 		const { queryClient } = context;
 		await queryClient.ensureQueryData(
@@ -23,6 +42,7 @@ export const Route = createFileRoute("/share/$documentId")({
 
 function ShareDocument() {
 	const { documentId } = Route.useParams();
+	const { embed, title } = Route.useSearch();
 	const { data: document } = useSuspenseQuery(
 		documentsQueries.getPublished(documentId as Id<"documents">),
 	);
@@ -80,26 +100,37 @@ function ShareDocument() {
 					<LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
 				</>
 			)}
-			{document.coverImage ? (
-				<div className="w-full h-[35vh] bg-muted">
-					<img
-						src={document.coverImage}
-						alt="Cover"
-						className="w-full h-full object-cover"
-					/>
-				</div>
-			) : (
-				<div className="w-full h-[12vh]" />
-			)}
+			{!embed &&
+				(document.coverImage ? (
+					<div className="w-full h-[35vh] bg-muted">
+						<img
+							src={document.coverImage}
+							alt="Cover"
+							className="w-full h-full object-cover"
+						/>
+					</div>
+				) : (
+					<div className="w-full h-[12vh]" />
+				))}
 			<div className="mx-auto w-full max-w-4xl">
-				<div className="px-11 pt-10">
-					<div className="text-xs text-muted-foreground">Read-only</div>
-					{!!document.icon && (
-						<div className="text-6xl pt-4">{document.icon}</div>
-					)}
-					<h1 className="text-4xl font-semibold pt-4">{document.title}</h1>
-				</div>
-				<div className="pb-40 pt-6">
+				{(!embed || title) && (
+					<div className={embed ? "px-6 pt-6" : "px-11 pt-10"}>
+						{!embed && (
+							<div className="text-xs text-muted-foreground">Read-only</div>
+						)}
+						{!!document.icon && !embed && (
+							<div className="text-6xl pt-4">{document.icon}</div>
+						)}
+						<h1
+							className={
+								embed ? "text-2xl font-semibold" : "text-4xl font-semibold pt-4"
+							}
+						>
+							{document.title}
+						</h1>
+					</div>
+				)}
+				<div className={embed ? "pb-8 pt-4" : "pb-40 pt-6"}>
 					<TiptapEditor
 						editorOptions={{
 							content,

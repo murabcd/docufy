@@ -998,6 +998,64 @@ export const listSidebar = query({
 	},
 });
 
+export const listSharedSidebar = query({
+	args: {
+		workspaceId: v.optional(v.id("workspaces")),
+		limit: v.optional(v.number()),
+	},
+	returns: v.array(
+		v.object({
+			_id: v.id("documents"),
+			_creationTime: v.number(),
+			title: v.string(),
+			parentId: v.optional(v.id("documents")),
+			order: v.optional(v.number()),
+			icon: v.optional(v.string()),
+			isPublished: v.boolean(),
+			createdAt: v.number(),
+			updatedAt: v.number(),
+		}),
+	),
+	handler: async (ctx, args) => {
+		const userId = await getUserId(ctx);
+		if (!userId) return [];
+		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
+		if (!workspaceId) return [];
+		const membership = await ctx.db
+			.query("members")
+			.withIndex("by_workspace_user", (q) =>
+				q.eq("workspaceId", workspaceId).eq("userId", userId),
+			)
+			.unique();
+		if (!membership) return [];
+
+		const limit = Math.max(1, Math.min(args.limit ?? 10_000, 25_000));
+
+		const docs = await ctx.db
+			.query("documents")
+			.withIndex("by_workspace_isArchived_isPublished_updatedAt", (q) =>
+				q
+					.eq("workspaceId", workspaceId)
+					.eq("isArchived", false)
+					.eq("isPublished", true),
+			)
+			.order("desc")
+			.take(limit);
+
+		return docs.map((doc) => ({
+			_id: doc._id,
+			_creationTime: doc._creationTime,
+			title: doc.title,
+			parentId: doc.parentId,
+			order: doc.order,
+			icon: doc.icon,
+			isPublished: doc.isPublished,
+			createdAt: doc.createdAt,
+			updatedAt: doc.updatedAt,
+		}));
+	},
+});
+
 export const listIndex = query({
 	args: {
 		workspaceId: v.optional(v.id("workspaces")),

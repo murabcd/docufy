@@ -15,6 +15,14 @@ export const documentsQueries = {
 			workspaceId: args.workspaceId,
 			limit: args.limit,
 		}),
+	listSharedSidebar: (args: {
+		workspaceId?: Id<"workspaces">;
+		limit?: number;
+	}) =>
+		convexQuery(api.documents.listSharedSidebar, {
+			workspaceId: args.workspaceId,
+			limit: args.limit,
+		}),
 
 	list: (args: {
 		workspaceId?: Id<"workspaces">;

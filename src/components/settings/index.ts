@@ -4,5 +4,6 @@ export { DataControlsSettings } from "@/components/settings/data-controls-settin
 export { DocAISettings } from "@/components/settings/doc-ai-settings";
 export { ImportSettings } from "@/components/settings/import-settings";
 export { ProfileSettings } from "@/components/settings/profile-settings";
+export { PublicPagesSettings } from "@/components/settings/public-pages-settings";
 export { TeamspacesSettings } from "@/components/settings/teamspaces-settings";
 export { WorkspacesSettings } from "@/components/settings/workspaces-settings";

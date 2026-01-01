@@ -2,6 +2,7 @@ import {
 	Database,
 	Download,
 	FolderKanban,
+	Globe,
 	Link2,
 	Paintbrush,
 	User,
@@ -16,6 +17,7 @@ import {
 	DocAISettings,
 	ImportSettings,
 	ProfileSettings,
+	PublicPagesSettings,
 	TeamspacesSettings,
 	WorkspacesSettings,
 } from "@/components/settings";
@@ -51,6 +53,7 @@ type SettingsPage =
 	| "Workspaces"
 	| "Teamspaces"
 	| "Doc AI"
+	| "Public pages"
 	| "Import"
 	| "Data controls";
 
@@ -61,6 +64,7 @@ const settingsNav: { name: SettingsPage; icon: React.ElementType }[] = [
 	{ name: "Workspaces", icon: FolderKanban },
 	{ name: "Teamspaces", icon: Users },
 	{ name: "Doc AI", icon: Wand2 },
+	{ name: "Public pages", icon: Globe },
 	{ name: "Import", icon: Download },
 	{ name: "Data controls", icon: Database },
 ];
@@ -68,23 +72,31 @@ const settingsNav: { name: SettingsPage; icon: React.ElementType }[] = [
 interface SettingsDialogProps {
 	open?: boolean;
 	onOpenChange?: (open: boolean) => void;
+	initialPage?: SettingsPage;
 }
 
 export function SettingsDialog({
 	open: controlledOpen,
 	onOpenChange,
+	initialPage,
 }: SettingsDialogProps) {
 	const [internalOpen, setInternalOpen] = React.useState(false);
-	const [activePage, setActivePage] = React.useState<SettingsPage>("Profile");
+	const [activePage, setActivePage] = React.useState<SettingsPage>(
+		initialPage ?? "Profile",
+	);
 	const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
 	const setOpen = onOpenChange || setInternalOpen;
 
-	// Reset to Profile when dialog opens
+	// Set initial page when dialog opens or initialPage changes
 	React.useEffect(() => {
 		if (open) {
-			setActivePage("Profile");
+			if (initialPage) {
+				setActivePage(initialPage);
+			} else {
+				setActivePage("Profile");
+			}
 		}
-	}, [open]);
+	}, [open, initialPage]);
 
 	const renderSettingsContent = () => {
 		switch (activePage) {
@@ -100,6 +112,8 @@ export function SettingsDialog({
 				return <TeamspacesSettings />;
 			case "Doc AI":
 				return <DocAISettings />;
+			case "Public pages":
+				return <PublicPagesSettings />;
 			case "Import":
 				return <ImportSettings />;
 			case "Data controls":
