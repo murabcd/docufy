@@ -6,6 +6,8 @@ export default defineSchema({
 		name: v.string(),
 		ownerId: v.string(),
 		isPrivate: v.optional(v.boolean()),
+		publicHomepageDocumentId: v.optional(v.id("documents")),
+		alwaysShowPublishedBanner: v.optional(v.boolean()),
 		createdAt: v.number(),
 		updatedAt: v.number(),
 	}).index("by_owner", ["ownerId"]),
@@ -31,6 +33,23 @@ export default defineSchema({
 		isArchived: v.boolean(),
 		archivedAt: v.optional(v.number()),
 		isPublished: v.boolean(),
+		webLinkEnabled: v.optional(v.boolean()),
+		isTemplate: v.optional(v.boolean()),
+		generalAccess: v.optional(
+			v.union(v.literal("private"), v.literal("workspace"), v.literal("public")),
+		),
+		workspaceAccessLevel: v.optional(
+			v.union(
+				v.literal("full"),
+				v.literal("edit"),
+				v.literal("comment"),
+				v.literal("view"),
+			),
+		),
+		publicAccessLevel: v.optional(
+			v.union(v.literal("edit"), v.literal("comment"), v.literal("view")),
+		),
+		publicLinkExpiresAt: v.optional(v.number()),
 		includeInAi: v.boolean(),
 		lastEditedAt: v.number(),
 		lastEmbeddedAt: v.optional(v.number()),
@@ -47,6 +66,12 @@ export default defineSchema({
 			"workspaceId",
 			"parentId",
 			"isArchived",
+		])
+		.index("by_workspace_user_isArchived_updatedAt", [
+			"workspaceId",
+			"userId",
+			"isArchived",
+			"updatedAt",
 		])
 		.index("by_workspaceId_and_parentId_and_isArchived_and_isPublished", [
 			"workspaceId",
@@ -78,6 +103,24 @@ export default defineSchema({
 			searchField: "searchableText",
 			filterFields: ["workspaceId", "isArchived"],
 		}),
+	documentPermissions: defineTable({
+		documentId: v.id("documents"),
+		workspaceId: v.id("workspaces"),
+		granteeUserId: v.string(),
+		accessLevel: v.union(
+			v.literal("full"),
+			v.literal("edit"),
+			v.literal("comment"),
+			v.literal("view"),
+		),
+		grantedByUserId: v.string(),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_document", ["documentId"])
+		.index("by_document_grantee", ["documentId", "granteeUserId"])
+		.index("by_workspace_grantee", ["workspaceId", "granteeUserId"])
+		.index("by_grantee", ["granteeUserId"]),
 	chunks: defineTable({
 		documentId: v.id("documents"),
 		blockId: v.optional(v.string()),
