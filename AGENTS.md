@@ -62,4 +62,4 @@ Use Bun (preferred; see `bun.lock`):
 
 ## ExecPlans
 
-When writing complex features or significant refactors, use an ExecPlan (as described in `PLANS.md`) from design to implementation.
+When writing complex features or significant refactors, use an ExecPlan (as described in `.agent/PLANS.md`) from design to implementation.
