@@ -57,7 +57,6 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
-import { optimisticUpdateDocument } from "@/lib/optimistic-documents";
 import { cn } from "@/lib/utils";
 import { authQueries, documentsQueries } from "@/queries";
 import { api } from "../../../convex/_generated/api";
@@ -68,6 +67,7 @@ interface ShareDialogModalProps {
 	onOpenChange: (open: boolean) => void;
 	documentId: Id<"documents">;
 	trigger?: React.ReactNode;
+	initialTab?: TabType;
 }
 
 type AccessLevel = "private" | "workspace" | "public";
@@ -86,11 +86,12 @@ export function ShareDialogModal({
 	onOpenChange,
 	documentId,
 	trigger,
+	initialTab,
 }: ShareDialogModalProps) {
 	const [email, setEmail] = useState("");
 	const [pending, setPending] = useState(false);
 	const [accessLevel, setAccessLevel] = useState<AccessLevel>("private");
-	const [activeTab, setActiveTab] = useState<TabType>("share");
+	const [activeTab, setActiveTab] = useState<TabType>(initialTab ?? "share");
 	const [publishView, setPublishView] = useState<"main" | "embed" | "social">(
 		"main",
 	);
@@ -114,67 +115,156 @@ export function ShareDialogModal({
 	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 	const { workspaces, activeWorkspaceId } = useActiveWorkspace();
 	const isPublished = document?.isPublished ?? false;
+	const webLinkEnabled = document?.webLinkEnabled === true;
 	const [embedShowTitle, setEmbedShowTitle] = useState(true);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const origin = typeof window === "undefined" ? "" : window.location.origin;
 	const hostname =
 		typeof window === "undefined" ? "" : window.location.hostname;
-	const shareUrl = `${origin}/share/${documentId}`;
+	const unlistedShareUrl = `${origin}/share/${documentId}`;
+	const publishedUrl = `${origin}/public/${documentId}`;
+	const documentUrl = `${origin}/documents/${documentId}`;
 
 	const activeWorkspace = workspaces.find((w) => w._id === activeWorkspaceId);
 	const workspaceName = activeWorkspace?.name || "Workspace";
+	const internalGeneralAccess =
+		document?.generalAccess === "workspace" ? "workspace" : "private";
+
+	const effectiveAccessLevel = (() => {
+		if (webLinkEnabled) return "public";
+		const generalAccess = document?.generalAccess;
+		if (generalAccess === "workspace") return "workspace";
+		return "private";
+	})();
 
 	// Sync access level with document state when popover opens or document changes
 	useEffect(() => {
 		if (open) {
-			setAccessLevel(isPublished ? "public" : "private");
+			setAccessLevel(effectiveAccessLevel);
+			setActiveTab(initialTab ?? "share");
+			setWorkspacePermission(document?.workspaceAccessLevel ?? "full");
+			setPublicPermission(document?.publicAccessLevel ?? "view");
+			setIsTemplate(document?.isTemplate ?? false);
+			const expiresAt = document?.publicLinkExpiresAt;
+			if (expiresAt) {
+				setLinkExpires("custom");
+				setCustomLinkExpiresAt(toLocalDateTimeInputValue(new Date(expiresAt)));
+			} else {
+				setLinkExpires("never");
+				setCustomLinkExpiresAt("");
+			}
 			setEmail("");
 			setPublishView("main");
 		}
-	}, [isPublished, open]);
+	}, [document, effectiveAccessLevel, initialTab, open]);
 
 	useEffect(() => {
 		setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
 	}, []);
 
-	const updateDocument = useMutation(api.documents.update).withOptimisticUpdate(
-		optimisticUpdateDocument,
-	);
+	const setGeneralAccess = useMutation(api.documents.setGeneralAccess);
+	const setPublishSettings = useMutation(api.documents.setPublishSettings);
+	const inviteToDocument = useMutation(api.documents.inviteToDocument);
 
-	const handleCopyLink = async () => {
-		const url = isPublished ? shareUrl : `${origin}/documents/${documentId}`;
+	const copyLink = async (url: string) => {
 		await navigator.clipboard.writeText(url);
 		toast.success("Link copied");
 	};
 
-	const handleSetAccessLevel = async (
-		level: AccessLevel,
-		updatePublished = false,
+	const handleCopyShareLink = async () => {
+		await copyLink(webLinkEnabled ? unlistedShareUrl : documentUrl);
+	};
+
+	const handleCopyPublishedLink = async () => {
+		await copyLink(publishedUrl);
+	};
+
+	const computeExpiresAt = (
+		nextLinkExpires: typeof linkExpires,
+		customValue: string,
 	) => {
+		if (nextLinkExpires === "never") return null;
+		const now = Date.now();
+		if (nextLinkExpires === "1h") return now + 60 * 60 * 1000;
+		if (nextLinkExpires === "1d") return now + 24 * 60 * 60 * 1000;
+		if (nextLinkExpires === "7d") return now + 7 * 24 * 60 * 60 * 1000;
+		if (nextLinkExpires === "30d") return now + 30 * 24 * 60 * 60 * 1000;
+		const parsed = new Date(customValue);
+		return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+	};
+
+	const commitGeneralAccess = async (
+		nextAccess: AccessLevel,
+		opts?: {
+			workspacePermission?: typeof workspacePermission;
+			publicPermission?: typeof publicPermission;
+			linkExpires?: typeof linkExpires;
+			customLinkExpiresAt?: string;
+			webLinkEnabled?: boolean;
+		},
+	) => {
+		const nextWorkspacePermission =
+			opts?.workspacePermission ?? workspacePermission;
+		const nextPublicPermission = opts?.publicPermission ?? publicPermission;
+		const nextLinkExpires = opts?.linkExpires ?? linkExpires;
+		const nextCustomLinkExpiresAt =
+			opts?.customLinkExpiresAt ?? customLinkExpiresAt;
+		const nextWebLinkEnabled = opts?.webLinkEnabled ?? nextAccess === "public";
+		const nextGeneralAccess =
+			nextAccess === "workspace"
+				? "workspace"
+				: nextAccess === "private"
+					? "private"
+					: internalGeneralAccess;
+
+		setPending(true);
+		try {
+			await setGeneralAccess({
+				documentId,
+				generalAccess: nextGeneralAccess,
+				webLinkEnabled: nextWebLinkEnabled,
+				workspaceAccessLevel:
+					nextAccess === "workspace" ? nextWorkspacePermission : undefined,
+				publicAccessLevel:
+					nextAccess === "public" ? nextPublicPermission : undefined,
+				publicLinkExpiresAt:
+					nextAccess === "public"
+						? computeExpiresAt(nextLinkExpires, nextCustomLinkExpiresAt)
+						: undefined,
+			});
+		} finally {
+			setPending(false);
+		}
+	};
+
+	const handleSetAccessLevel = async (level: AccessLevel) => {
 		// Update local state immediately for responsive UI
 		setAccessLevel(level);
 		try {
-			// Only update isPublished if explicitly requested (from Publish tab)
-			// When changing access level in Share tab, don't change isPublished
-			// TODO: Add proper workspace-level sharing support
-			if (updatePublished) {
-				const isPublished = level === "public";
-				await updateDocument({
-					id: documentId,
-					isPublished,
+			if (level === "public") {
+				await commitGeneralAccess(level, {
+					webLinkEnabled: true,
+				});
+			} else {
+				await commitGeneralAccess(level, {
+					webLinkEnabled: false,
 				});
 			}
 			if (level === "public") {
-				toast.success("Page shared publicly");
+				toast.success("Link sharing enabled");
 			} else if (level === "workspace") {
 				toast.success(`Page shared with ${workspaceName}`);
 			} else {
 				toast.success("Page is now private");
 			}
-		} catch {
+		} catch (error) {
 			// Revert on error
-			setAccessLevel(isPublished ? "public" : "private");
-			toast.error("Failed to update sharing settings");
+			setAccessLevel(effectiveAccessLevel);
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Failed to update sharing settings",
+			);
 		}
 	};
 
@@ -194,7 +284,11 @@ export function ShareDialogModal({
 
 		setPending(true);
 		try {
-			// TODO: Implement invite functionality
+			await inviteToDocument({
+				documentId,
+				email: trimmedEmail,
+				accessLevel: "view",
+			});
 			toast.success("Invitation sent");
 			setEmail("");
 		} catch (error) {
@@ -203,6 +297,45 @@ export function ShareDialogModal({
 			);
 		} finally {
 			setPending(false);
+		}
+	};
+
+	const handlePublish = async () => {
+		try {
+			await setPublishSettings({ documentId, isPublished: true });
+			toast.success("Page published");
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Failed to publish");
+		}
+	};
+
+	const handleUnpublish = async () => {
+		try {
+			await setPublishSettings({ documentId, isPublished: false });
+			toast.success("Page unpublished");
+		} catch (error) {
+			toast.error(
+				error instanceof Error ? error.message : "Failed to unpublish",
+			);
+		}
+	};
+
+	const handleToggleTemplate = async (nextIsTemplate: boolean) => {
+		setIsTemplate(nextIsTemplate);
+		try {
+			await setPublishSettings({ documentId, isTemplate: nextIsTemplate });
+			toast.success(
+				nextIsTemplate
+					? "Template duplication enabled"
+					: "Template duplication disabled",
+			);
+		} catch (error) {
+			setIsTemplate(document?.isTemplate ?? false);
+			toast.error(
+				error instanceof Error
+					? error.message
+					: "Failed to update template setting",
+			);
 		}
 	};
 
@@ -383,7 +516,7 @@ export function ShareDialogModal({
 											}}
 											disabled={pending}
 										>
-											<SelectTrigger className="w-40 pr-4">
+											<SelectTrigger className="pr-4">
 												<SelectValue>{ownerPermissionLabel}</SelectValue>
 											</SelectTrigger>
 											<SelectContent className="w-56">
@@ -478,13 +611,23 @@ export function ShareDialogModal({
 													<Select
 														value={workspacePermission}
 														onValueChange={(value) => {
+															const next = value as
+																| "full"
+																| "edit"
+																| "comment"
+																| "view";
 															setWorkspacePermission(
 																value as "full" | "edit" | "comment" | "view",
 															);
+															if (accessLevel === "workspace") {
+																void commitGeneralAccess("workspace", {
+																	workspacePermission: next,
+																});
+															}
 														}}
 														disabled={pending}
 													>
-														<SelectTrigger className="w-40 pr-4">
+														<SelectTrigger className="pr-4">
 															<SelectValue>
 																{workspacePermissionLabel}
 															</SelectValue>
@@ -542,7 +685,14 @@ export function ShareDialogModal({
 														</DropdownMenuTrigger>
 														<DropdownMenuContent className="w-72" align="end">
 															<DropdownMenuItem
-																onClick={() => setPublicPermission("edit")}
+																onClick={() => {
+																	setPublicPermission("edit");
+																	if (accessLevel === "public") {
+																		void commitGeneralAccess("public", {
+																			publicPermission: "edit",
+																		});
+																	}
+																}}
 															>
 																<div className="flex flex-col flex-1">
 																	<span>Can edit</span>
@@ -555,7 +705,14 @@ export function ShareDialogModal({
 																)}
 															</DropdownMenuItem>
 															<DropdownMenuItem
-																onClick={() => setPublicPermission("comment")}
+																onClick={() => {
+																	setPublicPermission("comment");
+																	if (accessLevel === "public") {
+																		void commitGeneralAccess("public", {
+																			publicPermission: "comment",
+																		});
+																	}
+																}}
 															>
 																<div className="flex flex-col flex-1">
 																	<span>Can comment</span>
@@ -568,7 +725,14 @@ export function ShareDialogModal({
 																)}
 															</DropdownMenuItem>
 															<DropdownMenuItem
-																onClick={() => setPublicPermission("view")}
+																onClick={() => {
+																	setPublicPermission("view");
+																	if (accessLevel === "public") {
+																		void commitGeneralAccess("public", {
+																			publicPermission: "view",
+																		});
+																	}
+																}}
 															>
 																<div className="flex flex-col flex-1">
 																	<span>Can view</span>
@@ -594,6 +758,11 @@ export function ShareDialogModal({
 																		onClick={() => {
 																			setLinkExpires("never");
 																			setCustomLinkExpiresAt("");
+																			if (accessLevel === "public") {
+																				void commitGeneralAccess("public", {
+																					linkExpires: "never",
+																				});
+																			}
 																		}}
 																	>
 																		<span>Never</span>
@@ -605,6 +774,11 @@ export function ShareDialogModal({
 																		onClick={() => {
 																			setLinkExpires("1h");
 																			setCustomLinkExpiresAt("");
+																			if (accessLevel === "public") {
+																				void commitGeneralAccess("public", {
+																					linkExpires: "1h",
+																				});
+																			}
 																		}}
 																	>
 																		<div className="flex flex-col flex-1">
@@ -626,6 +800,11 @@ export function ShareDialogModal({
 																		onClick={() => {
 																			setLinkExpires("1d");
 																			setCustomLinkExpiresAt("");
+																			if (accessLevel === "public") {
+																				void commitGeneralAccess("public", {
+																					linkExpires: "1d",
+																				});
+																			}
 																		}}
 																	>
 																		<div className="flex flex-col flex-1">
@@ -657,6 +836,11 @@ export function ShareDialogModal({
 																		onClick={() => {
 																			setLinkExpires("7d");
 																			setCustomLinkExpiresAt("");
+																			if (accessLevel === "public") {
+																				void commitGeneralAccess("public", {
+																					linkExpires: "7d",
+																				});
+																			}
 																		}}
 																	>
 																		<div className="flex flex-col flex-1">
@@ -689,6 +873,11 @@ export function ShareDialogModal({
 																		onClick={() => {
 																			setLinkExpires("30d");
 																			setCustomLinkExpiresAt("");
+																			if (accessLevel === "public") {
+																				void commitGeneralAccess("public", {
+																					linkExpires: "30d",
+																				});
+																			}
 																		}}
 																	>
 																		<div className="flex flex-col flex-1">
@@ -752,11 +941,23 @@ export function ShareDialogModal({
 																									base.getMinutes(),
 																								);
 																								setLinkExpires("custom");
-																								setCustomLinkExpiresAt(
+																								const nextValue =
 																									toLocalDateTimeInputValue(
 																										next,
-																									),
+																									);
+																								setCustomLinkExpiresAt(
+																									nextValue,
 																								);
+																								if (accessLevel === "public") {
+																									void commitGeneralAccess(
+																										"public",
+																										{
+																											linkExpires: "custom",
+																											customLinkExpiresAt:
+																												nextValue,
+																										},
+																									);
+																								}
 																							}}
 																							initialFocus
 																							captionLayout="dropdown"
@@ -787,7 +988,11 @@ export function ShareDialogModal({
 								</div>
 							)}
 							<div className="flex items-center justify-end pt-4">
-								<Button variant="outline" size="sm" onClick={handleCopyLink}>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={handleCopyShareLink}
+								>
 									Copy link
 								</Button>
 							</div>
@@ -816,9 +1021,7 @@ export function ShareDialogModal({
 									<div className="rounded-lg border bg-muted/30 p-3 overflow-hidden">
 										<pre className="whitespace-pre-wrap wrap-break-word text-sm text-muted-foreground overflow-x-auto max-w-full">
 											{`<iframe
-	src="${origin}/share/${documentId}?embed=1&title=${
-		embedShowTitle ? "1" : "0"
-	}"
+	src="${publishedUrl}?embed=1&title=${embedShowTitle ? "1" : "0"}"
 	width="100%" height="600"
 	frameborder="0" allowfullscreen />`}
 										</pre>
@@ -827,7 +1030,7 @@ export function ShareDialogModal({
 										<Button
 											variant="outline"
 											onClick={async () => {
-												const code = `<iframe\nsrc="${origin}/share/${documentId}?embed=1&title=${
+												const code = `<iframe\nsrc="${publishedUrl}?embed=1&title=${
 													embedShowTitle ? "1" : "0"
 												}"\nwidth="100%" height="600"\nframeborder="0" allowfullscreen />`;
 												await navigator.clipboard.writeText(code);
@@ -854,7 +1057,7 @@ export function ShareDialogModal({
 											disabled={!isPublished || pending}
 											onClick={() => {
 												const url = `https://twitter.com/intent/tweet?url=${encodeURIComponent(
-													shareUrl,
+													publishedUrl,
 												)}&text=${encodeURIComponent(pageTitle)}`;
 												window.open(url, "_blank", "noopener,noreferrer");
 											}}
@@ -868,7 +1071,7 @@ export function ShareDialogModal({
 											disabled={!isPublished || pending}
 											onClick={() => {
 												const url = `https://wa.me/?text=${encodeURIComponent(
-													`${pageTitle}\n${shareUrl}`,
+													`${pageTitle}\n${publishedUrl}`,
 												)}`;
 												window.open(url, "_blank", "noopener,noreferrer");
 											}}
@@ -882,7 +1085,7 @@ export function ShareDialogModal({
 											disabled={!isPublished || pending}
 											onClick={() => {
 												const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-													shareUrl,
+													publishedUrl,
 												)}`;
 												window.open(url, "_blank", "noopener,noreferrer");
 											}}
@@ -896,7 +1099,7 @@ export function ShareDialogModal({
 											disabled={!isPublished || pending}
 											onClick={() => {
 												const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-													shareUrl,
+													publishedUrl,
 												)}`;
 												window.open(url, "_blank", "noopener,noreferrer");
 											}}
@@ -911,7 +1114,7 @@ export function ShareDialogModal({
 											onClick={() => {
 												const url = `mailto:?subject=${encodeURIComponent(
 													pageTitle,
-												)}&body=${encodeURIComponent(shareUrl)}`;
+												)}&body=${encodeURIComponent(publishedUrl)}`;
 												window.location.href = url;
 											}}
 											className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-accent/50 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -923,7 +1126,7 @@ export function ShareDialogModal({
 									<div className="flex items-center justify-end">
 										<Button
 											variant="outline"
-											onClick={handleCopyLink}
+											onClick={handleCopyPublishedLink}
 											disabled={pending}
 										>
 											Copy link
@@ -942,14 +1145,14 @@ export function ShareDialogModal({
 											<ChevronDown className="h-4 w-4 text-muted-foreground" />
 											<Separator orientation="vertical" className="h-4" />
 											<span className="text-sm">
-												/share/{documentId.slice(0, 12)}...
+												/public/{documentId.slice(0, 12)}...
 											</span>
 											<div className="ml-auto">
 												<Tooltip>
 													<TooltipTrigger asChild>
 														<button
 															type="button"
-															onClick={handleCopyLink}
+															onClick={handleCopyPublishedLink}
 															className="rounded-md p-1 hover:bg-accent/50"
 														>
 															<LinkIcon className="h-4 w-4 text-muted-foreground" />
@@ -968,10 +1171,6 @@ export function ShareDialogModal({
 										<button
 											type="button"
 											className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm hover:bg-accent/50"
-											onClick={(e) => {
-												e.stopPropagation();
-												setIsTemplate(!isTemplate);
-											}}
 										>
 											<div className="flex items-center gap-3">
 												<Copy className="h-4 w-4 text-muted-foreground" />
@@ -979,7 +1178,10 @@ export function ShareDialogModal({
 											</div>
 											<Switch
 												checked={isTemplate}
-												onCheckedChange={setIsTemplate}
+												onCheckedChange={(next) =>
+													void handleToggleTemplate(next)
+												}
+												disabled={pending}
 											/>
 										</button>
 
@@ -1027,7 +1229,7 @@ export function ShareDialogModal({
 										<Button
 											variant="outline"
 											onClick={() => {
-												void handleSetAccessLevel("private", true);
+												void handleUnpublish();
 											}}
 											className="flex-1"
 											disabled={pending}
@@ -1037,7 +1239,7 @@ export function ShareDialogModal({
 										<Button
 											variant="default"
 											onClick={() => {
-												window.open(`${origin}/share/${documentId}`, "_blank");
+												window.open(publishedUrl, "_blank");
 											}}
 											className="flex-1"
 											disabled={pending}
@@ -1058,14 +1260,14 @@ export function ShareDialogModal({
 												{document?.title}
 											</div>
 											<div className="text-xs text-muted-foreground">
-												{origin}/share/{documentId}
+												{origin}/public/{documentId}
 											</div>
 										</div>
 									</div>
 									<Button
 										variant="default"
 										onClick={() => {
-											void handleSetAccessLevel("public", true);
+											void handlePublish();
 										}}
 										className="w-full"
 										disabled={pending}
