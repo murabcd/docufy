@@ -8,11 +8,13 @@
  * @module
  */
 
+import type * as aiMemories from "../aiMemories.js";
 import type * as auth from "../auth.js";
 import type * as chats from "../chats.js";
 import type * as documents from "../documents.js";
 import type * as favorites from "../favorites.js";
 import type * as http from "../http.js";
+import type * as imports from "../imports.js";
 import type * as init from "../init.js";
 import type * as prosemirrorSync from "../prosemirrorSync.js";
 import type * as workspaces from "../workspaces.js";
@@ -24,11 +26,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  aiMemories: typeof aiMemories;
   auth: typeof auth;
   chats: typeof chats;
   documents: typeof documents;
   favorites: typeof favorites;
   http: typeof http;
+  imports: typeof imports;
   init: typeof init;
   prosemirrorSync: typeof prosemirrorSync;
   workspaces: typeof workspaces;

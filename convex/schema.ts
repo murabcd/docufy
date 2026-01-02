@@ -5,9 +5,12 @@ export default defineSchema({
 	workspaces: defineTable({
 		name: v.string(),
 		ownerId: v.string(),
+		icon: v.optional(v.string()),
 		isPrivate: v.optional(v.boolean()),
 		publicHomepageDocumentId: v.optional(v.id("documents")),
 		alwaysShowPublishedBanner: v.optional(v.boolean()),
+		defaultWorkspaceIds: v.optional(v.array(v.id("workspaces"))),
+		onlyOwnersCanCreateWorkspaces: v.optional(v.boolean()),
 		createdAt: v.number(),
 		updatedAt: v.number(),
 	}).index("by_owner", ["ownerId"]),
@@ -167,4 +170,16 @@ export default defineSchema({
 		.index("by_userId", ["userId"])
 		.index("by_chat_createdAt", ["chatId", "createdAt"])
 		.index("by_chat_messageId", ["chatId", "messageId"]),
+	userSettings: defineTable({
+		userId: v.string(),
+		aiMemoryEnabled: v.boolean(),
+		updatedAt: v.number(),
+	}).index("by_user", ["userId"]),
+	aiMemories: defineTable({
+		userId: v.string(),
+		content: v.string(),
+		createdAt: v.number(),
+	})
+		.index("by_user", ["userId"])
+		.index("by_user_createdAt", ["userId", "createdAt"]),
 });
