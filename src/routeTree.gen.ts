@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShareDocumentIdRouteImport } from './routes/share.$documentId'
 import { Route as PublicDocumentIdRouteImport } from './routes/public.$documentId'
+import { Route as PublicPreviewDocumentIdRouteImport } from './routes/public-preview.$documentId'
 import { Route as DuplicateDocumentIdRouteImport } from './routes/duplicate.$documentId'
 import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$documentId'
 import { Route as ApiUploadRouteImport } from './routes/api/upload'
@@ -31,6 +32,11 @@ const ShareDocumentIdRoute = ShareDocumentIdRouteImport.update({
 const PublicDocumentIdRoute = PublicDocumentIdRouteImport.update({
   id: '/public/$documentId',
   path: '/public/$documentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PublicPreviewDocumentIdRoute = PublicPreviewDocumentIdRouteImport.update({
+  id: '/public-preview/$documentId',
+  path: '/public-preview/$documentId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DuplicateDocumentIdRoute = DuplicateDocumentIdRouteImport.update({
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/api/upload': typeof ApiUploadRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/duplicate/$documentId': typeof DuplicateDocumentIdRoute
+  '/public-preview/$documentId': typeof PublicPreviewDocumentIdRoute
   '/public/$documentId': typeof PublicDocumentIdRoute
   '/share/$documentId': typeof ShareDocumentIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/api/upload': typeof ApiUploadRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/duplicate/$documentId': typeof DuplicateDocumentIdRoute
+  '/public-preview/$documentId': typeof PublicPreviewDocumentIdRoute
   '/public/$documentId': typeof PublicDocumentIdRoute
   '/share/$documentId': typeof ShareDocumentIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/api/upload': typeof ApiUploadRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/duplicate/$documentId': typeof DuplicateDocumentIdRoute
+  '/public-preview/$documentId': typeof PublicPreviewDocumentIdRoute
   '/public/$documentId': typeof PublicDocumentIdRoute
   '/share/$documentId': typeof ShareDocumentIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/api/upload'
     | '/documents/$documentId'
     | '/duplicate/$documentId'
+    | '/public-preview/$documentId'
     | '/public/$documentId'
     | '/share/$documentId'
     | '/api/auth/$'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/api/upload'
     | '/documents/$documentId'
     | '/duplicate/$documentId'
+    | '/public-preview/$documentId'
     | '/public/$documentId'
     | '/share/$documentId'
     | '/api/auth/$'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/api/upload'
     | '/documents/$documentId'
     | '/duplicate/$documentId'
+    | '/public-preview/$documentId'
     | '/public/$documentId'
     | '/share/$documentId'
     | '/api/auth/$'
@@ -129,6 +141,7 @@ export interface RootRouteChildren {
   ApiUploadRoute: typeof ApiUploadRoute
   DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
   DuplicateDocumentIdRoute: typeof DuplicateDocumentIdRoute
+  PublicPreviewDocumentIdRoute: typeof PublicPreviewDocumentIdRoute
   PublicDocumentIdRoute: typeof PublicDocumentIdRoute
   ShareDocumentIdRoute: typeof ShareDocumentIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -155,6 +168,13 @@ declare module '@tanstack/react-router' {
       path: '/public/$documentId'
       fullPath: '/public/$documentId'
       preLoaderRoute: typeof PublicDocumentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/public-preview/$documentId': {
+      id: '/public-preview/$documentId'
+      path: '/public-preview/$documentId'
+      fullPath: '/public-preview/$documentId'
+      preLoaderRoute: typeof PublicPreviewDocumentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/duplicate/$documentId': {
@@ -201,6 +221,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiUploadRoute: ApiUploadRoute,
   DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
   DuplicateDocumentIdRoute: DuplicateDocumentIdRoute,
+  PublicPreviewDocumentIdRoute: PublicPreviewDocumentIdRoute,
   PublicDocumentIdRoute: PublicDocumentIdRoute,
   ShareDocumentIdRoute: ShareDocumentIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

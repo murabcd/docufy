@@ -15,12 +15,14 @@ import {
 	Lock,
 	Mail,
 	MessageCircle,
+	MoreHorizontal,
+	Search,
 	Settings,
 	Share2,
 	Twitter,
 	Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -57,6 +59,10 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
+import {
+	optimisticSetGeneralAccess,
+	optimisticSetPublishSettings,
+} from "@/lib/optimistic-documents";
 import { cn } from "@/lib/utils";
 import { authQueries, documentsQueries } from "@/queries";
 import { api } from "../../../convex/_generated/api";
@@ -72,6 +78,106 @@ interface ShareDialogModalProps {
 
 type AccessLevel = "private" | "workspace" | "public";
 type TabType = "share" | "publish";
+
+function SitePublishPreview({
+	src,
+	hostname,
+	pathLabel,
+	title,
+}: {
+	src: string;
+	hostname: string;
+	pathLabel: string;
+	title: string;
+}) {
+	const BASE_WIDTH = 1200;
+	const BASE_HEIGHT = 720;
+	const TOP_BAR_HEIGHT = 28;
+
+	const containerRef = useRef<HTMLDivElement | null>(null);
+	const [containerWidth, setContainerWidth] = useState<number>(0);
+	const [isLoaded, setIsLoaded] = useState(false);
+	const lastSrcRef = useRef(src);
+
+	useEffect(() => {
+		const element = containerRef.current;
+		if (!element) return;
+
+		const update = () => {
+			setContainerWidth(element.getBoundingClientRect().width);
+		};
+
+		update();
+		const ro = new ResizeObserver(() => update());
+		ro.observe(element);
+		return () => ro.disconnect();
+	}, []);
+
+	useEffect(() => {
+		if (lastSrcRef.current === src) return;
+		lastSrcRef.current = src;
+		setIsLoaded(false);
+	});
+
+	const scale = useMemo(() => {
+		if (!containerWidth) return 0.35;
+		return Math.min(1, Math.max(0.2, containerWidth / BASE_WIDTH));
+	}, [containerWidth]);
+
+	const contentHeight = Math.round(BASE_HEIGHT * scale);
+	const totalHeight = contentHeight + TOP_BAR_HEIGHT;
+
+	return (
+		<div
+			ref={containerRef}
+			className="rounded-lg border bg-background overflow-hidden shadow-sm"
+			style={{ height: totalHeight }}
+		>
+			<div className="h-7 border-b bg-muted/40 px-3 flex items-center gap-3 text-xs text-muted-foreground">
+				<div className="flex items-center gap-1.5">
+					<div className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
+					<div className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
+					<div className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
+				</div>
+				<div className="ml-1 flex-1 truncate text-muted-foreground/80">
+					{title}
+				</div>
+				<div className="flex items-center gap-2">
+					<Search className="h-3.5 w-3.5" />
+					<MoreHorizontal className="h-3.5 w-3.5" />
+					<div className="rounded bg-muted px-1.5 py-0.5 text-[10px]">
+						Made with Docufy
+					</div>
+				</div>
+			</div>
+			<div
+				className="relative w-full overflow-hidden bg-background"
+				style={{ height: contentHeight }}
+			>
+				{!isLoaded && (
+					<div className="absolute inset-0 animate-pulse bg-muted/30" />
+				)}
+				<iframe
+					title="Site preview"
+					src={src}
+					loading="lazy"
+					onLoad={() => setIsLoaded(true)}
+					className="absolute left-0 top-0 border-0 pointer-events-none"
+					style={{
+						width: BASE_WIDTH,
+						height: BASE_HEIGHT,
+						transform: `scale(${scale})`,
+						transformOrigin: "top left",
+					}}
+				/>
+				<div className="pointer-events-none absolute left-0 top-0 h-5 w-full bg-gradient-to-b from-background/70 to-transparent" />
+			</div>
+			<div className="sr-only">
+				{hostname}/{pathLabel}
+			</div>
+		</div>
+	);
+}
 
 function pad2(value: number) {
 	return String(value).padStart(2, "0");
@@ -124,6 +230,7 @@ export function ShareDialogModal({
 	const unlistedShareUrl = `${origin}/share/${documentId}`;
 	const publishedUrl = `${origin}/public/${documentId}`;
 	const documentUrl = `${origin}/documents/${documentId}`;
+	const publishPreviewUrl = `${origin}/public-preview/${documentId}?embed=1&title=1`;
 
 	const activeWorkspace = workspaces.find((w) => w._id === activeWorkspaceId);
 	const workspaceName = activeWorkspace?.name || "Workspace";
@@ -162,8 +269,12 @@ export function ShareDialogModal({
 		setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
 	}, []);
 
-	const setGeneralAccess = useMutation(api.documents.setGeneralAccess);
-	const setPublishSettings = useMutation(api.documents.setPublishSettings);
+	const setGeneralAccess = useMutation(
+		api.documents.setGeneralAccess,
+	).withOptimisticUpdate(optimisticSetGeneralAccess);
+	const setPublishSettings = useMutation(
+		api.documents.setPublishSettings,
+	).withOptimisticUpdate(optimisticSetPublishSettings);
 	const inviteToDocument = useMutation(api.documents.inviteToDocument);
 
 	const copyLink = async (url: string) => {
@@ -1249,27 +1360,21 @@ export function ShareDialogModal({
 									</div>
 								</div>
 							) : (
-								<div className="space-y-2">
-									<h3 className="text-sm font-semibold">Publish a website</h3>
-									<div className="rounded-lg border bg-muted/30 p-4 space-y-2">
-										<div className="text-xs text-muted-foreground mb-2">
-											Preview
-										</div>
-										<div className="bg-background rounded border p-3 space-y-2">
-											<div className="text-sm font-medium">
-												{document?.title}
-											</div>
-											<div className="text-xs text-muted-foreground">
-												{origin}/public/{documentId}
-											</div>
-										</div>
-									</div>
+								<div className="space-y-4">
+									<h3 className="text-sm font-medium">Publish a website</h3>
+
+									<SitePublishPreview
+										src={publishPreviewUrl}
+										hostname={hostname}
+										pathLabel={`public/${String(documentId).slice(0, 12)}…`}
+										title={pageTitle}
+									/>
 									<Button
 										variant="default"
 										onClick={() => {
 											void handlePublish();
 										}}
-										className="w-full"
+										className="w-full h-10"
 										disabled={pending}
 									>
 										Publish

@@ -78,6 +78,91 @@ function prependDocUnique(docs: DocumentRecord[], next: DocumentRecord) {
 	return [next, ...without];
 }
 
+function computePublishedResult(document: DocumentRecord | null) {
+	if (!document || document.isArchived) return null;
+	if (document.isPublished) return document;
+	if (document.webLinkEnabled !== true) return null;
+	const expiresAt = document.publicLinkExpiresAt;
+	if (expiresAt !== undefined && expiresAt <= Date.now()) return null;
+	return document;
+}
+
+export function optimisticSetGeneralAccess(
+	localStore: OptimisticLocalStore,
+	args: {
+		documentId: Id<"documents">;
+		generalAccess: "private" | "workspace";
+		webLinkEnabled?: boolean;
+		workspaceAccessLevel?: "full" | "edit" | "comment" | "view";
+		publicAccessLevel?: "edit" | "comment" | "view";
+		publicLinkExpiresAt?: number | null;
+	},
+) {
+	const getArgs = { id: args.documentId };
+	const existing = localStore.getQuery(api.documents.get, getArgs);
+	if (existing === undefined || existing === null) return;
+
+	const now = Date.now();
+	const current = existing as DocumentRecord;
+	const nextWebLinkEnabled =
+		args.webLinkEnabled ?? current.webLinkEnabled ?? false;
+
+	const next: DocumentRecord = {
+		...current,
+		generalAccess: args.generalAccess,
+		webLinkEnabled: nextWebLinkEnabled,
+		updatedAt: now,
+	};
+
+	if (args.workspaceAccessLevel !== undefined) {
+		next.workspaceAccessLevel = args.workspaceAccessLevel;
+	}
+	if (args.publicAccessLevel !== undefined) {
+		next.publicAccessLevel = args.publicAccessLevel;
+	}
+	if (args.publicLinkExpiresAt !== undefined) {
+		next.publicLinkExpiresAt =
+			args.publicLinkExpiresAt === null ? undefined : args.publicLinkExpiresAt;
+	}
+
+	localStore.setQuery(api.documents.get, getArgs, next);
+	localStore.setQuery(
+		api.documents.getPublished,
+		{ id: args.documentId },
+		computePublishedResult(next),
+	);
+}
+
+export function optimisticSetPublishSettings(
+	localStore: OptimisticLocalStore,
+	args: {
+		documentId: Id<"documents">;
+		isPublished?: boolean;
+		isTemplate?: boolean;
+	},
+) {
+	const getArgs = { id: args.documentId };
+	const existing = localStore.getQuery(api.documents.get, getArgs);
+	if (existing === undefined || existing === null) return;
+
+	const now = Date.now();
+	const current = existing as DocumentRecord;
+	const next: DocumentRecord = {
+		...current,
+		updatedAt: now,
+	};
+
+	if (args.isPublished !== undefined) next.isPublished = args.isPublished;
+	if (args.isTemplate !== undefined) next.isTemplate = args.isTemplate;
+
+	localStore.setQuery(api.documents.get, getArgs, next);
+	localStore.setQuery(
+		api.documents.getPublished,
+		{ id: args.documentId },
+		computePublishedResult(next),
+	);
+}
+
 export function optimisticUpdateDocument(
 	localStore: OptimisticLocalStore,
 	args: {
