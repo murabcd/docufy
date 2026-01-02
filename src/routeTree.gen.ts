@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShareDocumentIdRouteImport } from './routes/share.$documentId'
+import { Route as PublicDocumentIdRouteImport } from './routes/public.$documentId'
+import { Route as DuplicateDocumentIdRouteImport } from './routes/duplicate.$documentId'
 import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$documentId'
 import { Route as ApiUploadRouteImport } from './routes/api/upload'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -24,6 +26,16 @@ const IndexRoute = IndexRouteImport.update({
 const ShareDocumentIdRoute = ShareDocumentIdRouteImport.update({
   id: '/share/$documentId',
   path: '/share/$documentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PublicDocumentIdRoute = PublicDocumentIdRouteImport.update({
+  id: '/public/$documentId',
+  path: '/public/$documentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DuplicateDocumentIdRoute = DuplicateDocumentIdRouteImport.update({
+  id: '/duplicate/$documentId',
+  path: '/duplicate/$documentId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocumentsDocumentIdRoute = DocumentsDocumentIdRouteImport.update({
@@ -52,6 +64,8 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/upload': typeof ApiUploadRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/duplicate/$documentId': typeof DuplicateDocumentIdRoute
+  '/public/$documentId': typeof PublicDocumentIdRoute
   '/share/$documentId': typeof ShareDocumentIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -60,6 +74,8 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/upload': typeof ApiUploadRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/duplicate/$documentId': typeof DuplicateDocumentIdRoute
+  '/public/$documentId': typeof PublicDocumentIdRoute
   '/share/$documentId': typeof ShareDocumentIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -69,6 +85,8 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/upload': typeof ApiUploadRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/duplicate/$documentId': typeof DuplicateDocumentIdRoute
+  '/public/$documentId': typeof PublicDocumentIdRoute
   '/share/$documentId': typeof ShareDocumentIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -79,6 +97,8 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/upload'
     | '/documents/$documentId'
+    | '/duplicate/$documentId'
+    | '/public/$documentId'
     | '/share/$documentId'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
@@ -87,6 +107,8 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/upload'
     | '/documents/$documentId'
+    | '/duplicate/$documentId'
+    | '/public/$documentId'
     | '/share/$documentId'
     | '/api/auth/$'
   id:
@@ -95,6 +117,8 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/upload'
     | '/documents/$documentId'
+    | '/duplicate/$documentId'
+    | '/public/$documentId'
     | '/share/$documentId'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
@@ -104,6 +128,8 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiUploadRoute: typeof ApiUploadRoute
   DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
+  DuplicateDocumentIdRoute: typeof DuplicateDocumentIdRoute
+  PublicDocumentIdRoute: typeof PublicDocumentIdRoute
   ShareDocumentIdRoute: typeof ShareDocumentIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -122,6 +148,20 @@ declare module '@tanstack/react-router' {
       path: '/share/$documentId'
       fullPath: '/share/$documentId'
       preLoaderRoute: typeof ShareDocumentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/public/$documentId': {
+      id: '/public/$documentId'
+      path: '/public/$documentId'
+      fullPath: '/public/$documentId'
+      preLoaderRoute: typeof PublicDocumentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/duplicate/$documentId': {
+      id: '/duplicate/$documentId'
+      path: '/duplicate/$documentId'
+      fullPath: '/duplicate/$documentId'
+      preLoaderRoute: typeof DuplicateDocumentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/documents/$documentId': {
@@ -160,6 +200,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiUploadRoute: ApiUploadRoute,
   DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
+  DuplicateDocumentIdRoute: DuplicateDocumentIdRoute,
+  PublicDocumentIdRoute: PublicDocumentIdRoute,
   ShareDocumentIdRoute: ShareDocumentIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
