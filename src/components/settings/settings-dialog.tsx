@@ -100,7 +100,7 @@ export function SettingsDialog({
 				setActivePage("Profile");
 			}
 		}
-	}, [open, initialPage, startTransition]);
+	}, [open, initialPage]);
 
 	const renderSettingsContent = () => {
 		switch (activePage) {
