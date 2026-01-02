@@ -47,9 +47,12 @@ export const listMine = query({
 			_creationTime: v.number(),
 			name: v.string(),
 			ownerId: v.string(),
+			icon: v.optional(v.string()),
 			isPrivate: v.optional(v.boolean()),
 			publicHomepageDocumentId: v.optional(v.id("documents")),
 			alwaysShowPublishedBanner: v.optional(v.boolean()),
+			defaultWorkspaceIds: v.optional(v.array(v.id("workspaces"))),
+			onlyOwnersCanCreateWorkspaces: v.optional(v.boolean()),
 			createdAt: v.number(),
 			updatedAt: v.number(),
 		}),
@@ -64,6 +67,34 @@ export const listMine = query({
 		return workspaces
 			.filter((w): w is NonNullable<typeof w> => w !== null)
 			.sort((a, b) => b.updatedAt - a.updatedAt);
+	},
+});
+
+export const update = mutation({
+	args: {
+		workspaceId: v.id("workspaces"),
+		name: v.optional(v.string()),
+		icon: v.optional(v.union(v.string(), v.null())),
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const { membership } = await requireWorkspaceAccess(ctx, args.workspaceId);
+		if (membership.role !== "owner") throw new ConvexError("Unauthorized");
+
+		const patch: Record<string, unknown> = { updatedAt: Date.now() };
+
+		if (args.name !== undefined) {
+			const trimmed = args.name.trim();
+			if (!trimmed) throw new ConvexError("Workspace name required");
+			patch.name = trimmed;
+		}
+
+		if (args.icon !== undefined) {
+			patch.icon = args.icon === null ? undefined : args.icon;
+		}
+
+		await ctx.db.patch(args.workspaceId, patch);
+		return null;
 	},
 });
 
@@ -281,5 +312,48 @@ export const ensureDefault = mutation({
 		}
 
 		return { defaultWorkspaceId: workspaceId };
+	},
+});
+
+export const updateTeamspaceSettings = mutation({
+	args: {
+		workspaceId: v.id("workspaces"),
+		defaultWorkspaceIds: v.optional(v.array(v.id("workspaces"))),
+		onlyOwnersCanCreateWorkspaces: v.optional(v.boolean()),
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const { membership } = await requireWorkspaceAccess(ctx, args.workspaceId);
+		if (membership.role !== "owner") throw new ConvexError("Unauthorized");
+
+		const patch: Record<string, unknown> = { updatedAt: Date.now() };
+
+		if (args.defaultWorkspaceIds !== undefined) {
+			// Validate that all default workspace IDs are valid and user has access
+			for (const defaultWorkspaceId of args.defaultWorkspaceIds) {
+				const defaultWorkspace = await ctx.db.get(defaultWorkspaceId);
+				if (!defaultWorkspace) {
+					throw new ConvexError("Invalid workspace ID");
+				}
+				// Check if user has access to this workspace
+				const userMembership = await ctx.db
+					.query("members")
+					.withIndex("by_workspace_user", (q) =>
+						q.eq("workspaceId", defaultWorkspaceId).eq("userId", membership.userId),
+					)
+					.unique();
+				if (!userMembership) {
+					throw new ConvexError("No access to workspace");
+				}
+			}
+			patch.defaultWorkspaceIds = args.defaultWorkspaceIds;
+		}
+
+		if (args.onlyOwnersCanCreateWorkspaces !== undefined) {
+			patch.onlyOwnersCanCreateWorkspaces = args.onlyOwnersCanCreateWorkspaces;
+		}
+
+		await ctx.db.patch(args.workspaceId, patch);
+		return null;
 	},
 });
