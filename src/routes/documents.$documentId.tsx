@@ -77,6 +77,10 @@ function DocumentEditor() {
 	const { data: document } = useSuspenseQuery(
 		documentsQueries.get(documentId as Id<"documents">),
 	);
+	const { data: accessLevel } = useSuspenseQuery(
+		documentsQueries.getMyAccessLevel(documentId as Id<"documents">),
+	);
+	const canEdit = accessLevel === "full" || accessLevel === "edit";
 	const { data: ancestors = [] } = useQuery({
 		...documentsQueries.getAncestors(documentId as Id<"documents">),
 		placeholderData: [],
@@ -497,9 +501,8 @@ function DocumentEditor() {
 		return null;
 	}
 
-	const onTitleChangeIfEditable = document.isArchived
-		? undefined
-		: onTitleChange;
+	const onTitleChangeIfEditable =
+		!canEdit || document.isArchived ? undefined : onTitleChange;
 
 	const renderEditor = () => {
 		if (sync.isLoading || !isSyncReady || !syncExtensionRef.current) {
@@ -512,7 +515,7 @@ function DocumentEditor() {
 				ref={editorRef}
 				editorOptions={{
 					content: initialContentRef.current ?? EMPTY_DOCUMENT,
-					editable: !document.isArchived,
+					editable: canEdit && !document.isArchived,
 					imgUploadUrl: "/api/upload",
 				}}
 				extraExtensions={extraExtensionsRef.current}
@@ -542,10 +545,11 @@ function DocumentEditor() {
 					<CoverImage
 						url={document.coverImage}
 						documentId={documentId as Id<"documents">}
+						canEdit={canEdit && !document.isArchived}
 					/>
 					<div className="mx-auto w-full max-w-4xl">
 						<div className="px-11 group relative">
-							{!!document.icon && !document.isArchived && (
+							{!!document.icon && canEdit && !document.isArchived && (
 								<div
 									className={cn(
 										"group/icon relative z-10",
@@ -559,7 +563,7 @@ function DocumentEditor() {
 									</IconPicker>
 								</div>
 							)}
-							{!!document.icon && document.isArchived && (
+							{!!document.icon && (!canEdit || document.isArchived) && (
 								<p
 									className={cn(
 										"text-6xl relative z-10",
@@ -570,14 +574,14 @@ function DocumentEditor() {
 								</p>
 							)}
 							<div className="opacity-0 group-hover:opacity-100 flex items-center gap-x-1 py-4">
-								{!document.icon && !document.isArchived && (
+								{canEdit && !document.icon && !document.isArchived && (
 									<IconPicker asChild onChange={onIconSelect}>
 										<Button variant="ghost" size="sm">
 											<Smile className="h-4 w-4 mr-2" /> Add icon
 										</Button>
 									</IconPicker>
 								)}
-								{!document.coverImage && !document.isArchived && (
+								{canEdit && !document.coverImage && !document.isArchived && (
 									<Button onClick={onAddCover} variant="ghost" size="sm">
 										<ImageIcon className="h-4 w-4 mr-2" /> Add cover
 									</Button>

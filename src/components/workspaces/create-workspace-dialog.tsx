@@ -78,8 +78,7 @@ export function CreateWorkspaceDialog({
 						Create workspace
 					</DialogTitle>
 					<DialogDescription className="text-sm leading-6 text-muted-foreground">
-						Workspaces are shared environments where teams can connect to data
-						sources, run queries and create reports.
+						Workspaces are shared environments where teams can connect.
 					</DialogDescription>
 				</DialogHeader>
 

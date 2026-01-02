@@ -1,4 +1,5 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useConvexAuth } from "convex/react";
 import { Loader2 } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
@@ -23,7 +24,11 @@ export function LoginDialog({
 	open: controlledOpen,
 	onOpenChange,
 }: LoginDialogProps) {
-	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
+	const { isAuthenticated, isLoading } = useConvexAuth();
+	const { data: currentUser } = useQuery({
+		...authQueries.currentUser(),
+		enabled: !isLoading && isAuthenticated,
+	});
 	const [internalOpen, setInternalOpen] = React.useState(false);
 	const [loadingGitHub, setLoadingGitHub] = React.useState(false);
 

@@ -7,6 +7,8 @@ type WorkspaceSummary = {
 	_id: Id<"workspaces">;
 	name: string;
 	isPrivate?: boolean;
+	publicHomepageDocumentId?: Id<"documents">;
+	alwaysShowPublishedBanner?: boolean;
 };
 
 type ActiveWorkspaceContextValue = {

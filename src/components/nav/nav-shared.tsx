@@ -67,6 +67,7 @@ export function NavShared() {
 							workspaceId={activeWorkspaceId ?? undefined}
 							maxVisibleRoots={MAX_VISIBLE_ROOTS}
 							showAllRoots={showAllRoots}
+							canReorder={false}
 						/>
 
 						{hasMore && (

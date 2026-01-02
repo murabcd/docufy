@@ -25,7 +25,6 @@ function applyUpdateArgs(
 		icon?: string | null;
 		coverImage?: string | null;
 		isArchived?: boolean;
-		isPublished?: boolean;
 		includeInAi?: boolean;
 	},
 ) {
@@ -44,7 +43,6 @@ function applyUpdateArgs(
 	}
 
 	if (args.isArchived !== undefined) next.isArchived = args.isArchived;
-	if (args.isPublished !== undefined) next.isPublished = args.isPublished;
 	if (args.includeInAi !== undefined) next.includeInAi = args.includeInAi;
 
 	if (args.content !== undefined || args.searchableText !== undefined) {
@@ -90,7 +88,6 @@ export function optimisticUpdateDocument(
 		icon?: string | null;
 		coverImage?: string | null;
 		isArchived?: boolean;
-		isPublished?: boolean;
 		includeInAi?: boolean;
 	},
 ) {

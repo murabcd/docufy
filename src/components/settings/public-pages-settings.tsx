@@ -1,4 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
 import {
 	ChevronRight,
 	Flag,
@@ -46,23 +47,33 @@ import {
 } from "@/components/ui/tooltip";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { documentsQueries } from "@/queries";
+import { api } from "../../../convex/_generated/api";
 
 export function PublicPagesSettings() {
-	const { activeWorkspaceId } = useActiveWorkspace();
+	const { workspaces, activeWorkspaceId } = useActiveWorkspace();
+	const activeWorkspace = workspaces.find((w) => w._id === activeWorkspaceId);
 	const { data: allDocuments } = useSuspenseQuery(
 		documentsQueries.getAll(activeWorkspaceId ?? undefined),
 	);
 
-	const [showBanner, setShowBanner] = useState(true);
+	const updatePublicPagesSettings = useMutation(
+		api.workspaces.updatePublicPagesSettings,
+	);
+
 	const [updateDomainOpen, setUpdateDomainOpen] = useState(false);
 	const [domainName, setDomainName] = useState("");
 
+	const showBanner = activeWorkspace?.alwaysShowPublishedBanner ?? true;
+	const homepageDocumentId = activeWorkspace?.publicHomepageDocumentId ?? null;
+
 	const publishedSites = allDocuments.filter((doc) => doc.isPublished);
-	const publicForms = allDocuments.filter((_doc) => {
-		// TODO: Add form type check when forms are implemented
-		return false;
-	});
-	const anyoneWithLink = allDocuments.filter((doc) => doc.isPublished);
+	const anyoneWithLink = allDocuments.filter(
+		(doc) => doc.webLinkEnabled === true && !doc.isPublished,
+	);
+
+	const homepageDocument = homepageDocumentId
+		? (publishedSites.find((doc) => doc._id === homepageDocumentId) ?? null)
+		: null;
 
 	const hostname =
 		typeof window === "undefined" ? "" : window.location.hostname;
@@ -97,18 +108,20 @@ export function PublicPagesSettings() {
 					<Label className="text-sm">Public Pages</Label>
 				</div>
 
-				{/* Overview Cards */}
-				<div className="mb-8 grid grid-cols-3 gap-4">
+				<div className="mb-8 grid grid-cols-2 gap-4">
 					<Card className="cursor-pointer hover:bg-accent/50">
-						<CardContent className="p-4">
+						<CardContent className="p-3">
 							<div className="flex flex-col">
+								<div className="mb-1.5 text-xs text-muted-foreground">
+									Published sites
+								</div>
 								<div className="flex items-center justify-between">
-									<div className="text-2xl font-semibold">
+									<div className="text-xl font-semibold">
 										{publishedSites.length}
 									</div>
-									<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+									<ChevronRight className="h-3 w-3 text-muted-foreground" />
 								</div>
-								<div className="mt-2 flex items-center gap-2">
+								<div className="mt-1.5 flex items-center gap-2">
 									<Badge variant="outline" className="text-xs">
 										.docufy.site
 									</Badge>
@@ -118,31 +131,18 @@ export function PublicPagesSettings() {
 					</Card>
 
 					<Card className="cursor-pointer hover:bg-accent/50">
-						<CardContent className="p-4">
+						<CardContent className="p-3">
 							<div className="flex flex-col">
-								<div className="flex items-center justify-between">
-									<div className="text-2xl font-semibold">
-										{publicForms.length}
-									</div>
-									<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+								<div className="mb-1.5 text-xs text-muted-foreground">
+									Anyone with the link
 								</div>
-								<div className="mt-2 text-xs text-muted-foreground">
-									No public forms
-								</div>
-							</div>
-						</CardContent>
-					</Card>
-
-					<Card className="cursor-pointer hover:bg-accent/50">
-						<CardContent className="p-4">
-							<div className="flex flex-col">
 								<div className="flex items-center justify-between">
-									<div className="text-2xl font-semibold">
+									<div className="text-xl font-semibold">
 										{anyoneWithLink.length}
 									</div>
-									<ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+									<ChevronRight className="h-3 w-3 text-muted-foreground" />
 								</div>
-								<div className="mt-2 flex items-center gap-2">
+								<div className="mt-1.5 flex items-center gap-2">
 									<Badge variant="outline" className="text-xs">
 										{anyoneWithLink.length > 0
 											? anyoneWithLink[0]?.title || "Document"
@@ -204,10 +204,68 @@ export function PublicPagesSettings() {
 										</div>
 									</TableCell>
 									<TableCell>
-										<div className="flex items-center gap-2 text-muted-foreground">
-											<Globe className="h-4 w-4" />
-											<span>Select a page</span>
-										</div>
+										<DropdownMenu>
+											<DropdownMenuTrigger asChild>
+												<button
+													type="button"
+													className="flex items-center gap-2 text-muted-foreground rounded px-2 py-1 hover:bg-accent/50"
+												>
+													<Globe className="h-4 w-4" />
+													<span>
+														{homepageDocument?.title ?? "Select a page"}
+													</span>
+												</button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent align="start" className="w-72">
+												<DropdownMenuItem
+													onClick={() => {
+														if (!activeWorkspaceId) return;
+														updatePublicPagesSettings({
+															workspaceId: activeWorkspaceId,
+															publicHomepageDocumentId: null,
+														})
+															.then(() => toast.success("Homepage cleared"))
+															.catch((error) => {
+																toast.error(
+																	error instanceof Error
+																		? error.message
+																		: "Failed to update homepage",
+																);
+															});
+													}}
+												>
+													No homepage
+												</DropdownMenuItem>
+												{publishedSites.length > 0 ? (
+													publishedSites.map((doc) => (
+														<DropdownMenuItem
+															key={doc._id}
+															onClick={() => {
+																if (!activeWorkspaceId) return;
+																updatePublicPagesSettings({
+																	workspaceId: activeWorkspaceId,
+																	publicHomepageDocumentId: doc._id,
+																})
+																	.then(() => toast.success("Homepage updated"))
+																	.catch((error) => {
+																		toast.error(
+																			error instanceof Error
+																				? error.message
+																				: "Failed to update homepage",
+																		);
+																	});
+															}}
+														>
+															{doc.title || "Untitled"}
+														</DropdownMenuItem>
+													))
+												) : (
+													<DropdownMenuItem disabled>
+														Publish a page to select it
+													</DropdownMenuItem>
+												)}
+											</DropdownMenuContent>
+										</DropdownMenu>
 									</TableCell>
 									<TableCell>
 										<Badge variant="outline" className="gap-1.5">
@@ -258,7 +316,24 @@ export function PublicPagesSettings() {
 								Published pages will display a blue banner at the top
 							</AlertDescription>
 						</div>
-						<Switch checked={showBanner} onCheckedChange={setShowBanner} />
+						<Switch
+							checked={showBanner}
+							onCheckedChange={(checked) => {
+								if (!activeWorkspaceId) return;
+								updatePublicPagesSettings({
+									workspaceId: activeWorkspaceId,
+									alwaysShowPublishedBanner: checked,
+								})
+									.then(() => toast.success("Settings updated"))
+									.catch((error) => {
+										toast.error(
+											error instanceof Error
+												? error.message
+												: "Failed to update settings",
+										);
+									});
+							}}
+						/>
 					</Alert>
 				</div>
 

@@ -9,18 +9,14 @@ import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import {
 	ArrowUpRight,
-	Check,
 	ChevronRight,
 	Copy,
 	CornerUpRight,
 	FileText,
-	Globe,
 	Link as LinkIcon,
-	Lock,
 	MoreHorizontal,
 	Pencil,
 	Plus,
-	Share2,
 	Star,
 	Trash2,
 } from "lucide-react";
@@ -532,56 +528,6 @@ export function TreeDocuments({
 												}
 											}}
 										>
-											<DropdownMenuSub>
-												<DropdownMenuSubTrigger>
-													<Share2 className="text-muted-foreground" />
-													<span>Share</span>
-												</DropdownMenuSubTrigger>
-												<DropdownMenuSubContent className="w-56 rounded-lg">
-													<DropdownMenuItem
-														onClick={() => {
-															startTransition(async () => {
-																try {
-																	await updateDocument({
-																		id,
-																		isPublished: false,
-																	});
-																	toast.success("Page unshared");
-																} catch {
-																	toast.error(
-																		"Failed to update sharing settings",
-																	);
-																}
-															});
-														}}
-													>
-														<Lock className="text-muted-foreground" />
-														<span>Private</span>
-														{!data.isPublished && <Check className="ml-auto" />}
-													</DropdownMenuItem>
-													<DropdownMenuItem
-														onClick={() => {
-															startTransition(async () => {
-																try {
-																	await updateDocument({
-																		id,
-																		isPublished: true,
-																	});
-																	toast.success("Page shared");
-																} catch {
-																	toast.error(
-																		"Failed to update sharing settings",
-																	);
-																}
-															});
-														}}
-													>
-														<Globe className="text-muted-foreground" />
-														<span>Public</span>
-														{data.isPublished && <Check className="ml-auto" />}
-													</DropdownMenuItem>
-												</DropdownMenuSubContent>
-											</DropdownMenuSub>
 											<DropdownMenuItem
 												onClick={() => {
 													startTransition(async () => {

@@ -21,9 +21,15 @@ type CoverImageProps = {
 	url?: string;
 	preview?: boolean;
 	documentId: Id<"documents">;
+	canEdit?: boolean;
 };
 
-export function CoverImage({ url, preview, documentId }: CoverImageProps) {
+export function CoverImage({
+	url,
+	preview,
+	documentId,
+	canEdit = true,
+}: CoverImageProps) {
 	const [isPickerOpen, setIsPickerOpen] = useState(false);
 	const removeCoverImage = useMutation(
 		api.documents.update,
@@ -47,7 +53,7 @@ export function CoverImage({ url, preview, documentId }: CoverImageProps) {
 			{!!url && (
 				<img src={url} alt="Cover" className="w-full h-full object-cover" />
 			)}
-			{url && !preview && (
+			{url && !preview && canEdit && (
 				<div
 					className={cn(
 						"absolute top-4 right-4 opacity-0 pointer-events-none transition-opacity",
