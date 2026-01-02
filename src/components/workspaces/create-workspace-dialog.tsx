@@ -102,7 +102,7 @@ export function CreateWorkspaceDialog({
 							{pending ? "Creating..." : "Create workspace"}
 						</Button>
 					</div>
-					<div className="border-t bg-muted rounded-b-md px-6 py-4">
+					<div className="border-t rounded-b-md px-6 py-4">
 						<div className="flex items-start space-x-3">
 							<div className="mt-1 pt-0.5">
 								<Switch

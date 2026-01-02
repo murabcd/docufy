@@ -133,7 +133,7 @@ export function InviteMembersDialog({
 					</div>
 				</form>
 				<h4 className="mt-4 text-sm font-medium text-foreground">
-					People with existing access
+					Members with existing access
 				</h4>
 				<ul className="divide-y">
 					{members.map((member) => (

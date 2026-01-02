@@ -25,6 +25,16 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SettingsDialog } from "@/components/settings/settings-dialog";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -170,7 +180,7 @@ function SitePublishPreview({
 						transformOrigin: "top left",
 					}}
 				/>
-				<div className="pointer-events-none absolute left-0 top-0 h-5 w-full bg-gradient-to-b from-background/70 to-transparent" />
+				<div className="pointer-events-none absolute left-0 top-0 h-5 w-full bg-linear-to-b from-background/70 to-transparent" />
 			</div>
 			<div className="sr-only">
 				{hostname}/{pathLabel}
@@ -216,6 +226,11 @@ export function ShareDialogModal({
 	const [customLinkExpiresAt, setCustomLinkExpiresAt] = useState<string>("");
 	const [timeZone, setTimeZone] = useState<string | undefined>(undefined);
 	const [isTemplate, setIsTemplate] = useState(false);
+	const wasOpenRef = useRef(open);
+	const [confirmDowngradeOpen, setConfirmDowngradeOpen] = useState(false);
+	const [pendingOwnerPermission, setPendingOwnerPermission] = useState<
+		"full" | "edit" | "comment" | "view" | null
+	>(null);
 
 	const { data: document } = useSuspenseQuery(documentsQueries.get(documentId));
 	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
@@ -246,9 +261,10 @@ export function ShareDialogModal({
 
 	// Sync access level with document state when popover opens or document changes
 	useEffect(() => {
+		const wasOpen = wasOpenRef.current;
+		wasOpenRef.current = open;
 		if (open) {
 			setAccessLevel(effectiveAccessLevel);
-			setActiveTab(initialTab ?? "share");
 			setWorkspacePermission(document?.workspaceAccessLevel ?? "full");
 			setPublicPermission(document?.publicAccessLevel ?? "view");
 			setIsTemplate(document?.isTemplate ?? false);
@@ -260,8 +276,11 @@ export function ShareDialogModal({
 				setLinkExpires("never");
 				setCustomLinkExpiresAt("");
 			}
-			setEmail("");
-			setPublishView("main");
+			if (!wasOpen) {
+				setActiveTab(initialTab ?? "share");
+				setEmail("");
+				setPublishView("main");
+			}
 		}
 	}, [document, effectiveAccessLevel, initialTab, open]);
 
@@ -524,7 +543,11 @@ export function ShareDialogModal({
 	return (
 		<Popover open={open} onOpenChange={onOpenChange}>
 			{trigger && <PopoverTrigger asChild>{trigger}</PopoverTrigger>}
-			<PopoverContent className="w-[450px] p-0" align="end">
+			<PopoverContent
+				className="w-[450px] p-0"
+				align="end"
+				avoidCollisions={false}
+			>
 				{activeTab === "publish" && publishView !== "main" ? (
 					<div className="flex items-center gap-2 border-b px-4 py-3">
 						<button
@@ -621,9 +644,17 @@ export function ShareDialogModal({
 										<Select
 											value={ownerPermission}
 											onValueChange={(value) => {
-												setOwnerPermission(
-													value as "full" | "edit" | "comment" | "view",
-												);
+												const next = value as
+													| "full"
+													| "edit"
+													| "comment"
+													| "view";
+												if (ownerPermission === "full" && next !== "full") {
+													setPendingOwnerPermission(next);
+													setConfirmDowngradeOpen(true);
+													return;
+												}
+												setOwnerPermission(next);
 											}}
 											disabled={pending}
 										>
@@ -1110,6 +1141,38 @@ export function ShareDialogModal({
 						</div>
 					)}
 
+					<AlertDialog
+						open={confirmDowngradeOpen}
+						onOpenChange={(next) => {
+							setConfirmDowngradeOpen(next);
+							if (!next) setPendingOwnerPermission(null);
+						}}
+					>
+						<AlertDialogContent>
+							<AlertDialogHeader>
+								<AlertDialogTitle>Downgrade your access?</AlertDialogTitle>
+								<AlertDialogDescription>
+									Are you sure you want to downgrade your own access? You may
+									lose the ability to manage sharing and settings for this page.
+								</AlertDialogDescription>
+							</AlertDialogHeader>
+							<AlertDialogFooter>
+								<AlertDialogCancel>Cancel</AlertDialogCancel>
+								<AlertDialogAction
+									className="bg-destructive text-white hover:bg-destructive/90"
+									onClick={() => {
+										if (!pendingOwnerPermission) return;
+										setOwnerPermission(pendingOwnerPermission);
+										setPendingOwnerPermission(null);
+										setConfirmDowngradeOpen(false);
+									}}
+								>
+									Downgrade
+								</AlertDialogAction>
+							</AlertDialogFooter>
+						</AlertDialogContent>
+					</AlertDialog>
+
 					{activeTab === "publish" && (
 						<div className="space-y-4">
 							{publishView === "embed" ? (
@@ -1130,29 +1193,36 @@ export function ShareDialogModal({
 										/>
 									</div>
 									<div className="rounded-lg border bg-muted/30 p-3 overflow-hidden">
-										<pre className="whitespace-pre-wrap wrap-break-word text-sm text-muted-foreground overflow-x-auto max-w-full">
-											{`<iframe
+										<div className="relative">
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<Button
+														variant="outline"
+														size="icon"
+														className="absolute right-0 top-0 h-8 w-8"
+														onClick={async () => {
+															const code = `<iframe\nsrc="${publishedUrl}?embed=1&title=${
+																embedShowTitle ? "1" : "0"
+															}"\nwidth="100%" height="600"\nframeborder="0" allowfullscreen />`;
+															await navigator.clipboard.writeText(code);
+															toast.success("Embed code copied");
+														}}
+														disabled={pending}
+													>
+														<Copy className="h-4 w-4" />
+													</Button>
+												</TooltipTrigger>
+												<TooltipContent>
+													<p>Copy code</p>
+												</TooltipContent>
+											</Tooltip>
+											<pre className="whitespace-pre-wrap break-words text-sm text-muted-foreground max-w-full pr-10">
+												{`<iframe
 	src="${publishedUrl}?embed=1&title=${embedShowTitle ? "1" : "0"}"
 	width="100%" height="600"
 	frameborder="0" allowfullscreen />`}
-										</pre>
-									</div>
-									<div className="flex items-center justify-end">
-										<Button
-											variant="outline"
-											onClick={async () => {
-												const code = `<iframe\nsrc="${publishedUrl}?embed=1&title=${
-													embedShowTitle ? "1" : "0"
-												}"\nwidth="100%" height="600"\nframeborder="0" allowfullscreen />`;
-												await navigator.clipboard.writeText(code);
-												toast.success("Embed code copied");
-											}}
-											className="gap-2"
-											disabled={pending}
-										>
-											<Copy className="h-4 w-4" />
-											Copy code
-										</Button>
+											</pre>
+										</div>
 									</div>
 								</div>
 							) : publishView === "social" ? (
@@ -1233,15 +1303,6 @@ export function ShareDialogModal({
 											<Mail className="h-4 w-4 text-muted-foreground" />
 											<span>Share via Email</span>
 										</button>
-									</div>
-									<div className="flex items-center justify-end">
-										<Button
-											variant="outline"
-											onClick={handleCopyPublishedLink}
-											disabled={pending}
-										>
-											Copy link
-										</Button>
 									</div>
 								</div>
 							) : isPublished ? (

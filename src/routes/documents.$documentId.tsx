@@ -11,6 +11,7 @@ import {
 	useEffectEvent,
 	useMemo,
 	useRef,
+	useState,
 	useTransition,
 } from "react";
 import { toast } from "sonner";
@@ -73,6 +74,10 @@ function DocumentEditor() {
 	).withOptimisticUpdate(optimisticUpdateDocument);
 	const editorRef = useRef<TiptapEditorHandle>(null);
 	const [, startTransition] = useTransition();
+	const [shareDialogOpen, setShareDialogOpen] = useState(false);
+	const [shareDialogInitialTab, setShareDialogInitialTab] = useState<
+		"share" | "publish"
+	>("share");
 	const { activeWorkspaceId, setActiveWorkspaceId } = useActiveWorkspace();
 	const { data: document } = useSuspenseQuery(
 		documentsQueries.get(documentId as Id<"documents">),
@@ -534,9 +539,19 @@ function DocumentEditor() {
 					ancestors={ancestors}
 					onTitleChange={onTitleChangeIfEditable}
 					updatedAt={document?.updatedAt}
+					shareDialogOpen={shareDialogOpen}
+					onShareDialogOpenChange={setShareDialogOpen}
+					shareDialogInitialTab={shareDialogInitialTab}
+					onShareDialogInitialTabChange={setShareDialogInitialTab}
 				/>
 				{document?.isPublished && !document.isArchived && (
-					<PublishedBanner documentId={documentId as Id<"documents">} />
+					<PublishedBanner
+						documentId={documentId as Id<"documents">}
+						onOpenSiteSettings={() => {
+							setShareDialogInitialTab("publish");
+							setShareDialogOpen(true);
+						}}
+					/>
 				)}
 				{document?.isArchived && (
 					<TrashBanner documentId={documentId as Id<"documents">} />

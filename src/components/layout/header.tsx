@@ -37,6 +37,10 @@ type HeaderProps = {
 	ancestors?: Array<{ _id: Id<"documents">; title: string }>;
 	onTitleChange?: (title: string) => void | Promise<void>;
 	updatedAt?: number;
+	shareDialogOpen?: boolean;
+	onShareDialogOpenChange?: (open: boolean) => void;
+	shareDialogInitialTab?: "share" | "publish";
+	onShareDialogInitialTabChange?: (tab: "share" | "publish") => void;
 };
 
 export function Header({
@@ -47,15 +51,32 @@ export function Header({
 	ancestors = [],
 	onTitleChange,
 	updatedAt,
+	shareDialogOpen,
+	onShareDialogOpenChange,
+	shareDialogInitialTab,
+	onShareDialogInitialTabChange,
 }: HeaderProps) {
 	const { toggleRightSidebar, state, isMobile } = useSidebar();
 	const { createAndNavigate, isCreating } = useCreateDocument();
 	const [isEditingTitle, setIsEditingTitle] = useState(false);
-	const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+	const [uncontrolledShareDialogOpen, setUncontrolledShareDialogOpen] =
+		useState(false);
+	const [
+		uncontrolledShareDialogInitialTab,
+		setUncontrolledShareDialogInitialTab,
+	] = useState<"share" | "publish">("share");
 	const [titleValue, setTitleValue] = useState(
 		documentTitle || title || "Untitled",
 	);
 	const canEditTitle = !!documentId && !!onTitleChange;
+
+	const isShareDialogOpen = shareDialogOpen ?? uncontrolledShareDialogOpen;
+	const setIsShareDialogOpen =
+		onShareDialogOpenChange ?? setUncontrolledShareDialogOpen;
+	const shareDialogTab =
+		shareDialogInitialTab ?? uncontrolledShareDialogInitialTab;
+	const setShareDialogTab =
+		onShareDialogInitialTabChange ?? setUncontrolledShareDialogInitialTab;
 
 	// Show Plus button in header when sidebar is collapsed OR on mobile (like openchat)
 	const showPlusButton = state === "collapsed" || isMobile;
@@ -332,8 +353,14 @@ export function Header({
 						open={isShareDialogOpen}
 						onOpenChange={setIsShareDialogOpen}
 						documentId={documentId}
+						initialTab={shareDialogTab}
 						trigger={
-							<Button variant="ghost" size="sm" className="h-8">
+							<Button
+								variant="ghost"
+								size="sm"
+								className="h-8"
+								onClick={() => setShareDialogTab("share")}
+							>
 								Share
 							</Button>
 						}
