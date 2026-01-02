@@ -31,6 +31,7 @@ export interface Team {
 	id?: string;
 	name: string;
 	logo: LucideIcon;
+	icon?: string;
 	plan: string;
 	isPrivate?: boolean;
 }
@@ -138,6 +139,7 @@ export function AppSidebar({
 						? "Guest"
 						: workspace.name,
 				logo: Command,
+				icon: workspace.icon,
 				plan: "Free",
 				isPrivate: workspace.isPrivate ?? false,
 			}));

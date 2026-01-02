@@ -6,9 +6,15 @@ import type { Id } from "../../convex/_generated/dataModel";
 type WorkspaceSummary = {
 	_id: Id<"workspaces">;
 	name: string;
+	ownerId: string;
+	icon?: string;
 	isPrivate?: boolean;
 	publicHomepageDocumentId?: Id<"documents">;
 	alwaysShowPublishedBanner?: boolean;
+	defaultWorkspaceIds?: Id<"workspaces">[];
+	onlyOwnersCanCreateWorkspaces?: boolean;
+	createdAt: number;
+	updatedAt: number;
 };
 
 type ActiveWorkspaceContextValue = {

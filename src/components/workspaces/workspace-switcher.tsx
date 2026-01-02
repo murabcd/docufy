@@ -40,6 +40,7 @@ import { InviteMembersDialog } from "@/components/workspaces/invite-members-dial
 import { useCreateDocument } from "@/hooks/use-create-document";
 import { authClient } from "@/lib/auth-client";
 import { authQueries } from "@/queries";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 export function WorkspaceSwitcher({
 	teams,
@@ -51,6 +52,7 @@ export function WorkspaceSwitcher({
 		id?: string;
 		name: string;
 		logo: React.ElementType;
+		icon?: string;
 		plan: string;
 		isPrivate?: boolean;
 	}[];
@@ -168,7 +170,7 @@ export function WorkspaceSwitcher({
 				<InviteMembersDialog
 					open={inviteMembersOpen}
 					onOpenChange={setInviteMembersOpen}
-					workspaceId={activeTeam.id}
+					workspaceId={activeTeam.id as Id<"workspaces">}
 					canInviteMembers={canInviteMembers}
 				/>
 			) : null}
@@ -178,8 +180,21 @@ export function WorkspaceSwitcher({
 						<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
 							<DropdownMenuTrigger asChild>
 								<SidebarMenuButton className="w-full px-1.5">
-									<div className="bg-sidebar-primary dark:bg-sidebar-primary-foreground text-sidebar-primary-foreground dark:text-sidebar-primary flex aspect-square size-5 items-center justify-center rounded-md shrink-0">
-										<activeTeam.logo className="size-3" />
+									<div className="bg-sidebar-primary dark:bg-sidebar-primary-foreground text-sidebar-primary-foreground dark:text-sidebar-primary flex aspect-square size-5 items-center justify-center rounded-md shrink-0 overflow-hidden">
+										{activeTeam.icon ? (
+											activeTeam.icon.startsWith("data:") ||
+											activeTeam.icon.startsWith("http") ? (
+												<img
+													src={activeTeam.icon}
+													alt={activeTeam.name}
+													className="size-full object-cover"
+												/>
+											) : (
+												<span className="text-xs">{activeTeam.icon}</span>
+											)
+										) : (
+											<activeTeam.logo className="size-3" />
+										)}
 									</div>
 									<span className="truncate font-medium flex-1">
 										{activeTeam.name}
@@ -249,8 +264,21 @@ export function WorkspaceSwitcher({
 											onClick={() => onSelectTeamId?.(teamKey)}
 											className="gap-2"
 										>
-											<div className="flex size-6 items-center justify-center rounded-xs border">
-												<team.logo className="size-4 shrink-0" />
+											<div className="flex size-6 items-center justify-center rounded-xs border overflow-hidden">
+												{team.icon ? (
+													team.icon.startsWith("data:") ||
+													team.icon.startsWith("http") ? (
+														<img
+															src={team.icon}
+															alt={team.name}
+															className="size-full object-cover"
+														/>
+													) : (
+														<span className="text-sm">{team.icon}</span>
+													)
+												) : (
+													<team.logo className="size-4 shrink-0" />
+												)}
 											</div>
 											<span className="truncate">{team.name}</span>
 											{team.isPrivate ? (

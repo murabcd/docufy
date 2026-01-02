@@ -23,22 +23,50 @@ export function InviteMembersDialog({
 	open,
 	onOpenChange,
 	workspaceId,
+	workspaceName,
 	canInviteMembers = false,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	workspaceId?: string;
+	workspaceId: Id<"workspaces">;
+	workspaceName?: string;
 	canInviteMembers?: boolean;
 }) {
-	const inviteMember = useMutation(api.workspaces.inviteMember);
+	const inviteMember = useMutation(
+		api.workspaces.inviteMember,
+	).withOptimisticUpdate((localStore, args) => {
+		const existing = localStore.getQuery(api.workspaces.listMembers, {
+			workspaceId: args.workspaceId,
+		});
+		if (existing === undefined) return;
+
+		const email = args.email.trim().toLowerCase();
+		if (!email) return;
+		if (existing.some((m) => m.email.trim().toLowerCase() === email)) return;
+
+		const now = Date.now();
+		localStore.setQuery(
+			api.workspaces.listMembers,
+			{ workspaceId: args.workspaceId },
+			[
+				...existing,
+				{
+					userId: `optimistic:${crypto.randomUUID()}`,
+					role: "member" as const,
+					createdAt: now,
+					name: email,
+					email,
+					image: null,
+				},
+			],
+		);
+	});
 	const [email, setEmail] = useState("");
 	const [pending, setPending] = useState(false);
 
-	const canQueryMembers =
-		canInviteMembers && Boolean(workspaceId) && workspaceId !== "default";
-	const workspaceIdForQuery = (workspaceId ?? "default") as Id<"workspaces">;
+	const canQueryMembers = canInviteMembers;
 	const membersQuery = useQuery({
-		...workspacesQueries.members(workspaceIdForQuery),
+		...workspacesQueries.members(workspaceId),
 		enabled: open && canQueryMembers,
 		gcTime: 10_000,
 		placeholderData: (prev) => prev ?? [],
@@ -67,10 +95,6 @@ export function InviteMembersDialog({
 			toast.error("You don't have permission to invite members");
 			return;
 		}
-		if (!workspaceId) {
-			toast.error("No workspace selected");
-			return;
-		}
 
 		const trimmedEmail = email.trim();
 		if (!trimmedEmail) {
@@ -87,7 +111,7 @@ export function InviteMembersDialog({
 		setPending(true);
 		try {
 			await inviteMember({
-				workspaceId: workspaceId as Id<"workspaces">,
+				workspaceId,
 				email: trimmedEmail,
 			});
 			setEmail("");
@@ -107,7 +131,9 @@ export function InviteMembersDialog({
 			<DialogContent className="sm:max-w-2xl">
 				<DialogHeader>
 					<DialogTitle className="font-semibold text-foreground">
-						Invite members
+						{workspaceName
+							? `Invite people to ${workspaceName}`
+							: "Invite members"}
 					</DialogTitle>
 					<DialogDescription className="text-sm leading-6 text-muted-foreground">
 						Add new team members to your workspace.
