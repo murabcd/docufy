@@ -1,7 +1,9 @@
 import { ProsemirrorSync } from "@convex-dev/prosemirror-sync";
 import type { GenericMutationCtx, GenericQueryCtx } from "convex/server";
+import { ConvexError } from "convex/values";
 import { components } from "./_generated/api";
 import type { DataModel, Id } from "./_generated/dataModel";
+import { authComponent } from "./auth";
 
 type ProsemirrorNode = {
 	type?: string;
@@ -11,11 +13,107 @@ type ProsemirrorNode = {
 
 type AnyCtx = GenericQueryCtx<DataModel> | GenericMutationCtx<DataModel>;
 
+type MembershipRole = "owner" | "member";
+type AccessLevel = "full" | "edit" | "comment" | "view";
+
 const getDocument = async (
 	ctx: AnyCtx,
 	id: Id<"documents">,
 ) => {
 	return await ctx.db.get(id);
+};
+
+const getUserId = async (ctx: AnyCtx) => {
+	const user = await authComponent.safeGetAuthUser(ctx as any);
+	return user ? String(user._id) : null;
+};
+
+const isPublicLinkActive = (doc: { publicLinkExpiresAt?: number }) => {
+	const expiresAt = doc.publicLinkExpiresAt;
+	if (expiresAt === undefined) return true;
+	return expiresAt > Date.now();
+};
+
+const isWebLinkEnabled = (doc: { webLinkEnabled?: boolean }) =>
+	doc.webLinkEnabled === true;
+
+const resolveInternalAccess = (doc: { generalAccess?: string }) => {
+	return doc.generalAccess === "workspace" ? "workspace" : "private";
+};
+
+const isWriteLevel = (level: AccessLevel) => level === "full" || level === "edit";
+
+const getMembership = async (ctx: AnyCtx, workspaceId: Id<"workspaces">, userId: string) => {
+	return await ctx.db
+		.query("members")
+		.withIndex("by_workspace_user", (q) =>
+			q.eq("workspaceId", workspaceId).eq("userId", userId),
+		)
+		.unique();
+};
+
+const getExplicitPermission = async (
+	ctx: AnyCtx,
+	documentId: Id<"documents">,
+	userId: string,
+) => {
+	return await ctx.db
+		.query("documentPermissions")
+		.withIndex("by_document_grantee", (q) =>
+			q.eq("documentId", documentId).eq("granteeUserId", userId),
+		)
+		.unique();
+};
+
+const canReadDocument = async (
+	ctx: AnyCtx,
+	doc: any,
+	userId: string | null,
+) => {
+	if (doc.isPublished) return true;
+	if (isWebLinkEnabled(doc) && isPublicLinkActive(doc)) return true;
+	if (!userId) return false;
+	if (!doc.workspaceId) return doc.userId === userId;
+
+	const membership = await getMembership(ctx, doc.workspaceId, userId);
+	if (!membership) return false;
+	if ((membership.role as MembershipRole) === "owner") return true;
+	if (doc.userId === userId) return true;
+
+	if (resolveInternalAccess(doc) === "workspace") return true;
+
+	const explicit = await getExplicitPermission(ctx, doc._id, userId);
+	return Boolean(explicit);
+};
+
+const canWriteDocument = async (
+	ctx: AnyCtx,
+	doc: any,
+	userId: string | null,
+) => {
+	if (
+		isWebLinkEnabled(doc) &&
+		isPublicLinkActive(doc) &&
+		doc.publicAccessLevel === "edit"
+	) {
+		return true;
+	}
+	if (!userId) return false;
+	if (!doc.workspaceId) return doc.userId === userId;
+
+	const membership = await getMembership(ctx, doc.workspaceId, userId);
+	if (!membership) return false;
+	if ((membership.role as MembershipRole) === "owner") return true;
+	if (doc.userId === userId) return true;
+
+	if (resolveInternalAccess(doc) === "workspace") {
+		const workspaceLevel = (doc.workspaceAccessLevel ?? "full") as AccessLevel;
+		return isWriteLevel(workspaceLevel);
+	}
+
+	const explicit = await getExplicitPermission(ctx, doc._id, userId);
+	if (!explicit) return false;
+	return isWriteLevel(explicit.accessLevel as AccessLevel);
 };
 
 const prosemirrorSync = new ProsemirrorSync<Id<"documents">>(
@@ -87,12 +185,20 @@ export const {
 		if (!document) {
 			return;
 		}
+		const userId = await getUserId(ctx);
+		if (!(await canReadDocument(ctx, document, userId))) {
+			throw new ConvexError("Unauthorized");
+		}
 	},
 	checkWrite: async (ctx, id) => {
 		// Same rationale as `checkRead`: avoid noisy errors during deletion races.
 		const document = await getDocument(ctx, id);
 		if (!document) {
 			return;
+		}
+		const userId = await getUserId(ctx);
+		if (!(await canWriteDocument(ctx, document, userId))) {
+			throw new ConvexError("Unauthorized");
 		}
 	},
 	onSnapshot: async (ctx, id, snapshot) => {

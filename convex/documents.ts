@@ -36,6 +36,115 @@ const requireWorkspaceAccess = async (
 	return userId;
 };
 
+type GeneralAccess = "private" | "workspace";
+type AccessLevel = "full" | "edit" | "comment" | "view";
+
+const resolveGeneralAccess = (doc: Doc<"documents">): GeneralAccess => {
+	if (doc.generalAccess === "private" || doc.generalAccess === "workspace") {
+		return doc.generalAccess;
+	}
+	return "private";
+};
+
+const resolveWorkspaceAccessLevel = (doc: Doc<"documents">): AccessLevel => {
+	return doc.workspaceAccessLevel ?? "full";
+};
+
+const isPublicLinkActive = (doc: Doc<"documents">) => {
+	const expiresAt = doc.publicLinkExpiresAt;
+	if (expiresAt === undefined) return true;
+	return expiresAt > Date.now();
+};
+
+const isWebLinkEnabled = (doc: Doc<"documents">) => {
+	return doc.webLinkEnabled === true;
+};
+
+const getWorkspaceMembership = async (
+	ctx: QueryCtx | MutationCtx,
+	workspaceId: Id<"workspaces">,
+	userId: string,
+) => {
+	return await ctx.db
+		.query("members")
+		.withIndex("by_workspace_user", (q) =>
+			q.eq("workspaceId", workspaceId).eq("userId", userId),
+		)
+		.unique();
+};
+
+const getExplicitDocumentPermission = async (
+	ctx: QueryCtx | MutationCtx,
+	documentId: Id<"documents">,
+	granteeUserId: string,
+) => {
+	return await ctx.db
+		.query("documentPermissions")
+		.withIndex("by_document_grantee", (q) =>
+			q.eq("documentId", documentId).eq("granteeUserId", granteeUserId),
+		)
+		.unique();
+};
+
+const listExplicitPermissionsForWorkspaceUser = async (
+	ctx: QueryCtx | MutationCtx,
+	workspaceId: Id<"workspaces">,
+	granteeUserId: string,
+) => {
+	const rows = await ctx.db
+		.query("documentPermissions")
+		.withIndex("by_workspace_grantee", (q) =>
+			q.eq("workspaceId", workspaceId).eq("granteeUserId", granteeUserId),
+		)
+		.collect();
+	return new Map<string, AccessLevel>(
+		rows.map((row) => [String(row.documentId), row.accessLevel]),
+	);
+};
+
+const getEffectiveAccessLevel = async (
+	ctx: QueryCtx | MutationCtx,
+	doc: Doc<"documents">,
+	userId: string,
+): Promise<AccessLevel | null> => {
+	if (doc.userId && doc.userId === userId) return "full";
+	if (!doc.workspaceId) return null;
+
+	const membership = await getWorkspaceMembership(ctx, doc.workspaceId, userId);
+	if (!membership) return null;
+	if (membership.role === "owner") return "full";
+
+	const generalAccess = resolveGeneralAccess(doc);
+	if (generalAccess === "workspace") {
+		return resolveWorkspaceAccessLevel(doc);
+	}
+
+	const explicit = await getExplicitDocumentPermission(ctx, doc._id, userId);
+	return explicit?.accessLevel ?? null;
+};
+
+const requireDocumentReadAccess = async (
+	ctx: QueryCtx | MutationCtx,
+	doc: Doc<"documents">,
+	userId: string,
+) => {
+	const access = await getEffectiveAccessLevel(ctx, doc, userId);
+	if (!access) throw new ConvexError("Not found");
+	return access;
+};
+
+const requireDocumentWriteAccess = async (
+	ctx: QueryCtx | MutationCtx,
+	doc: Doc<"documents">,
+	userId: string,
+) => {
+	const access = await requireDocumentReadAccess(ctx, doc, userId);
+	if (access !== "full" && access !== "edit") {
+		throw new ConvexError("Unauthorized");
+	}
+	return access;
+};
+
 const resolveWorkspaceId = async (
 	ctx: QueryCtx,
 	workspaceId: Id<"workspaces"> | undefined,
@@ -65,6 +174,23 @@ const documentFields = {
 	isArchived: v.boolean(),
 	archivedAt: v.optional(v.number()),
 	isPublished: v.boolean(),
+	webLinkEnabled: v.optional(v.boolean()),
+	isTemplate: v.optional(v.boolean()),
+	generalAccess: v.optional(
+		v.union(v.literal("private"), v.literal("workspace"), v.literal("public")),
+	),
+	workspaceAccessLevel: v.optional(
+		v.union(
+			v.literal("full"),
+			v.literal("edit"),
+			v.literal("comment"),
+			v.literal("view"),
+		),
+	),
+	publicAccessLevel: v.optional(
+		v.union(v.literal("edit"), v.literal("comment"), v.literal("view")),
+	),
+	publicLinkExpiresAt: v.optional(v.number()),
 	includeInAi: v.boolean(),
 	lastEditedAt: v.number(),
 	lastEmbeddedAt: v.optional(v.number()),
@@ -90,6 +216,13 @@ export const create = mutation({
 				.first())?.workspaceId;
 		if (!workspaceId) throw new ConvexError("No workspace");
 		await requireWorkspaceAccess(ctx, workspaceId);
+		if (args.parentId) {
+			const parent = await ctx.db.get(args.parentId);
+			if (!parent || parent.workspaceId !== workspaceId || parent.isArchived) {
+				throw new ConvexError("Not found");
+			}
+			await requireDocumentWriteAccess(ctx, parent, userId);
+		}
 		const now = Date.now();
 
 		const siblings = await ctx.db
@@ -122,6 +255,12 @@ export const create = mutation({
 			isArchived: false,
 			archivedAt: undefined,
 			isPublished: false,
+			webLinkEnabled: false,
+			isTemplate: false,
+			generalAccess: "private",
+			workspaceAccessLevel: "full",
+			publicAccessLevel: "view",
+			publicLinkExpiresAt: undefined,
 			includeInAi: true,
 			lastEditedAt: now,
 			lastEmbeddedAt: undefined,
@@ -183,6 +322,13 @@ export const createFromAi = mutation({
 				.first())?.workspaceId;
 		if (!workspaceId) throw new ConvexError("No workspace");
 		await requireWorkspaceAccess(ctx, workspaceId);
+		if (args.parentId) {
+			const parent = await ctx.db.get(args.parentId);
+			if (!parent || parent.workspaceId !== workspaceId || parent.isArchived) {
+				throw new ConvexError("Not found");
+			}
+			await requireDocumentWriteAccess(ctx, parent, userId);
+		}
 		const now = Date.now();
 
 		const siblings = await ctx.db
@@ -218,6 +364,12 @@ export const createFromAi = mutation({
 			isArchived: false,
 			archivedAt: undefined,
 			isPublished: false,
+			webLinkEnabled: false,
+			isTemplate: false,
+			generalAccess: "private",
+			workspaceAccessLevel: "full",
+			publicAccessLevel: "view",
+			publicLinkExpiresAt: undefined,
 			includeInAi: true,
 			lastEditedAt: now,
 			lastEmbeddedAt: undefined,
@@ -245,18 +397,19 @@ export const get = query({
 		if (!userId) return null;
 		const doc = await ctx.db.get(args.id);
 		if (!doc) return null;
-		if (doc.workspaceId) {
-			const membership = await ctx.db
-				.query("members")
-				.withIndex("by_workspace_user", (q) =>
-					q.eq("workspaceId", doc.workspaceId!).eq("userId", userId),
-				)
-				.unique();
-			if (!membership) return null;
-		} else if (doc.userId !== userId) {
+		if (!doc.workspaceId) {
+			return doc.userId === userId ? doc : null;
+		}
+
+		const membership = await getWorkspaceMembership(ctx, doc.workspaceId, userId);
+		if (!membership) return null;
+
+		try {
+			await requireDocumentReadAccess(ctx, doc, userId);
+			return doc;
+		} catch {
 			return null;
 		}
-		return doc;
 	},
 });
 
@@ -270,10 +423,35 @@ export const getPublished = query({
 	),
 	handler: async (ctx, args) => {
 		const doc = await ctx.db.get(args.id);
-		if (!doc || doc.isArchived || !doc.isPublished) {
+		if (!doc || doc.isArchived) {
 			return null;
 		}
+		if (doc.isPublished) return doc;
+		if (!isWebLinkEnabled(doc)) return null;
+		if (!isPublicLinkActive(doc)) return null;
 		return doc;
+	},
+});
+
+export const getMyAccessLevel = query({
+	args: {
+		id: v.id("documents"),
+	},
+	returns: v.union(
+		v.union(
+			v.literal("full"),
+			v.literal("edit"),
+			v.literal("comment"),
+			v.literal("view"),
+		),
+		v.null(),
+	),
+	handler: async (ctx, args) => {
+		const userId = await getUserId(ctx);
+		if (!userId) return null;
+		const doc = await ctx.db.get(args.id);
+		if (!doc) return null;
+		return await getEffectiveAccessLevel(ctx, doc, userId);
 	},
 });
 
@@ -287,7 +465,6 @@ export const update = mutation({
 		icon: v.optional(v.union(v.string(), v.null())),
 		coverImage: v.optional(v.union(v.string(), v.null())),
 		isArchived: v.optional(v.boolean()),
-		isPublished: v.optional(v.boolean()),
 		includeInAi: v.optional(v.boolean()),
 	},
 	returns: v.null(),
@@ -297,11 +474,7 @@ export const update = mutation({
 		if (!existing) {
 			throw new ConvexError("Not found");
 		}
-		if (existing.workspaceId) {
-			await requireWorkspaceAccess(ctx, existing.workspaceId);
-		} else if (existing.userId !== userId) {
-			throw new ConvexError("Not found");
-		}
+		await requireDocumentWriteAccess(ctx, existing, userId);
 
 		const { id, ...updates } = args;
 		const now = Date.now();
@@ -339,6 +512,252 @@ export const update = mutation({
 	},
 });
 
+const requireDocumentAdminAccess = async (
+	ctx: QueryCtx | MutationCtx,
+	doc: Doc<"documents">,
+	userId: string,
+) => {
+	if (!doc.workspaceId) {
+		if (doc.userId !== userId) throw new ConvexError("Not found");
+		return;
+	}
+
+	const membership = await getWorkspaceMembership(ctx, doc.workspaceId, userId);
+	if (!membership) throw new ConvexError("Not found");
+
+	if (membership.role === "owner") return;
+	if (doc.userId && doc.userId === userId) return;
+
+	throw new ConvexError("Unauthorized");
+};
+
+export const setGeneralAccess = mutation({
+	args: {
+		documentId: v.id("documents"),
+		generalAccess: v.union(v.literal("private"), v.literal("workspace")),
+		webLinkEnabled: v.optional(v.boolean()),
+		workspaceAccessLevel: v.optional(
+			v.union(
+				v.literal("full"),
+				v.literal("edit"),
+				v.literal("comment"),
+				v.literal("view"),
+			),
+		),
+		publicAccessLevel: v.optional(
+			v.union(v.literal("edit"), v.literal("comment"), v.literal("view")),
+		),
+		publicLinkExpiresAt: v.optional(v.union(v.number(), v.null())),
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const userId = await requireUserId(ctx);
+		const document = await ctx.db.get(args.documentId);
+		if (!document) throw new ConvexError("Not found");
+
+		await requireDocumentAdminAccess(ctx, document, userId);
+
+		const now = Date.now();
+		const nextWebLinkEnabled = args.webLinkEnabled ?? document.webLinkEnabled ?? false;
+
+		if (
+			args.publicLinkExpiresAt !== undefined &&
+			args.publicLinkExpiresAt !== null &&
+			args.publicLinkExpiresAt <= now
+		) {
+			throw new ConvexError("Expiry must be in the future");
+		}
+		const patch: Partial<Doc<"documents">> & Record<string, unknown> = {
+			generalAccess: args.generalAccess,
+			webLinkEnabled: nextWebLinkEnabled,
+			updatedAt: now,
+		};
+
+		if (args.workspaceAccessLevel !== undefined) {
+			patch.workspaceAccessLevel = args.workspaceAccessLevel;
+		}
+		if (args.publicAccessLevel !== undefined) {
+			patch.publicAccessLevel = args.publicAccessLevel;
+		}
+		if (args.publicLinkExpiresAt !== undefined) {
+			patch.publicLinkExpiresAt =
+				args.publicLinkExpiresAt === null ? undefined : args.publicLinkExpiresAt;
+		}
+
+		await ctx.db.patch(args.documentId, patch);
+		return null;
+	},
+});
+
+export const setPublishSettings = mutation({
+	args: {
+		documentId: v.id("documents"),
+		isPublished: v.optional(v.boolean()),
+		isTemplate: v.optional(v.boolean()),
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const userId = await requireUserId(ctx);
+		const document = await ctx.db.get(args.documentId);
+		if (!document) throw new ConvexError("Not found");
+
+		await requireDocumentAdminAccess(ctx, document, userId);
+
+		const patch: Record<string, unknown> = { updatedAt: Date.now() };
+		if (args.isPublished !== undefined) patch.isPublished = args.isPublished;
+		if (args.isTemplate !== undefined) patch.isTemplate = args.isTemplate;
+
+		await ctx.db.patch(args.documentId, patch);
+		return null;
+	},
+});
+
+export const inviteToDocument = mutation({
+	args: {
+		documentId: v.id("documents"),
+		email: v.string(),
+		accessLevel: v.union(
+			v.literal("full"),
+			v.literal("edit"),
+			v.literal("comment"),
+			v.literal("view"),
+		),
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const userId = await requireUserId(ctx);
+		const document = await ctx.db.get(args.documentId);
+		if (!document) throw new ConvexError("Not found");
+		if (!document.workspaceId) throw new ConvexError("Not found");
+
+		await requireDocumentAdminAccess(ctx, document, userId);
+
+		const email = args.email.trim().toLowerCase();
+		if (!email) throw new ConvexError("Email required");
+
+		const user = (await ctx.runQuery(components.betterAuth.adapter.findOne, {
+			model: "user",
+			where: [{ field: "email", value: email }],
+		})) as { _id: string } | null;
+
+		if (!user) throw new ConvexError("User not found");
+		if (document.userId && user._id === document.userId) return null;
+
+		const existing = await getExplicitDocumentPermission(
+			ctx,
+			args.documentId,
+			user._id,
+		);
+		const now = Date.now();
+
+		if (existing) {
+			await ctx.db.patch(existing._id, {
+				accessLevel: args.accessLevel,
+				grantedByUserId: userId,
+				updatedAt: now,
+			});
+			return null;
+		}
+
+		await ctx.db.insert("documentPermissions", {
+			documentId: args.documentId,
+			workspaceId: document.workspaceId,
+			granteeUserId: user._id,
+			accessLevel: args.accessLevel,
+			grantedByUserId: userId,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		return null;
+	},
+});
+
+export const removeDocumentPermission = mutation({
+	args: {
+		documentId: v.id("documents"),
+		granteeUserId: v.string(),
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const userId = await requireUserId(ctx);
+		const document = await ctx.db.get(args.documentId);
+		if (!document) throw new ConvexError("Not found");
+		if (!document.workspaceId) throw new ConvexError("Not found");
+
+		await requireDocumentAdminAccess(ctx, document, userId);
+
+		const existing = await getExplicitDocumentPermission(
+			ctx,
+			args.documentId,
+			args.granteeUserId,
+		);
+		if (!existing) return null;
+
+		await ctx.db.delete(existing._id);
+		return null;
+	},
+});
+
+export const listDocumentPermissions = query({
+	args: {
+		documentId: v.id("documents"),
+	},
+	returns: v.array(
+		v.object({
+			userId: v.string(),
+			accessLevel: v.union(
+				v.literal("full"),
+				v.literal("edit"),
+				v.literal("comment"),
+				v.literal("view"),
+			),
+			createdAt: v.number(),
+			name: v.string(),
+			email: v.string(),
+			image: v.optional(v.union(v.null(), v.string())),
+		}),
+	),
+	handler: async (ctx, args) => {
+		const userId = await getUserId(ctx);
+		if (!userId) return [];
+		const document = await ctx.db.get(args.documentId);
+		if (!document) return [];
+		if (!document.workspaceId) return [];
+
+		try {
+			await requireDocumentAdminAccess(ctx, document, userId);
+		} catch {
+			return [];
+		}
+
+		const permissions = await ctx.db
+			.query("documentPermissions")
+			.withIndex("by_document", (q) => q.eq("documentId", args.documentId))
+			.collect();
+
+		const users = await Promise.all(
+			permissions.map(async (permission) => {
+				const user = await authComponent.getAnyUserById(
+					ctx,
+					permission.granteeUserId,
+				);
+				if (!user) return null;
+				return {
+					userId: permission.granteeUserId,
+					accessLevel: permission.accessLevel,
+					createdAt: permission.createdAt,
+					name: user.name,
+					email: user.email,
+					image: user.image ?? null,
+				};
+			}),
+		);
+
+		return users.filter((u): u is NonNullable<typeof u> => u !== null);
+	},
+});
+
 export const list = query({
 	args: {
 		workspaceId: v.optional(v.id("workspaces")),
@@ -352,13 +771,24 @@ export const list = query({
 		if (!userId) return [];
 		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
 		if (!workspaceId) return [];
-		const membership = await ctx.db
-			.query("members")
-			.withIndex("by_workspace_user", (q) =>
-				q.eq("workspaceId", workspaceId).eq("userId", userId),
-			)
-			.unique();
+		const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
 		if (!membership) return [];
+
+		if (membership.role === "owner") {
+			return await ctx.db
+				.query("documents")
+				.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+					q.eq("workspaceId", workspaceId).eq("isArchived", false),
+				)
+				.order("desc")
+				.collect();
+		}
+
+		const explicitPermissions = await listExplicitPermissionsForWorkspaceUser(
+			ctx,
+			workspaceId,
+			userId,
+		);
 		const parentId = args.parentId === null ? undefined : args.parentId;
 
 		const docs = await ctx.db
@@ -371,7 +801,14 @@ export const list = query({
 			)
 			.collect();
 
-		return docs.sort((a, b) => {
+			const accessible = docs.filter((doc) => {
+				if (doc.userId && doc.userId === userId) return true;
+				const generalAccess = resolveGeneralAccess(doc);
+				if (generalAccess === "workspace") return true;
+				return explicitPermissions.has(String(doc._id));
+			});
+
+		return accessible.sort((a, b) => {
 			const orderA = a.order ?? 0;
 			const orderB = b.order ?? 0;
 			if (orderA !== orderB) {
@@ -390,13 +827,13 @@ export const reorder = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
+		const userId = await requireUserId(ctx);
 		const document = await ctx.db.get(args.id);
 		if (!document) {
 			throw new ConvexError("Not found");
 		}
 		if (!document.workspaceId) throw new ConvexError("Not found");
-		await requireWorkspaceAccess(ctx, document.workspaceId);
+		await requireDocumentWriteAccess(ctx, document, userId);
 		if (document.isArchived) {
 			throw new Error("Cannot reorder an archived document");
 		}
@@ -411,6 +848,7 @@ export const reorder = mutation({
 			if (!newParent || newParent.workspaceId !== workspaceId) {
 				throw new ConvexError("Not found");
 			}
+			await requireDocumentWriteAccess(ctx, newParent, userId);
 		}
 		
 		if (oldParentId !== newParentId) {
@@ -510,14 +948,14 @@ export const archive = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
+		const userId = await requireUserId(ctx);
 		const now = Date.now();
 		const document = await ctx.db.get(args.id);
 		if (!document) {
 			throw new ConvexError("Not found");
 		}
 		if (!document.workspaceId) throw new ConvexError("Not found");
-		await requireWorkspaceAccess(ctx, document.workspaceId);
+		await requireDocumentWriteAccess(ctx, document, userId);
 		const workspaceId = document.workspaceId;
 
 		const recursiveArchive = async (documentId: Id<"documents">) => {
@@ -562,13 +1000,27 @@ export const getTrash = query({
 		if (!userId) return [];
 		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
 		if (!workspaceId) return [];
-		const membership = await ctx.db
-			.query("members")
-			.withIndex("by_workspace_user", (q) =>
-				q.eq("workspaceId", workspaceId).eq("userId", userId),
-			)
-			.unique();
+		const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
 		if (!membership) return [];
+		if (membership.role === "owner") {
+			const documents = await ctx.db
+				.query("documents")
+				.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+					q.eq("workspaceId", workspaceId).eq("isArchived", true),
+				)
+				.collect();
+
+			return documents.sort((a, b) => {
+				const aArchivedAt = a.archivedAt ?? a.updatedAt;
+				const bArchivedAt = b.archivedAt ?? b.updatedAt;
+				return bArchivedAt - aArchivedAt;
+			});
+		}
+		const explicitPermissions = await listExplicitPermissionsForWorkspaceUser(
+			ctx,
+			workspaceId,
+			userId,
+		);
 		const documents = await ctx.db
 			.query("documents")
 			.withIndex("by_workspace_isArchived_updatedAt", (q) =>
@@ -576,7 +1028,14 @@ export const getTrash = query({
 			)
 			.collect();
 
-		return documents.sort((a, b) => {
+		const accessible = documents.filter((doc) => {
+			if (doc.userId && doc.userId === userId) return true;
+			const generalAccess = resolveGeneralAccess(doc);
+			if (generalAccess === "workspace") return true;
+			return explicitPermissions.has(String(doc._id));
+		});
+
+		return accessible.sort((a, b) => {
 			const aArchivedAt = a.archivedAt ?? a.updatedAt;
 			const bArchivedAt = b.archivedAt ?? b.updatedAt;
 			return bArchivedAt - aArchivedAt;
@@ -590,14 +1049,14 @@ export const restore = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
+		const userId = await requireUserId(ctx);
 		const now = Date.now();
 		const document = await ctx.db.get(args.id);
 		if (!document) {
 			throw new ConvexError("Not found");
 		}
 		if (!document.workspaceId) throw new ConvexError("Not found");
-		await requireWorkspaceAccess(ctx, document.workspaceId);
+		await requireDocumentWriteAccess(ctx, document, userId);
 		const workspaceId = document.workspaceId;
 
 		const recursiveRestore = async (documentId: Id<"documents">) => {
@@ -636,8 +1095,13 @@ export const restore = mutation({
 		let targetParentId: Id<"documents"> | undefined = document.parentId;
 		if (targetParentId) {
 			const parent = await ctx.db.get(targetParentId);
-			if (parent?.isArchived || parent?.workspaceId !== workspaceId) {
+			if (!parent || parent.isArchived || parent.workspaceId !== workspaceId) {
 				targetParentId = undefined;
+			} else {
+				const parentAccess = await getEffectiveAccessLevel(ctx, parent, userId);
+				if (!parentAccess) {
+					targetParentId = undefined;
+				}
 			}
 		}
 
@@ -691,6 +1155,14 @@ async function cascadeDelete(
 	}
 
 	for (const documentId of idsToDelete.reverse()) {
+		const relatedPermissions = await ctx.db
+			.query("documentPermissions")
+			.withIndex("by_document", (q) => q.eq("documentId", documentId))
+			.collect();
+		for (const permission of relatedPermissions) {
+			await ctx.db.delete(permission._id);
+		}
+
 		const relatedChunks = await ctx.db
 			.query("chunks")
 			.withIndex("by_documentId", (q) => q.eq("documentId", documentId))
@@ -721,13 +1193,13 @@ export const remove = mutation({
 	},
 	returns: v.null(),
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
+		const userId = await requireUserId(ctx);
 		const document = await ctx.db.get(args.id);
 		if (!document) {
 			throw new ConvexError("Not found");
 		}
 		if (!document.workspaceId) throw new ConvexError("Not found");
-		await requireWorkspaceAccess(ctx, document.workspaceId);
+		await requireDocumentWriteAccess(ctx, document, userId);
 
 		if (!document.isArchived) {
 			throw new Error("Page must be moved to trash before permanent deletion");
@@ -798,13 +1270,13 @@ export const duplicate = mutation({
 	},
 	returns: v.id("documents"),
 	handler: async (ctx, args) => {
-		await requireUserId(ctx);
+		const userId = await requireUserId(ctx);
 		const original = await ctx.db.get(args.id);
 		if (!original) {
 			throw new ConvexError("Not found");
 		}
 		if (!original.workspaceId) throw new ConvexError("Not found");
-		const userId = await requireWorkspaceAccess(ctx, original.workspaceId);
+		await requireDocumentReadAccess(ctx, original, userId);
 		const workspaceId = original.workspaceId;
 
 		const now = Date.now();
@@ -812,8 +1284,14 @@ export const duplicate = mutation({
 		let targetParentId: Id<"documents"> | undefined = original.parentId;
 		if (targetParentId) {
 			const parent = await ctx.db.get(targetParentId);
-			if (parent?.isArchived || parent?.workspaceId !== workspaceId) {
+			if (!parent || parent.isArchived || parent.workspaceId !== workspaceId) {
 				targetParentId = undefined;
+			} else {
+				try {
+					await requireDocumentWriteAccess(ctx, parent, userId);
+				} catch {
+					targetParentId = undefined;
+				}
 			}
 		}
 
@@ -845,7 +1323,10 @@ export const duplicate = mutation({
 			workspaceId,
 			title: `${original.title} (Copy)`,
 			content: JSON.stringify(contentJson),
-			searchableText: original.searchableText ?? "",
+			searchableText: ensureTitleInSearchableText(
+				`${original.title} (Copy)`,
+				normalizePlainText(original.searchableText ?? ""),
+			),
 			parentId: targetParentId,
 			order: maxOrder + 1,
 			icon: original.icon,
@@ -853,6 +1334,12 @@ export const duplicate = mutation({
 			isArchived: false,
 			archivedAt: undefined,
 			isPublished: false,
+			webLinkEnabled: false,
+			isTemplate: false,
+			generalAccess: "private",
+			workspaceAccessLevel: "full",
+			publicAccessLevel: "view",
+			publicLinkExpiresAt: undefined,
 			includeInAi: original.includeInAi,
 			lastEditedAt: now,
 			lastEmbeddedAt: undefined,
@@ -863,6 +1350,87 @@ export const duplicate = mutation({
 
 		await prosemirrorSync.create(ctx, documentId, contentJson);
 
+		return documentId;
+	},
+});
+
+export const duplicateFromTemplate = mutation({
+	args: {
+		sourceDocumentId: v.id("documents"),
+		workspaceId: v.id("workspaces"),
+	},
+	returns: v.id("documents"),
+	handler: async (ctx, args) => {
+		const userId = await requireUserId(ctx);
+		await requireWorkspaceAccess(ctx, args.workspaceId);
+
+		const source = await ctx.db.get(args.sourceDocumentId);
+		if (!source || source.isArchived) {
+			throw new ConvexError("Not found");
+		}
+		if (!source.isTemplate) {
+			throw new ConvexError("Not found");
+		}
+		if (!isWebLinkEnabled(source) || !isPublicLinkActive(source)) {
+			throw new ConvexError("Not found");
+		}
+
+		const now = Date.now();
+		const siblings = await ctx.db
+			.query("documents")
+			.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
+				q
+					.eq("workspaceId", args.workspaceId)
+					.eq("parentId", undefined)
+					.eq("isArchived", false),
+			)
+			.collect();
+		const maxOrder = siblings.reduce(
+			(max, doc) => Math.max(max, doc.order ?? 0),
+			-1,
+		);
+
+		const title = source.title.trim() || "New page";
+		let contentJson = EMPTY_DOCUMENT;
+		try {
+			if (source.content) {
+				contentJson = JSON.parse(source.content) as typeof EMPTY_DOCUMENT;
+			}
+		} catch {
+			contentJson = EMPTY_DOCUMENT;
+		}
+
+		const documentId = await ctx.db.insert("documents", {
+			userId,
+			workspaceId: args.workspaceId,
+			title,
+			content: JSON.stringify(contentJson),
+			searchableText: ensureTitleInSearchableText(
+				title,
+				normalizePlainText(source.searchableText ?? ""),
+			),
+			parentId: undefined,
+			order: maxOrder + 1,
+			icon: source.icon,
+			coverImage: source.coverImage,
+			isArchived: false,
+			archivedAt: undefined,
+			isPublished: false,
+			webLinkEnabled: false,
+			isTemplate: false,
+			generalAccess: "private",
+			workspaceAccessLevel: "full",
+			publicAccessLevel: "view",
+			publicLinkExpiresAt: undefined,
+			includeInAi: source.includeInAi,
+			lastEditedAt: now,
+			lastEmbeddedAt: undefined,
+			contentHash: source.contentHash,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		await prosemirrorSync.create(ctx, documentId, contentJson);
 		return documentId;
 	},
 });
@@ -883,16 +1451,14 @@ export const getAncestors = query({
 		if (!currentDoc) {
 			return ancestors;
 		}
-		if (currentDoc.workspaceId) {
-			const membership = await ctx.db
-				.query("members")
-				.withIndex("by_workspace_user", (q) =>
-					q.eq("workspaceId", currentDoc.workspaceId!).eq("userId", userId),
-				)
-				.unique();
-			if (!membership) return ancestors;
-		} else if (currentDoc.userId !== userId) {
-			return ancestors;
+		if (!currentDoc.workspaceId) {
+			if (currentDoc.userId !== userId) return ancestors;
+		} else {
+			try {
+				await requireDocumentReadAccess(ctx, currentDoc, userId);
+			} catch {
+				return ancestors;
+			}
 		}
 
 		let currentId: Id<"documents"> | undefined = currentDoc.parentId;
@@ -902,10 +1468,15 @@ export const getAncestors = query({
 			if (!doc) {
 				break;
 			}
-			if (currentDoc.workspaceId) {
+			if (!currentDoc.workspaceId) {
+				if (doc.userId !== userId) break;
+			} else {
 				if (doc.workspaceId !== currentDoc.workspaceId) break;
-			} else if (doc.userId !== userId) {
-				break;
+				try {
+					await requireDocumentReadAccess(ctx, doc, userId);
+				} catch {
+					break;
+				}
 			}
 
 			ancestors.unshift(doc);
@@ -926,20 +1497,39 @@ export const getAll = query({
 		if (!userId) return [];
 		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
 		if (!workspaceId) return [];
-		const membership = await ctx.db
-			.query("members")
-			.withIndex("by_workspace_user", (q) =>
-				q.eq("workspaceId", workspaceId).eq("userId", userId),
-			)
-			.unique();
+		const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
 		if (!membership) return [];
-		return await ctx.db
+
+		if (membership.role === "owner") {
+			return await ctx.db
+				.query("documents")
+				.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+					q.eq("workspaceId", workspaceId).eq("isArchived", false),
+				)
+				.order("desc")
+				.collect();
+		}
+
+		const explicitPermissions = await listExplicitPermissionsForWorkspaceUser(
+			ctx,
+			workspaceId,
+			userId,
+		);
+
+		const docs = await ctx.db
 			.query("documents")
 			.withIndex("by_workspace_isArchived_updatedAt", (q) =>
 				q.eq("workspaceId", workspaceId).eq("isArchived", false),
 			)
 			.order("desc")
 			.collect();
+
+		return docs.filter((doc) => {
+			if (doc.userId && doc.userId === userId) return true;
+			const generalAccess = resolveGeneralAccess(doc);
+			if (generalAccess === "workspace") return true;
+			return explicitPermissions.has(String(doc._id));
+		});
 	},
 });
 
@@ -966,20 +1556,18 @@ export const listSidebar = query({
 		if (!userId) return [];
 		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
 		if (!workspaceId) return [];
-		const membership = await ctx.db
-			.query("members")
-			.withIndex("by_workspace_user", (q) =>
-				q.eq("workspaceId", workspaceId).eq("userId", userId),
-			)
-			.unique();
+		const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
 		if (!membership) return [];
 
 		const limit = Math.max(1, Math.min(args.limit ?? 10_000, 25_000));
 
 		const docs = await ctx.db
 			.query("documents")
-			.withIndex("by_workspace_isArchived_updatedAt", (q) =>
-				q.eq("workspaceId", workspaceId).eq("isArchived", false),
+			.withIndex("by_workspace_user_isArchived_updatedAt", (q) =>
+				q
+					.eq("workspaceId", workspaceId)
+					.eq("userId", userId)
+					.eq("isArchived", false),
 			)
 			.order("desc")
 			.take(limit);
@@ -1021,38 +1609,67 @@ export const listSharedSidebar = query({
 		if (!userId) return [];
 		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
 		if (!workspaceId) return [];
-		const membership = await ctx.db
-			.query("members")
-			.withIndex("by_workspace_user", (q) =>
-				q.eq("workspaceId", workspaceId).eq("userId", userId),
-			)
-			.unique();
+		const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
 		if (!membership) return [];
 
 		const limit = Math.max(1, Math.min(args.limit ?? 10_000, 25_000));
 
+		if (membership.role === "owner") {
+			const docs = await ctx.db
+				.query("documents")
+				.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+					q.eq("workspaceId", workspaceId).eq("isArchived", false),
+				)
+				.order("desc")
+				.take(limit);
+
+			return docs
+				.filter((doc) => !(doc.userId && doc.userId === userId))
+				.map((doc) => ({
+					_id: doc._id,
+					_creationTime: doc._creationTime,
+					title: doc.title,
+					parentId: doc.parentId,
+					order: doc.order,
+					icon: doc.icon,
+					isPublished: doc.isPublished,
+					createdAt: doc.createdAt,
+					updatedAt: doc.updatedAt,
+				}));
+		}
+
+		const explicitPermissions = await listExplicitPermissionsForWorkspaceUser(
+			ctx,
+			workspaceId,
+			userId,
+		);
+
 		const docs = await ctx.db
 			.query("documents")
-			.withIndex("by_workspace_isArchived_isPublished_updatedAt", (q) =>
-				q
-					.eq("workspaceId", workspaceId)
-					.eq("isArchived", false)
-					.eq("isPublished", true),
+			.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+				q.eq("workspaceId", workspaceId).eq("isArchived", false),
 			)
 			.order("desc")
 			.take(limit);
 
-		return docs.map((doc) => ({
-			_id: doc._id,
-			_creationTime: doc._creationTime,
-			title: doc.title,
-			parentId: doc.parentId,
-			order: doc.order,
-			icon: doc.icon,
-			isPublished: doc.isPublished,
-			createdAt: doc.createdAt,
-			updatedAt: doc.updatedAt,
-		}));
+		return docs
+			.filter((doc) => {
+				if (doc.userId && doc.userId === userId) return false;
+				const generalAccess = resolveGeneralAccess(doc);
+				if (generalAccess === "workspace") return true;
+				return explicitPermissions.has(String(doc._id));
+			})
+			.map((doc) => ({
+				_id: doc._id,
+				_creationTime: doc._creationTime,
+				title: doc.title,
+				parentId: doc.parentId,
+				order: doc.order,
+				icon: doc.icon,
+				isPublished: doc.isPublished,
+				createdAt: doc.createdAt,
+				updatedAt: doc.updatedAt,
+			}));
 	},
 });
 
@@ -1078,15 +1695,11 @@ export const listIndex = query({
 		if (!userId) return [];
 		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
 		if (!workspaceId) return [];
-		const membership = await ctx.db
-			.query("members")
-			.withIndex("by_workspace_user", (q) =>
-				q.eq("workspaceId", workspaceId).eq("userId", userId),
-			)
-			.unique();
+		const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
 		if (!membership) return [];
 
 		const limit = Math.max(1, Math.min(args.limit ?? 2_000, 10_000));
+		const fetchLimit = Math.max(limit, Math.min(limit * 5, 10_000));
 		const includeArchived = args.includeArchived ?? false;
 		const toIndex = (doc: Doc<"documents">) => ({
 			_id: doc._id,
@@ -1098,6 +1711,55 @@ export const listIndex = query({
 			updatedAt: doc.updatedAt,
 		});
 
+		if (membership.role === "owner") {
+			if (!includeArchived) {
+				return (
+					await ctx.db
+						.query("documents")
+						.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+							q.eq("workspaceId", workspaceId).eq("isArchived", false),
+						)
+						.order("desc")
+						.take(limit)
+				).map(toIndex);
+			}
+
+			const [active, archived] = await Promise.all([
+				ctx.db
+					.query("documents")
+					.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+						q.eq("workspaceId", workspaceId).eq("isArchived", false),
+					)
+					.order("desc")
+					.take(fetchLimit),
+				ctx.db
+					.query("documents")
+					.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+						q.eq("workspaceId", workspaceId).eq("isArchived", true),
+					)
+					.order("desc")
+					.take(fetchLimit),
+			]);
+
+			const combined = [...active, ...archived]
+				.sort((a, b) => b.updatedAt - a.updatedAt)
+				.slice(0, limit);
+			return combined.map(toIndex);
+		}
+
+		const explicitPermissions = await listExplicitPermissionsForWorkspaceUser(
+			ctx,
+			workspaceId,
+			userId,
+		);
+
+		const isAccessible = (doc: Doc<"documents">) => {
+			if (doc.userId && doc.userId === userId) return true;
+			const generalAccess = resolveGeneralAccess(doc);
+			if (generalAccess === "workspace") return true;
+			return explicitPermissions.has(String(doc._id));
+		};
+
 		if (!includeArchived) {
 			return (
 				await ctx.db
@@ -1106,8 +1768,11 @@ export const listIndex = query({
 						q.eq("workspaceId", workspaceId).eq("isArchived", false),
 					)
 					.order("desc")
-					.take(limit)
-			).map(toIndex);
+					.take(fetchLimit)
+			)
+				.filter(isAccessible)
+				.slice(0, limit)
+				.map(toIndex);
 		}
 
 		const [active, archived] = await Promise.all([
@@ -1117,17 +1782,18 @@ export const listIndex = query({
 					q.eq("workspaceId", workspaceId).eq("isArchived", false),
 				)
 				.order("desc")
-				.take(limit),
+				.take(fetchLimit),
 			ctx.db
 				.query("documents")
 				.withIndex("by_workspace_isArchived_updatedAt", (q) =>
 					q.eq("workspaceId", workspaceId).eq("isArchived", true),
 				)
 				.order("desc")
-				.take(limit),
+				.take(fetchLimit),
 		]);
 
 		const combined = [...active, ...archived]
+			.filter(isAccessible)
 			.sort((a, b) => b.updatedAt - a.updatedAt)
 			.slice(0, limit);
 		return combined.map(toIndex);
@@ -1147,21 +1813,41 @@ export const getRecentlyUpdated = query({
 		if (!userId) return [];
 		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
 		if (!workspaceId) return [];
-		const membership = await ctx.db
-			.query("members")
-			.withIndex("by_workspace_user", (q) =>
-				q.eq("workspaceId", workspaceId).eq("userId", userId),
-			)
-			.unique();
+		const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
 		if (!membership) return [];
 		const limit = Math.max(1, Math.min(args.limit ?? 6, 50));
-		return await ctx.db
+		if (membership.role === "owner") {
+			return await ctx.db
+				.query("documents")
+				.withIndex("by_workspace_isArchived_updatedAt", (q) =>
+					q.eq("workspaceId", workspaceId).eq("isArchived", false),
+				)
+				.order("desc")
+				.take(limit);
+		}
+		const explicitPermissions = await listExplicitPermissionsForWorkspaceUser(
+			ctx,
+			workspaceId,
+			userId,
+		);
+		const fetchLimit = Math.max(limit, Math.min(limit * 5, 10_000));
+
+		const docs = await ctx.db
 			.query("documents")
 			.withIndex("by_workspace_isArchived_updatedAt", (q) =>
 				q.eq("workspaceId", workspaceId).eq("isArchived", false),
 			)
 			.order("desc")
-			.take(limit);
+			.take(fetchLimit);
+
+		return docs
+			.filter((doc) => {
+				if (doc.userId && doc.userId === userId) return true;
+				const generalAccess = resolveGeneralAccess(doc);
+				if (generalAccess === "workspace") return true;
+				return explicitPermissions.has(String(doc._id));
+			})
+			.slice(0, limit);
 	},
 });
 
@@ -1177,18 +1863,30 @@ export const search = query({
 		if (!userId) return [];
 		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
 		if (!workspaceId) return [];
-		const membership = await ctx.db
-			.query("members")
-			.withIndex("by_workspace_user", (q) =>
-				q.eq("workspaceId", workspaceId).eq("userId", userId),
-			)
-			.unique();
+		const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
 		if (!membership) return [];
 		const limit = Math.max(1, Math.min(args.limit ?? 20, 50));
 		const term = args.term.trim();
 		if (!term) {
 			return [];
 		}
+
+		if (membership.role === "owner") {
+			return await ctx.db
+				.query("documents")
+				.withSearchIndex("search_body", (q) =>
+					q
+						.search("searchableText", term)
+						.eq("workspaceId", workspaceId)
+						.eq("isArchived", false),
+				)
+				.take(limit);
+		}
+		const explicitPermissions = await listExplicitPermissionsForWorkspaceUser(
+			ctx,
+			workspaceId,
+			userId,
+		);
 		const results = await ctx.db
 			.query("documents")
 			.withSearchIndex("search_body", (q) =>
@@ -1197,8 +1895,15 @@ export const search = query({
 					.eq("workspaceId", workspaceId)
 					.eq("isArchived", false),
 			)
-			.take(limit);
-		return results;
+			.take(Math.max(limit, Math.min(limit * 5, 200)));
+		return results
+			.filter((doc) => {
+				if (doc.userId && doc.userId === userId) return true;
+				const generalAccess = resolveGeneralAccess(doc);
+				if (generalAccess === "workspace") return true;
+				return explicitPermissions.has(String(doc._id));
+			})
+			.slice(0, limit);
 	},
 });
 
@@ -1220,21 +1925,32 @@ export const searchInWorkspaces = query({
 			.query("members")
 			.withIndex("by_user", (q) => q.eq("userId", userId))
 			.collect();
-		const accessibleByString = new Map<string, Id<"workspaces">>(
-			memberships.map((m) => [String(m.workspaceId), m.workspaceId]),
+		const accessibleByString = new Map<
+			string,
+			{ workspaceId: Id<"workspaces">; role: "owner" | "member" }
+		>(
+			memberships.map((m) => [
+				String(m.workspaceId),
+				{ workspaceId: m.workspaceId, role: m.role },
+			]),
 		);
 		const requestedWorkspaceIds =
 			args.workspaceIds?.filter((id) => accessibleByString.has(String(id))) ?? null;
 		const workspaceIds =
 			requestedWorkspaceIds && requestedWorkspaceIds.length > 0
 				? requestedWorkspaceIds
-				: Array.from(accessibleByString.values());
+				: Array.from(accessibleByString.values()).map((v) => v.workspaceId);
 		if (workspaceIds.length === 0) return [];
 
 		const perWorkspaceLimit = Math.max(1, Math.ceil(limit / workspaceIds.length));
-		const results = await Promise.all(
+		const perWorkspaceFetchLimit = Math.max(
+			perWorkspaceLimit,
+			Math.min(perWorkspaceLimit * 5, 200),
+		);
+
+		const groups = await Promise.all(
 			workspaceIds.map(async (workspaceId) => {
-				return await ctx.db
+				const results = await ctx.db
 					.query("documents")
 					.withSearchIndex("search_body", (q) =>
 						q
@@ -1242,15 +1958,28 @@ export const searchInWorkspaces = query({
 							.eq("workspaceId", workspaceId)
 							.eq("isArchived", false),
 					)
-					.take(perWorkspaceLimit);
+					.take(perWorkspaceFetchLimit);
+
+				const role = accessibleByString.get(String(workspaceId))?.role ?? "member";
+				if (role === "owner") return results;
+
+				const explicitPermissions = await listExplicitPermissionsForWorkspaceUser(
+					ctx,
+					workspaceId,
+					userId,
+				);
+				return results.filter((doc) => {
+					if (doc.userId && doc.userId === userId) return true;
+					const generalAccess = resolveGeneralAccess(doc);
+					if (generalAccess === "workspace") return true;
+					return explicitPermissions.has(String(doc._id));
+				});
 			}),
 		);
 
 		const byId = new Map<string, Doc<"documents">>();
-		for (const group of results) {
-			for (const doc of group) {
-				byId.set(String(doc._id), doc);
-			}
+		for (const group of groups) {
+			for (const doc of group) byId.set(String(doc._id), doc);
 		}
 
 		return Array.from(byId.values())
@@ -1272,27 +2001,55 @@ export const listShared = query({
 		if (!userId) return [];
 		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
 		if (!workspaceId) return [];
-		const membership = await ctx.db
-			.query("members")
-			.withIndex("by_workspace_user", (q) =>
-				q.eq("workspaceId", workspaceId).eq("userId", userId),
-			)
-			.unique();
+		const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
 		if (!membership) return [];
+		if (membership.role === "owner") {
+			const parentId = args.parentId === null ? undefined : args.parentId;
+			const docs = await ctx.db
+				.query("documents")
+				.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
+					q
+						.eq("workspaceId", workspaceId)
+						.eq("parentId", parentId)
+						.eq("isArchived", false),
+				)
+				.collect();
+
+			return docs.sort((a, b) => {
+				const orderA = a.order ?? 0;
+				const orderB = b.order ?? 0;
+				if (orderA !== orderB) {
+					return orderA - orderB;
+				}
+				return a.createdAt - b.createdAt;
+			});
+		}
+
+		const explicitPermissions = await listExplicitPermissionsForWorkspaceUser(
+			ctx,
+			workspaceId,
+			userId,
+		);
 		const parentId = args.parentId === null ? undefined : args.parentId;
 
 		const docs = await ctx.db
 			.query("documents")
-			.withIndex("by_workspaceId_and_parentId_and_isArchived_and_isPublished", (q) =>
+			.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
 				q
 					.eq("workspaceId", workspaceId)
 					.eq("parentId", parentId)
-					.eq("isArchived", false)
-					.eq("isPublished", true),
+					.eq("isArchived", false),
 			)
 			.collect();
 
-		return docs.sort((a, b) => {
+		const shared = docs.filter((doc) => {
+			if (doc.userId && doc.userId === userId) return false;
+			const generalAccess = resolveGeneralAccess(doc);
+			if (generalAccess === "workspace") return true;
+			return explicitPermissions.has(String(doc._id));
+		});
+
+		return shared.sort((a, b) => {
 			const orderA = a.order ?? 0;
 			const orderB = b.order ?? 0;
 			if (orderA !== orderB) {

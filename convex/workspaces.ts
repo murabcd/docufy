@@ -48,6 +48,8 @@ export const listMine = query({
 			name: v.string(),
 			ownerId: v.string(),
 			isPrivate: v.optional(v.boolean()),
+			publicHomepageDocumentId: v.optional(v.id("documents")),
+			alwaysShowPublishedBanner: v.optional(v.boolean()),
 			createdAt: v.number(),
 			updatedAt: v.number(),
 		}),
@@ -62,6 +64,43 @@ export const listMine = query({
 		return workspaces
 			.filter((w): w is NonNullable<typeof w> => w !== null)
 			.sort((a, b) => b.updatedAt - a.updatedAt);
+	},
+});
+
+export const updatePublicPagesSettings = mutation({
+	args: {
+		workspaceId: v.id("workspaces"),
+		publicHomepageDocumentId: v.optional(v.union(v.id("documents"), v.null())),
+		alwaysShowPublishedBanner: v.optional(v.boolean()),
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const { membership } = await requireWorkspaceAccess(ctx, args.workspaceId);
+		if (membership.role !== "owner") throw new ConvexError("Unauthorized");
+
+		const patch: Record<string, unknown> = { updatedAt: Date.now() };
+
+		if (args.alwaysShowPublishedBanner !== undefined) {
+			patch.alwaysShowPublishedBanner = args.alwaysShowPublishedBanner;
+		}
+
+		if (args.publicHomepageDocumentId !== undefined) {
+			if (args.publicHomepageDocumentId === null) {
+				patch.publicHomepageDocumentId = undefined;
+			} else {
+				const doc = await ctx.db.get(args.publicHomepageDocumentId);
+				if (!doc || doc.workspaceId !== args.workspaceId || doc.isArchived) {
+					throw new ConvexError("Not found");
+				}
+				if (!doc.isPublished) {
+					throw new ConvexError("Homepage must be published");
+				}
+				patch.publicHomepageDocumentId = doc._id;
+			}
+		}
+
+		await ctx.db.patch(args.workspaceId, patch);
+		return null;
 	},
 });
 
