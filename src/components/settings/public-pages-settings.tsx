@@ -58,7 +58,32 @@ export function PublicPagesSettings() {
 
 	const updatePublicPagesSettings = useMutation(
 		api.workspaces.updatePublicPagesSettings,
-	);
+	).withOptimisticUpdate((localStore, args) => {
+		const existing = localStore.getQuery(api.workspaces.listMine, {});
+		if (existing === undefined) return;
+
+		const now = Date.now();
+		localStore.setQuery(
+			api.workspaces.listMine,
+			{},
+			existing.map((workspace) => {
+				if (workspace._id !== args.workspaceId) return workspace;
+				return {
+					...workspace,
+					publicHomepageDocumentId:
+						args.publicHomepageDocumentId === undefined
+							? workspace.publicHomepageDocumentId
+							: args.publicHomepageDocumentId === null
+								? undefined
+								: args.publicHomepageDocumentId,
+					alwaysShowPublishedBanner:
+						args.alwaysShowPublishedBanner ??
+						workspace.alwaysShowPublishedBanner,
+					updatedAt: now,
+				};
+			}),
+		);
+	});
 
 	const [updateDomainOpen, setUpdateDomainOpen] = useState(false);
 	const [domainName, setDomainName] = useState("");
@@ -105,7 +130,7 @@ export function PublicPagesSettings() {
 		<ScrollArea className="h-full">
 			<div className="flex flex-col px-3 pt-4">
 				<div className="mb-6 grid gap-2">
-					<Label className="text-sm">Public Pages</Label>
+					<Label className="text-sm">Public pages</Label>
 				</div>
 
 				<div className="mb-8 grid grid-cols-2 gap-4">
