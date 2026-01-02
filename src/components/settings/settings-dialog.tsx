@@ -84,6 +84,7 @@ export function SettingsDialog({
 	const [activePage, setActivePage] = React.useState<SettingsPage>(
 		initialPage ?? "Profile",
 	);
+	const [, startTransition] = React.useTransition();
 	const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
 	const setOpen = onOpenChange || setInternalOpen;
 
@@ -91,12 +92,15 @@ export function SettingsDialog({
 	React.useEffect(() => {
 		if (open) {
 			if (initialPage) {
-				setActivePage(initialPage);
+				setActivePage("Profile");
+				startTransition(() => {
+					setActivePage(initialPage);
+				});
 			} else {
 				setActivePage("Profile");
 			}
 		}
-	}, [open, initialPage]);
+	}, [open, initialPage, startTransition]);
 
 	const renderSettingsContent = () => {
 		switch (activePage) {
@@ -107,7 +111,7 @@ export function SettingsDialog({
 			case "Appearance":
 				return <AppearanceSettings />;
 			case "Workspaces":
-				return <WorkspacesSettings />;
+				return <WorkspacesSettings onClose={() => setOpen(false)} />;
 			case "Teamspaces":
 				return <TeamspacesSettings />;
 			case "Doc AI":
@@ -144,7 +148,11 @@ export function SettingsDialog({
 												>
 													<button
 														type="button"
-														onClick={() => setActivePage(item.name)}
+														onClick={() => {
+															startTransition(() => {
+																setActivePage(item.name);
+															});
+														}}
 													>
 														<item.icon />
 														<span>{item.name}</span>
@@ -174,7 +182,9 @@ export function SettingsDialog({
 							</div>
 						</header>
 						<div className="flex flex-1 flex-col overflow-hidden">
-							{renderSettingsContent()}
+							<React.Suspense fallback={null}>
+								{renderSettingsContent()}
+							</React.Suspense>
 						</div>
 					</main>
 				</SidebarProvider>
