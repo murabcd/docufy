@@ -2,6 +2,9 @@ import type { ModelMessage, TextPart } from "@tanstack/ai";
 import { chat, toStreamResponse } from "@tanstack/ai";
 import { openai } from "@tanstack/ai-openai";
 import { createFileRoute } from "@tanstack/react-router";
+import { systemPrompts } from "@/lib/ai/prompts";
+import { createChatTools } from "@/lib/ai/tool-registry";
+import { createAuthedConvexHttpClient } from "@/lib/convex-http";
 
 const CONTEXT_PREFIX = "__DOCCTX__";
 const CONTEXT_SUFFIX = "__ENDDOCCTX__";
@@ -117,6 +120,58 @@ const buildContextSystemPrompt = (mentions: MentionPayload[]) => {
 	);
 };
 
+const extractApprovals = (value: unknown) => {
+	if (!value || typeof value !== "object") {
+		return new Map<string, boolean>();
+	}
+	const approvals = new Map<string, boolean>();
+	for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+		if (typeof entry === "boolean") {
+			approvals.set(key, entry);
+		}
+	}
+	return approvals;
+};
+
+const injectApprovalParts = (
+	messages: Array<ModelMessage>,
+	approvals: Map<string, boolean>,
+) => {
+	if (approvals.size === 0) return messages;
+
+	return messages.map((message) => {
+		if (message.role !== "assistant" || !message.toolCalls?.length) {
+			return message;
+		}
+
+		const parts = message.toolCalls
+			.map((toolCall) => {
+				const approvalId = `approval_${toolCall.id}`;
+				if (!approvals.has(approvalId)) return null;
+
+				return {
+					type: "tool-call",
+					id: toolCall.id,
+					name: toolCall.function.name,
+					arguments: toolCall.function.arguments,
+					state: "approval-responded",
+					approval: {
+						id: approvalId,
+						approved: approvals.get(approvalId),
+					},
+				} as const;
+			})
+			.filter(Boolean);
+
+		if (parts.length === 0) return message;
+
+		return {
+			...message,
+			parts,
+		} as ModelMessage;
+	});
+};
+
 export const Route = createFileRoute("/api/chat")({
 	server: {
 		handlers: {
@@ -133,20 +188,64 @@ export const Route = createFileRoute("/api/chat")({
 					);
 				}
 
-				const { messages, conversationId, model } = await request.json();
+				const {
+					messages,
+					approvals: rawApprovals,
+					conversationId: rawConversationId,
+					model: rawModel,
+					workspaceId: rawWorkspaceId,
+					documentId: rawDocumentId,
+					data,
+				} = await request.json();
+
+				// TanStack AI client sends per-request metadata under `data`.
+				// Keep top-level fields for backward compatibility.
+				const requestData =
+					data && typeof data === "object"
+						? (data as Record<string, unknown>)
+						: {};
+				const conversationId =
+					rawConversationId ??
+					(requestData.conversationId as string | undefined);
+				const model = rawModel ?? (requestData.model as string | undefined);
+				const workspaceId =
+					rawWorkspaceId ?? (requestData.workspaceId as string | undefined);
+				const documentId =
+					rawDocumentId ?? (requestData.documentId as string | undefined);
+				const approvals = extractApprovals(
+					rawApprovals ?? (requestData.approvals as unknown),
+				);
 
 				const { sanitized, contexts } = sanitizeMessages(
 					messages as Array<ModelMessage>,
 				);
+				const withApprovals = injectApprovalParts(sanitized, approvals);
 				const contextPrompt = buildContextSystemPrompt(contexts);
 
 				const selectedModel = model || "gpt-4.1-mini";
 
 				try {
+					const { client: convex } =
+						await createAuthedConvexHttpClient(request);
+
+					const tools = createChatTools({
+						workspaceId,
+						documentId,
+						convex,
+					});
+
 					const stream = chat({
 						adapter: openai(),
-						messages: sanitized,
-						systemPrompts: contextPrompt ? [contextPrompt] : undefined,
+						messages: withApprovals,
+						systemPrompts: [
+							...systemPrompts({
+								model: selectedModel,
+								workspaceId,
+								documentId,
+							}),
+							contextPrompt,
+						].filter((prompt): prompt is string => Boolean(prompt)),
+						tools,
 						model: selectedModel,
 						conversationId,
 					});

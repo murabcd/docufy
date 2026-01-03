@@ -3,6 +3,13 @@ import { Copy, Plus, ThumbsDown, ThumbsUp } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
+import {
+	Confirmation,
+	ConfirmationAction,
+	ConfirmationActions,
+	ConfirmationRequest,
+	ConfirmationTitle,
+} from "@/components/ai-elements/confirmation";
 import { Button } from "@/components/ui/button";
 import { ShimmerText } from "@/components/ui/shimmer-text";
 import {
@@ -25,6 +32,60 @@ const stripContextMetadata = (text: string) => {
 	return text.slice(endIndex + CONTEXT_SUFFIX.length);
 };
 
+const tryParseJson = (value: string): unknown => {
+	try {
+		return JSON.parse(value) as unknown;
+	} catch {
+		return value;
+	}
+};
+
+const formatApprovalPrompt = (toolName: string, args: unknown): string => {
+	if (toolName === "rename_page") {
+		const title =
+			args && typeof args === "object" && "title" in args
+				? (args as { title?: unknown }).title
+				: undefined;
+		if (typeof title === "string" && title.trim()) {
+			return `This will rename the page to "${title.trim()}". Do you approve this action?`;
+		}
+		return "This will rename the page. Do you approve this action?";
+	}
+
+	if (toolName === "update_page") {
+		const ops =
+			args && typeof args === "object" && "ops" in args
+				? (args as { ops?: unknown }).ops
+				: undefined;
+		const opCount = Array.isArray(ops) ? ops.length : null;
+		if (typeof opCount === "number") {
+			return `This will edit the page (${opCount} change${opCount === 1 ? "" : "s"}). Do you approve this action?`;
+		}
+		return "This will edit the page. Do you approve this action?";
+	}
+
+	const verb = toolName.startsWith("delete_")
+		? "delete"
+		: toolName.startsWith("rename_")
+			? "rename"
+			: toolName.startsWith("update_")
+				? "edit"
+				: toolName.startsWith("create_")
+					? "create"
+					: toolName.startsWith("archive_")
+						? "archive"
+						: "run";
+	const target = toolName
+		.replace(/^(delete|rename|update|create|archive)_/, "")
+		.replaceAll("_", " ");
+
+	if (verb === "run") {
+		return `This tool wants to run "${toolName}". Do you approve this action?`;
+	}
+
+	return `This tool wants to ${verb} ${target}. Do you approve this action?`;
+};
+
 interface ChatMessagesProps {
 	messages: Array<UIMessage>;
 	isLoading?: boolean;
@@ -36,6 +97,7 @@ interface ChatMessagesProps {
 		| "created"
 		| undefined;
 	plusTooltip?: string;
+	onToolApprovalResponse?: (args: { id: string; approved: boolean }) => void;
 }
 
 type Reaction = "like" | "dislike";
@@ -71,6 +133,7 @@ export function ChatMessages({
 	isLoading,
 	onPlusAction,
 	plusTooltip,
+	onToolApprovalResponse,
 }: ChatMessagesProps) {
 	const messagesEndRef = React.useRef<HTMLDivElement>(null);
 	const prevMessagesLengthRef = React.useRef(messages.length);
@@ -97,8 +160,25 @@ export function ChatMessages({
 				const isStreaming =
 					isLastMessage && isLastMessageAssistant && isLoading;
 				const isEmpty = message.parts.length === 0;
+				const hasVisibleAssistantParts =
+					message.role === "assistant" &&
+					message.parts.some(
+						(part) =>
+							part.type === "text" ||
+							part.type === "thinking" ||
+							(part.type === "tool-call" &&
+								part.state === "approval-requested"),
+					);
 				const messageText = getMessageText(message);
 				const reaction = reactionsByMessageId[message.id];
+
+				if (
+					message.role === "assistant" &&
+					!hasVisibleAssistantParts &&
+					!(isStreaming && isEmpty)
+				) {
+					return null;
+				}
 
 				return (
 					<div
@@ -148,6 +228,61 @@ export function ChatMessages({
 													{cleanedContent}
 												</Streamdown>
 											);
+										}
+										if (part.type === "tool-call") {
+											const approvalId = part.approval?.id;
+
+											if (part.state !== "approval-requested") {
+												return null;
+											}
+
+											const args = part.arguments
+												? tryParseJson(part.arguments)
+												: undefined;
+											const prompt = formatApprovalPrompt(part.name, args);
+
+											return (
+												<Confirmation
+													key={`${message.id}-tool-call-${index}`}
+													approval={part.approval}
+													state={part.state}
+													className="mt-2"
+												>
+													<ConfirmationRequest>
+														<ConfirmationTitle>{prompt}</ConfirmationTitle>
+														<ConfirmationActions>
+															<ConfirmationAction
+																disabled={!approvalId}
+																onClick={() => {
+																	if (!approvalId) return;
+																	onToolApprovalResponse?.({
+																		id: approvalId,
+																		approved: true,
+																	});
+																}}
+															>
+																Approve
+															</ConfirmationAction>
+															<ConfirmationAction
+																disabled={!approvalId}
+																variant="outline"
+																onClick={() => {
+																	if (!approvalId) return;
+																	onToolApprovalResponse?.({
+																		id: approvalId,
+																		approved: false,
+																	});
+																}}
+															>
+																Deny
+															</ConfirmationAction>
+														</ConfirmationActions>
+													</ConfirmationRequest>
+												</Confirmation>
+											);
+										}
+										if (part.type === "tool-result") {
+											return null;
 										}
 										return null;
 									})}

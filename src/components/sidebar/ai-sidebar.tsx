@@ -76,6 +76,61 @@ type ActiveChat =
 	| { kind: "draft"; id: string; modelId: string }
 	| { kind: "persisted"; id: Id<"chats"> };
 
+type ToolApprovals = Record<string, boolean>;
+
+const ensureNonApprovalToolOutputs = (messages: UIMessage[]): UIMessage[] => {
+	let lastAssistantIndex = -1;
+	for (let index = messages.length - 1; index >= 0; index--) {
+		if (messages[index]?.role === "assistant") {
+			lastAssistantIndex = index;
+			break;
+		}
+	}
+	if (lastAssistantIndex === -1) return messages;
+
+	const message = messages[lastAssistantIndex];
+	let changed = false;
+	const nextParts = message.parts.map((part) => {
+		if (part.type !== "tool-call") return part;
+		if (part.approval) return part;
+		if (part.output !== undefined) return part;
+		changed = true;
+		return { ...part, output: null };
+	});
+
+	if (!changed) return messages;
+	const next = [...messages];
+	next[lastAssistantIndex] = { ...message, parts: nextParts };
+	return next;
+};
+
+function useApprovalsSseConnection(args: { sessionKey: string }) {
+	const approvalsRef = React.useRef<ToolApprovals>({});
+	const sessionKey = args.sessionKey;
+
+	React.useEffect(() => {
+		approvalsRef.current = {};
+		void sessionKey;
+	}, [sessionKey]);
+
+	const recordApproval = React.useCallback(
+		(approvalId: string, approved: boolean) => {
+			approvalsRef.current[approvalId] = approved;
+		},
+		[],
+	);
+
+	const connection = React.useMemo(
+		() =>
+			fetchServerSentEvents("/api/chat", () => ({
+				body: { approvals: approvalsRef.current },
+			})),
+		[],
+	);
+
+	return { connection, recordApproval };
+}
+
 const DOCUMENT_CONTEXT_PREFIX = "__DOCCTX__";
 const DOCUMENT_CONTEXT_SUFFIX = "__ENDDOCCTX__";
 
@@ -133,9 +188,15 @@ function mergeMessages(
 	persisted: ReadonlyArray<UIMessage>,
 	current: ReadonlyArray<UIMessage>,
 ): Array<UIMessage> {
+	// Persisted messages are stored snapshots; current messages may include
+	// newer streaming/tool state updates for the same ids. Prefer `current`.
+	const currentById = new Map(current.map((m) => [m.id, m] as const));
 	const persistedIds = new Set(persisted.map((m) => m.id));
+
+	const mergedPersisted = persisted.map((m) => currentById.get(m.id) ?? m);
 	const extras = current.filter((m) => !persistedIds.has(m.id));
-	return [...persisted, ...extras];
+
+	return [...mergedPersisted, ...extras];
 }
 
 function stripDocumentContext(text: string): string {
@@ -408,6 +469,8 @@ function ChatSession(
 		onCreatePageFromAi: (chatTitle: string, content: string) => Promise<void>;
 	}>,
 ) {
+	const { activeWorkspaceId } = useActiveWorkspace();
+
 	const {
 		activeChat,
 		todayChats,
@@ -444,8 +507,10 @@ function ChatSession(
 	const body = React.useMemo(
 		() => ({
 			model: selectedModel.model,
+			workspaceId: activeWorkspaceId ?? undefined,
+			documentId: contextDocumentId ?? undefined,
 		}),
-		[selectedModel.model],
+		[activeWorkspaceId, contextDocumentId, selectedModel.model],
 	);
 
 	const activeChatKey =
@@ -544,6 +609,10 @@ function ChatSessionChrome(
 		onNewChat: () => void;
 		onSelectChat: (chatId: Id<"chats">) => void | Promise<void>;
 		onSendMessage: (payload: string, question: string) => void;
+		onToolApprovalResponse: (response: {
+			id: string;
+			approved: boolean;
+		}) => void;
 		sidebarOpen: boolean;
 		contextDocumentId?: Id<"documents"> | null;
 		isAutoMentionDismissed: boolean;
@@ -571,6 +640,7 @@ function ChatSessionChrome(
 		onNewChat,
 		onSelectChat,
 		onSendMessage,
+		onToolApprovalResponse,
 		sidebarOpen,
 		contextDocumentId,
 		isAutoMentionDismissed,
@@ -797,6 +867,7 @@ function ChatSessionChrome(
 						isLoading={isLoading}
 						onPlusAction={handlePlusAction}
 						plusTooltip={plusTooltip}
+						onToolApprovalResponse={onToolApprovalResponse}
 					/>
 				)}
 			</SidebarContent>
@@ -844,7 +915,11 @@ function PersistedChatSession(
 		setInputValue: (value: string) => void;
 		selectedModel: ChatModel;
 		setSelectedModel: (model: ChatModel) => void;
-		body: { model: string };
+		body: {
+			model: string;
+			workspaceId?: Id<"workspaces">;
+			documentId?: Id<"documents">;
+		};
 		onSend?: (message: string) => void;
 		placeholder?: string;
 		rightMode: "sidebar" | "floating";
@@ -935,11 +1010,27 @@ function PersistedChatSession(
 	}, [pendingSavedChat]);
 
 	const messagesRef = React.useRef<UIMessage[]>([]);
-	const { messages, sendMessage, isLoading, stop, setMessages } = useChat({
+	const { connection, recordApproval } = useApprovalsSseConnection({
+		sessionKey: String(chatId),
+	});
+	const {
+		messages,
+		sendMessage,
+		isLoading,
+		stop,
+		setMessages,
+		addToolApprovalResponse,
+	} = useChat({
 		id: chatId,
-		connection: fetchServerSentEvents("/api/chat"),
+		connection,
 		body,
 		initialMessages,
+		onChunk: () => {
+			// Chunk handler
+		},
+		onError: () => {
+			// Error handler
+		},
 		onFinish: async (assistantMessage) => {
 			const safe = toPersistedUIMessage(assistantMessage);
 			await upsertMessage({
@@ -952,9 +1043,7 @@ function PersistedChatSession(
 		},
 	});
 
-	React.useEffect(() => {
-		messagesRef.current = messages;
-	}, [messages]);
+	messagesRef.current = messages;
 
 	React.useEffect(() => {
 		if (isLoading) return;
@@ -990,6 +1079,44 @@ function PersistedChatSession(
 		setInputValue("");
 		onSend?.(question);
 	};
+
+	const queuedApprovalRef = React.useRef<{
+		id: string;
+		approved: boolean;
+	} | null>(null);
+	React.useEffect(() => {
+		if (isLoading) return;
+		const queued = queuedApprovalRef.current;
+		if (!queued) return;
+		queuedApprovalRef.current = null;
+		void addToolApprovalResponse({
+			id: queued.id,
+			approved: queued.approved,
+		});
+	}, [addToolApprovalResponse, isLoading]);
+
+	const handleToolApprovalResponse = React.useCallback(
+		(response: { id: string; approved: boolean }) => {
+			void (async () => {
+				const patched = ensureNonApprovalToolOutputs(messagesRef.current);
+				if (patched !== messagesRef.current) {
+					setMessages(patched);
+					messagesRef.current = patched;
+				}
+
+				recordApproval(response.id, response.approved);
+				if (isLoading) {
+					queuedApprovalRef.current = response;
+					return;
+				}
+				await addToolApprovalResponse({
+					id: response.id,
+					approved: response.approved,
+				});
+			})();
+		},
+		[addToolApprovalResponse, isLoading, recordApproval, setMessages],
+	);
 
 	const handleNewChat = () => {
 		if (isLoading) stop();
@@ -1035,6 +1162,7 @@ function PersistedChatSession(
 			onNewChat={handleNewChat}
 			onSelectChat={handleSelectChat}
 			onSendMessage={handleSend}
+			onToolApprovalResponse={handleToolApprovalResponse}
 		>
 			{children}
 		</ChatSessionChrome>
@@ -1055,7 +1183,11 @@ function DraftChatSession(
 		setInputValue: (value: string) => void;
 		selectedModel: ChatModel;
 		setSelectedModel: (model: ChatModel) => void;
-		body: { model: string };
+		body: {
+			model: string;
+			workspaceId?: Id<"workspaces">;
+			documentId?: Id<"documents">;
+		};
 		onSend?: (message: string) => void;
 		placeholder?: string;
 		rightMode: "sidebar" | "floating";
@@ -1109,14 +1241,38 @@ function DraftChatSession(
 	const setChatModel = useMutation(api.chats.setModel);
 
 	const didFinalizeDraftRef = React.useRef(false);
+	const { connection, recordApproval } = useApprovalsSseConnection({
+		sessionKey: draftId,
+	});
 	const messagesRef = React.useRef<UIMessage[]>([]);
 
-	const { messages, sendMessage, isLoading, stop } = useChat({
+	const {
+		messages,
+		sendMessage,
+		isLoading,
+		stop,
+		setMessages,
+		addToolApprovalResponse,
+	} = useChat({
 		id: draftId,
-		connection: fetchServerSentEvents("/api/chat"),
+		connection,
 		body,
 		initialMessages: [],
+		onChunk: () => {
+			// Chunk handler
+		},
+		onError: () => {
+			// Error handler
+		},
 		onFinish: async (assistantMessage) => {
+			const isWaitingForApproval = assistantMessage.parts.some(
+				(part) =>
+					part.type === "tool-call" && part.state === "approval-requested",
+			);
+			if (isWaitingForApproval) {
+				return;
+			}
+
 			if (didFinalizeDraftRef.current) return;
 			didFinalizeDraftRef.current = true;
 
@@ -1154,9 +1310,7 @@ function DraftChatSession(
 		},
 	});
 
-	React.useEffect(() => {
-		messagesRef.current = messages;
-	}, [messages]);
+	messagesRef.current = messages;
 
 	const handleSend = (payload: string, question: string) => {
 		if (!payload || isLoading) return;
@@ -1164,6 +1318,44 @@ function DraftChatSession(
 		setInputValue("");
 		onSend?.(question);
 	};
+
+	const queuedApprovalRef = React.useRef<{
+		id: string;
+		approved: boolean;
+	} | null>(null);
+	React.useEffect(() => {
+		if (isLoading) return;
+		const queued = queuedApprovalRef.current;
+		if (!queued) return;
+		queuedApprovalRef.current = null;
+		void addToolApprovalResponse({
+			id: queued.id,
+			approved: queued.approved,
+		});
+	}, [addToolApprovalResponse, isLoading]);
+
+	const handleToolApprovalResponse = React.useCallback(
+		(response: { id: string; approved: boolean }) => {
+			void (async () => {
+				const patched = ensureNonApprovalToolOutputs(messagesRef.current);
+				if (patched !== messagesRef.current) {
+					setMessages(patched);
+					messagesRef.current = patched;
+				}
+
+				recordApproval(response.id, response.approved);
+				if (isLoading) {
+					queuedApprovalRef.current = response;
+					return;
+				}
+				await addToolApprovalResponse({
+					id: response.id,
+					approved: response.approved,
+				});
+			})();
+		},
+		[addToolApprovalResponse, isLoading, recordApproval, setMessages],
+	);
 
 	const handleNewChat = () => {
 		if (isLoading) stop();
@@ -1202,6 +1394,7 @@ function DraftChatSession(
 			onNewChat={handleNewChat}
 			onSelectChat={handleSelectChat}
 			onSendMessage={handleSend}
+			onToolApprovalResponse={handleToolApprovalResponse}
 		>
 			{children}
 		</ChatSessionChrome>

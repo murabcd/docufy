@@ -41,9 +41,3 @@ yarn-error.log*
 .output/
 .tanstack/
 .nitro/
-
-# claude code
-CLAUDE.md
-
-# codex
-.agent/

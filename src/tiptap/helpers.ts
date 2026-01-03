@@ -252,8 +252,8 @@ export const copyNodeTextContent = (editor: Editor) => {
 
 	if (!textContent) return;
 
-	navigator.clipboard.writeText(textContent).catch((err) => {
-		console.error("Failed to copy to clipboard:", err);
+	navigator.clipboard.writeText(textContent).catch(() => {
+		// Failed to copy to clipboard
 	});
 };
 
@@ -568,7 +568,6 @@ export const updateNodeByPos = (
 	}
 
 	if (pos === null) {
-		console.log("Could not find imageUploader node to update");
 		return;
 	}
 
