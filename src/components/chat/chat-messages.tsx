@@ -10,6 +10,12 @@ import {
 	ConfirmationRequest,
 	ConfirmationTitle,
 } from "@/components/ai-elements/confirmation";
+import {
+	Source,
+	Sources,
+	SourcesContent,
+	SourcesTrigger,
+} from "@/components/ai-elements/sources";
 import { Button } from "@/components/ui/button";
 import { ShimmerText } from "@/components/ui/shimmer-text";
 import {
@@ -38,6 +44,96 @@ const tryParseJson = (value: string): unknown => {
 	} catch {
 		return value;
 	}
+};
+
+const tryParseToolOutput = (value: unknown): unknown => {
+	if (typeof value === "string") {
+		return tryParseJson(value);
+	}
+	return value;
+};
+
+type ToolSource = { href: string; title: string };
+
+const collectToolSources = (message: UIMessage): ToolSource[] => {
+	const sources: ToolSource[] = [];
+
+	const toolNameByCallId = new Map<string, string>();
+	for (const part of message.parts) {
+		if (part.type !== "tool-call") continue;
+		toolNameByCallId.set(part.id, part.name);
+	}
+
+	const addSourcesFromToolOutput = (toolName: string, output: unknown) => {
+		if (!output || typeof output !== "object") return;
+
+		if (toolName === "web_search_jina") {
+			const results =
+				"results" in output ? (output as { results?: unknown }).results : undefined;
+			if (!Array.isArray(results)) return;
+			for (const entry of results) {
+				if (!entry || typeof entry !== "object") continue;
+				const title =
+					"title" in entry ? (entry as { title?: unknown }).title : undefined;
+				const url = "url" in entry ? (entry as { url?: unknown }).url : undefined;
+				if (typeof title === "string" && typeof url === "string" && url) {
+					sources.push({ href: url, title });
+				}
+			}
+			return;
+		}
+
+		if (toolName === "search_pages") {
+			const results =
+				"results" in output ? (output as { results?: unknown }).results : undefined;
+			if (!Array.isArray(results)) return;
+			for (const entry of results) {
+				if (!entry || typeof entry !== "object") continue;
+				const pageId =
+					"pageId" in entry ? (entry as { pageId?: unknown }).pageId : undefined;
+				const title =
+					"title" in entry ? (entry as { title?: unknown }).title : undefined;
+				if (typeof pageId === "string" && typeof title === "string" && pageId) {
+					sources.push({ href: `/documents/${pageId}`, title });
+				}
+			}
+			return;
+		}
+
+		if (toolName === "get_page") {
+			const pageId =
+				"pageId" in output ? (output as { pageId?: unknown }).pageId : undefined;
+			const title =
+				"title" in output ? (output as { title?: unknown }).title : undefined;
+			if (typeof pageId === "string" && typeof title === "string" && pageId) {
+				sources.push({ href: `/documents/${pageId}`, title });
+			}
+		}
+	};
+
+	// Prefer server tool results (tool-result parts), since server tools rarely populate
+	// `tool-call.output` on the assistant message itself.
+	for (const part of message.parts) {
+		if (part.type !== "tool-result") continue;
+		const toolName = toolNameByCallId.get(part.toolCallId);
+		if (!toolName) continue;
+		addSourcesFromToolOutput(toolName, tryParseJson(part.content));
+	}
+
+	// Fallback: client tools (or some flows) attach output directly to the tool-call part.
+	for (const part of message.parts) {
+		if (part.type !== "tool-call") continue;
+		if (part.output === undefined || part.output === null) continue;
+		addSourcesFromToolOutput(part.name, tryParseToolOutput(part.output));
+	}
+
+	const seen = new Set<string>();
+	return sources.filter((source) => {
+		const key = `${source.href}::${source.title}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
 };
 
 const formatApprovalPrompt = (toolName: string, args: unknown): string => {
@@ -181,6 +277,8 @@ export function ChatMessages({
 								part.state === "approval-requested"),
 					);
 				const messageText = getMessageText(message);
+				const toolSources =
+					message.role === "assistant" ? collectToolSources(message) : [];
 				const reaction = reactionsByMessageId[message.id];
 
 				if (
@@ -303,6 +401,20 @@ export function ChatMessages({
 											<ShimmerText>Thinking...</ShimmerText>
 										</div>
 									)}
+									{toolSources.length > 0 ? (
+										<Sources defaultOpen={false}>
+											<SourcesTrigger count={toolSources.length} />
+											<SourcesContent>
+												{toolSources.map((source) => (
+													<Source
+														key={`${message.id}:${source.href}:${source.title}`}
+														href={source.href}
+														title={source.title}
+													/>
+												))}
+											</SourcesContent>
+										</Sources>
+									) : null}
 									<div className="mt-2 flex items-center gap-1">
 										<Tooltip>
 											<TooltipTrigger asChild>

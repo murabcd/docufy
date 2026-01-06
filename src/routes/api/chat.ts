@@ -258,6 +258,7 @@ export const Route = createFileRoute("/api/chat")({
 					model: rawModel,
 					workspaceId: rawWorkspaceId,
 					documentId: rawDocumentId,
+					webSearchEnabled: rawWebSearchEnabled,
 					data,
 				} = await request.json();
 
@@ -275,6 +276,14 @@ export const Route = createFileRoute("/api/chat")({
 					rawWorkspaceId ?? (requestData.workspaceId as string | undefined);
 				const documentId =
 					rawDocumentId ?? (requestData.documentId as string | undefined);
+				const webSearchEnabledRaw =
+					typeof rawWebSearchEnabled === "boolean"
+						? rawWebSearchEnabled
+						: (requestData.webSearchEnabled as unknown);
+				const webSearchRequested =
+					typeof webSearchEnabledRaw === "boolean" ? webSearchEnabledRaw : false;
+				const webSearchAvailable =
+					webSearchRequested && Boolean(process.env.JINA_API_KEY);
 				const approvals = extractApprovals(
 					rawApprovals ?? (requestData.approvals as unknown),
 				);
@@ -360,8 +369,22 @@ export const Route = createFileRoute("/api/chat")({
 						workspaceId: workspaceIdTyped,
 						documentId,
 						memoryEnabled,
+						webSearchEnabled: webSearchAvailable,
 						convex,
 					});
+
+					const webSearchPrompt = webSearchAvailable
+						? [
+								"Web search is enabled.",
+								'Use the tool "web_search_jina" when you need up-to-date or niche information outside the workspace.',
+								"Prefer trustworthy sources and include URLs when referencing web results.",
+								"Do not paste raw URLs in the assistant message. Mention sources by name only; the UI will show clickable links in the Sources section.",
+								"Do not include a 'Sources' section or bullet list of sources in the assistant message. Keep the answer focused; the Sources UI will display citations automatically.",
+								"Always answer the user's question directly. Do not respond with only a list of sources.",
+							].join("\n")
+						: webSearchRequested
+							? "Web search was requested but is unavailable (missing JINA_API_KEY)."
+							: null;
 
 					const stream = chat({
 						adapter: openai(),
@@ -375,6 +398,7 @@ export const Route = createFileRoute("/api/chat")({
 							memoryPrompt,
 							contextPrompt,
 							memorySavePrompt,
+							webSearchPrompt,
 						].filter((prompt): prompt is string => Boolean(prompt)),
 						tools,
 						model: selectedModel,

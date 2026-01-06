@@ -499,6 +499,7 @@ function ChatSession(
 	const [inputValue, setInputValue] = React.useState("");
 	const [selectedModel, setSelectedModel] =
 		React.useState<ChatModel>(defaultModel);
+	const [webSearchEnabled, setWebSearchEnabled] = React.useState(true);
 
 	React.useEffect(() => {
 		setSelectedModel(defaultModel);
@@ -509,8 +510,9 @@ function ChatSession(
 			model: selectedModel.model,
 			workspaceId: activeWorkspaceId ?? undefined,
 			documentId: contextDocumentId ?? undefined,
+			webSearchEnabled,
 		}),
-		[activeWorkspaceId, contextDocumentId, selectedModel.model],
+		[activeWorkspaceId, contextDocumentId, selectedModel.model, webSearchEnabled],
 	);
 
 	const activeChatKey =
@@ -541,6 +543,8 @@ function ChatSession(
 			setRightMode={setRightMode}
 			toggleRightSidebar={toggleRightSidebar}
 			sidebarOpen={sidebarOpen}
+			webSearchEnabled={webSearchEnabled}
+			onWebSearchEnabledChange={setWebSearchEnabled}
 			contextDocumentId={contextDocumentId}
 			isAutoMentionDismissed={isAutoMentionDismissed}
 			onAutoMentionDismiss={onAutoMentionDismiss}
@@ -571,6 +575,8 @@ function ChatSession(
 			setRightMode={setRightMode}
 			toggleRightSidebar={toggleRightSidebar}
 			sidebarOpen={sidebarOpen}
+			webSearchEnabled={webSearchEnabled}
+			onWebSearchEnabledChange={setWebSearchEnabled}
 			contextDocumentId={contextDocumentId}
 			isAutoMentionDismissed={isAutoMentionDismissed}
 			onAutoMentionDismiss={onAutoMentionDismiss}
@@ -614,6 +620,8 @@ function ChatSessionChrome(
 			approved: boolean;
 		}) => void;
 		sidebarOpen: boolean;
+		webSearchEnabled: boolean;
+		onWebSearchEnabledChange: (enabled: boolean) => void;
 		contextDocumentId?: Id<"documents"> | null;
 		isAutoMentionDismissed: boolean;
 		onAutoMentionDismiss: (documentId: Id<"documents">) => void;
@@ -642,6 +650,8 @@ function ChatSessionChrome(
 		onSendMessage,
 		onToolApprovalResponse,
 		sidebarOpen,
+		webSearchEnabled,
+		onWebSearchEnabledChange,
 		contextDocumentId,
 		isAutoMentionDismissed,
 		onAutoMentionDismiss,
@@ -890,6 +900,8 @@ function ChatSessionChrome(
 					suggestionAction={suggestionAction}
 					selectedModel={selectedModel}
 					onModelChange={onModelChange}
+					webSearchEnabled={webSearchEnabled}
+					onWebSearchEnabledChange={onWebSearchEnabledChange}
 					sidebarOpen={sidebarOpen}
 					autoMentionDocumentId={contextDocumentId ?? null}
 					isAutoMentionDismissed={isAutoMentionDismissed}
@@ -919,6 +931,7 @@ function PersistedChatSession(
 			model: string;
 			workspaceId?: Id<"workspaces">;
 			documentId?: Id<"documents">;
+			webSearchEnabled?: boolean;
 		};
 		onSend?: (message: string) => void;
 		placeholder?: string;
@@ -926,6 +939,8 @@ function PersistedChatSession(
 		setRightMode: (mode: "sidebar" | "floating") => void;
 		toggleRightSidebar: () => void;
 		sidebarOpen: boolean;
+		webSearchEnabled: boolean;
+		onWebSearchEnabledChange: (enabled: boolean) => void;
 		contextDocumentId?: Id<"documents"> | null;
 		isAutoMentionDismissed: boolean;
 		onAutoMentionDismiss: (documentId: Id<"documents">) => void;
@@ -953,6 +968,8 @@ function PersistedChatSession(
 		setRightMode,
 		toggleRightSidebar,
 		sidebarOpen,
+		webSearchEnabled,
+		onWebSearchEnabledChange,
 		contextDocumentId,
 		isAutoMentionDismissed,
 		onAutoMentionDismiss,
@@ -1153,6 +1170,8 @@ function PersistedChatSession(
 			setRightMode={setRightMode}
 			toggleRightSidebar={toggleRightSidebar}
 			sidebarOpen={sidebarOpen}
+			webSearchEnabled={webSearchEnabled}
+			onWebSearchEnabledChange={onWebSearchEnabledChange}
 			contextDocumentId={contextDocumentId}
 			isAutoMentionDismissed={isAutoMentionDismissed}
 			onAutoMentionDismiss={onAutoMentionDismiss}
@@ -1187,6 +1206,7 @@ function DraftChatSession(
 			model: string;
 			workspaceId?: Id<"workspaces">;
 			documentId?: Id<"documents">;
+			webSearchEnabled?: boolean;
 		};
 		onSend?: (message: string) => void;
 		placeholder?: string;
@@ -1194,6 +1214,8 @@ function DraftChatSession(
 		setRightMode: (mode: "sidebar" | "floating") => void;
 		toggleRightSidebar: () => void;
 		sidebarOpen: boolean;
+		webSearchEnabled: boolean;
+		onWebSearchEnabledChange: (enabled: boolean) => void;
 		contextDocumentId?: Id<"documents"> | null;
 		isAutoMentionDismissed: boolean;
 		onAutoMentionDismiss: (documentId: Id<"documents">) => void;
@@ -1224,6 +1246,8 @@ function DraftChatSession(
 		setRightMode,
 		toggleRightSidebar,
 		sidebarOpen,
+		webSearchEnabled,
+		onWebSearchEnabledChange,
 		contextDocumentId,
 		isAutoMentionDismissed,
 		onAutoMentionDismiss,
@@ -1385,6 +1409,8 @@ function DraftChatSession(
 			setRightMode={setRightMode}
 			toggleRightSidebar={toggleRightSidebar}
 			sidebarOpen={sidebarOpen}
+			webSearchEnabled={webSearchEnabled}
+			onWebSearchEnabledChange={onWebSearchEnabledChange}
 			contextDocumentId={contextDocumentId}
 			isAutoMentionDismissed={isAutoMentionDismissed}
 			onAutoMentionDismiss={onAutoMentionDismiss}

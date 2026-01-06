@@ -7,6 +7,10 @@
   Notion-like Platform Built with TanStack Start, TanStack AI and Convex.
 </p>
 
+- Memory: Persistent AI memory that stores user preferences and facts, with contextual retrieval during conversations
+- Web Search: Real-time web search powered by Jina AI for up-to-date information retrieval
+- Document Management: AI-powered search, retrieval, and editing of workspace documents through natural language
+
 <p align="center">
   <a href="#features"><strong>Features</strong></a> ·
   <a href="#model-providers"><strong>Model providers</strong></a> ·
@@ -23,12 +27,15 @@
 - [TanStack AI](https://tanstack.com/ai/latest)
   - AI integration with OpenAI adapter
   - Server-sent events for streaming responses
+- [Jina](https://jina.ai/)
+  - Web search API for up-to-date information retrieval
+  - Integrated with AI tools for real-time web search capabilities
 - [Tiptap v3](https://tiptap.dev/)
   - Modern rich text editor framework
   - Extensible with custom extensions (code blocks, emojis, slash commands, etc.)
 - [Convex](https://www.convex.dev/)
   - Collaborative editing with [ProseMirror Sync from Convex](https://www.convex.dev/components/prosemirror-sync)
-  - [Full-text search](https://docs.convex.dev/search/text-search) for document content
+  - [RAG](https://www.convex.dev/components/rag) and [full-text search](https://docs.convex.dev/search/text-search) for document content
 - [Better Auth](https://www.better-auth.com/)
   - Secure authentication with [Better Auth for Convex](https://labs.convex.dev/better-auth)
   - GitHub OAuth integration

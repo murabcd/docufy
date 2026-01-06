@@ -91,6 +91,8 @@ interface ChatInputProps {
 	suggestionAction?: { id: string; text: string; submit?: boolean } | null;
 	selectedModel?: ChatModel;
 	onModelChange?: (model: ChatModel) => void;
+	webSearchEnabled?: boolean;
+	onWebSearchEnabledChange?: (enabled: boolean) => void;
 	sidebarOpen?: boolean;
 	autoMentionDocumentId?: Id<"documents"> | null;
 	isAutoMentionDismissed?: boolean;
@@ -107,6 +109,8 @@ export function ChatInput({
 	suggestionAction = null,
 	selectedModel: propSelectedModel,
 	onModelChange,
+	webSearchEnabled: propWebSearchEnabled,
+	onWebSearchEnabledChange: propOnWebSearchEnabledChange,
 	sidebarOpen = false,
 	autoMentionDocumentId,
 	isAutoMentionDismissed = false,
@@ -122,6 +126,7 @@ export function ChatInput({
 	const [mentionPopoverOpen, setMentionPopoverOpen] = useState(false);
 	const [modelPopoverOpen, setModelPopoverOpen] = useState(false);
 	const [scopeMenuOpen, setScopeMenuOpen] = useState(false);
+	const [internalWebSearchEnabled, setInternalWebSearchEnabled] = useState(true);
 	const [documentSearchTerm, setDocumentSearchTerm] = useState("");
 	const [sourceSearchTerm, setSourceSearchTerm] = useState("");
 	const [workspaceScopes, setWorkspaceScopes] = useState<Id<"workspaces">[]>(
@@ -140,6 +145,9 @@ export function ChatInput({
 	const onChange = propOnChange ?? setInternalValue;
 	const selectedModel = propSelectedModel ?? internalSelectedModel;
 	const setSelectedModel = onModelChange ?? setInternalSelectedModel;
+	const webSearchEnabled = propWebSearchEnabled ?? internalWebSearchEnabled;
+	const setWebSearchEnabled =
+		propOnWebSearchEnabledChange ?? setInternalWebSearchEnabled;
 
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const wasSidebarOpenRef = useRef(false);
@@ -644,7 +652,8 @@ export function ChatInput({
 											<Switch
 												id="web-search"
 												className="ml-auto"
-												defaultChecked
+												checked={webSearchEnabled}
+												onCheckedChange={setWebSearchEnabled}
 											/>
 										</label>
 									</DropdownMenuItem>

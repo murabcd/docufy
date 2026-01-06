@@ -5,12 +5,14 @@ import { createRenamePageTool } from "@/lib/ai/tools/rename-page";
 import { createSaveMemoryFactTool } from "@/lib/ai/tools/save-memory-fact";
 import { createSearchPagesTool } from "@/lib/ai/tools/search-pages";
 import { createUpdatePageTool } from "@/lib/ai/tools/update-page";
+import { createWebSearchTool } from "@/lib/ai/tools/web-search";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 export const createChatTools = (args: {
 	workspaceId?: Id<"workspaces">;
 	documentId?: Id<"documents">;
 	memoryEnabled?: boolean;
+	webSearchEnabled?: boolean;
 	convex: ConvexHttpClient;
 }) => {
 	const tools: Array<ServerTool> = [];
@@ -21,6 +23,10 @@ export const createChatTools = (args: {
 			convex: args.convex,
 		}),
 	);
+
+	if (args.webSearchEnabled) {
+		tools.push(createWebSearchTool());
+	}
 	tools.push(createGetPageTool({ convex: args.convex }));
 	tools.push(createRenamePageTool({ convex: args.convex }));
 	tools.push(
