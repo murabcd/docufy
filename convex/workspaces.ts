@@ -4,6 +4,7 @@ import type { Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import { authComponent } from "./auth";
 import { components } from "./_generated/api";
+import { internal } from "./_generated/api";
 
 const getUserId = async (ctx: QueryCtx | MutationCtx) => {
 	const user = await authComponent.safeGetAuthUser(ctx);
@@ -277,6 +278,7 @@ export const ensureDefault = mutation({
 	}),
 	handler: async (ctx, args) => {
 		const userId = await requireUserId(ctx);
+		await ctx.runMutation(internal.init.ensureGuestCleanupCron, {});
 
 		const memberships = await ctx.db
 			.query("members")

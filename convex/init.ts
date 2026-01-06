@@ -22,3 +22,22 @@ export const ensureTrashCleanupCron = internalMutation({
 		return null;
 	},
 });
+
+export const ensureGuestCleanupCron = internalMutation({
+	handler: async (ctx) => {
+		const name = "guest-cleanup-daily";
+		if ((await crons.get(ctx, { name })) !== null) {
+			return null;
+		}
+
+		await crons.register(
+			ctx,
+			{ kind: "cron", cronspec: "0 0 * * *" },
+			internal.guestCleanup.cleanupAnonymousUsers,
+			{},
+			name,
+		);
+
+		return null;
+	},
+});

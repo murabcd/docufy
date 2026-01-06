@@ -13,6 +13,7 @@ import type * as auth from "../auth.js";
 import type * as chats from "../chats.js";
 import type * as documents from "../documents.js";
 import type * as favorites from "../favorites.js";
+import type * as guestCleanup from "../guestCleanup.js";
 import type * as http from "../http.js";
 import type * as imports from "../imports.js";
 import type * as init from "../init.js";
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   chats: typeof chats;
   documents: typeof documents;
   favorites: typeof favorites;
+  guestCleanup: typeof guestCleanup;
   http: typeof http;
   imports: typeof imports;
   init: typeof init;
