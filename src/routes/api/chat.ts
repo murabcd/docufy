@@ -281,7 +281,9 @@ export const Route = createFileRoute("/api/chat")({
 						? rawWebSearchEnabled
 						: (requestData.webSearchEnabled as unknown);
 				const webSearchRequested =
-					typeof webSearchEnabledRaw === "boolean" ? webSearchEnabledRaw : false;
+					typeof webSearchEnabledRaw === "boolean"
+						? webSearchEnabledRaw
+						: false;
 				const webSearchAvailable =
 					webSearchRequested && Boolean(process.env.JINA_API_KEY);
 				const approvals = extractApprovals(

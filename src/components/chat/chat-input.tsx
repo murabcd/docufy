@@ -126,7 +126,8 @@ export function ChatInput({
 	const [mentionPopoverOpen, setMentionPopoverOpen] = useState(false);
 	const [modelPopoverOpen, setModelPopoverOpen] = useState(false);
 	const [scopeMenuOpen, setScopeMenuOpen] = useState(false);
-	const [internalWebSearchEnabled, setInternalWebSearchEnabled] = useState(true);
+	const [internalWebSearchEnabled, setInternalWebSearchEnabled] =
+		useState(true);
 	const [documentSearchTerm, setDocumentSearchTerm] = useState("");
 	const [sourceSearchTerm, setSourceSearchTerm] = useState("");
 	const [workspaceScopes, setWorkspaceScopes] = useState<Id<"workspaces">[]>(

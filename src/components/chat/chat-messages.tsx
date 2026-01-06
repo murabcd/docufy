@@ -69,13 +69,16 @@ const collectToolSources = (message: UIMessage): ToolSource[] => {
 
 		if (toolName === "web_search_jina") {
 			const results =
-				"results" in output ? (output as { results?: unknown }).results : undefined;
+				"results" in output
+					? (output as { results?: unknown }).results
+					: undefined;
 			if (!Array.isArray(results)) return;
 			for (const entry of results) {
 				if (!entry || typeof entry !== "object") continue;
 				const title =
 					"title" in entry ? (entry as { title?: unknown }).title : undefined;
-				const url = "url" in entry ? (entry as { url?: unknown }).url : undefined;
+				const url =
+					"url" in entry ? (entry as { url?: unknown }).url : undefined;
 				if (typeof title === "string" && typeof url === "string" && url) {
 					sources.push({ href: url, title });
 				}
@@ -85,12 +88,16 @@ const collectToolSources = (message: UIMessage): ToolSource[] => {
 
 		if (toolName === "search_pages") {
 			const results =
-				"results" in output ? (output as { results?: unknown }).results : undefined;
+				"results" in output
+					? (output as { results?: unknown }).results
+					: undefined;
 			if (!Array.isArray(results)) return;
 			for (const entry of results) {
 				if (!entry || typeof entry !== "object") continue;
 				const pageId =
-					"pageId" in entry ? (entry as { pageId?: unknown }).pageId : undefined;
+					"pageId" in entry
+						? (entry as { pageId?: unknown }).pageId
+						: undefined;
 				const title =
 					"title" in entry ? (entry as { title?: unknown }).title : undefined;
 				if (typeof pageId === "string" && typeof title === "string" && pageId) {
@@ -102,7 +109,9 @@ const collectToolSources = (message: UIMessage): ToolSource[] => {
 
 		if (toolName === "get_page") {
 			const pageId =
-				"pageId" in output ? (output as { pageId?: unknown }).pageId : undefined;
+				"pageId" in output
+					? (output as { pageId?: unknown }).pageId
+					: undefined;
 			const title =
 				"title" in output ? (output as { title?: unknown }).title : undefined;
 			if (typeof pageId === "string" && typeof title === "string" && pageId) {

@@ -1150,7 +1150,7 @@ export function ShareDialogModal({
 					>
 						<AlertDialogContent>
 							<AlertDialogHeader>
-								<AlertDialogTitle>Downgrade your access?</AlertDialogTitle>
+								<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
 								<AlertDialogDescription>
 									Are you sure you want to downgrade your own access? You may
 									lose the ability to manage sharing and settings for this page.

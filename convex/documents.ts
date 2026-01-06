@@ -1209,6 +1209,35 @@ export const remove = mutation({
 	},
 });
 
+export const removeAllForUser = mutation({
+	args: {},
+	returns: v.null(),
+	handler: async (ctx) => {
+		const userId = await requireUserId(ctx);
+
+		const documents = await ctx.db
+			.query("documents")
+			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.collect();
+
+		const ownedIds = new Set<string>(documents.map((doc) => String(doc._id)));
+		const roots = documents.filter((doc) => {
+			if (!doc.parentId) return true;
+			return !ownedIds.has(String(doc.parentId));
+		});
+
+		for (const doc of roots) {
+			const current = await ctx.db.get(doc._id);
+			if (!current) continue;
+			if (!current.workspaceId) continue;
+			await requireDocumentWriteAccess(ctx, current, userId);
+			await cascadeDelete(ctx, current._id, current.workspaceId);
+		}
+
+		return null;
+	},
+});
+
 export const cleanupTrash = internalMutation({
 	args: {
 		retentionDays: v.optional(v.number()),

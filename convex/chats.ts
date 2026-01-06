@@ -239,3 +239,29 @@ export const setModel = mutation({
 		return null;
 	},
 });
+
+export const removeAll = mutation({
+	args: {},
+	returns: v.null(),
+	handler: async (ctx) => {
+		const userId = await requireUserId(ctx);
+
+		const messages = await ctx.db
+			.query("messages")
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
+			.collect();
+		for (const message of messages) {
+			await ctx.db.delete(message._id);
+		}
+
+		const chats = await ctx.db
+			.query("chats")
+			.withIndex("by_user_updatedAt", (q) => q.eq("userId", userId))
+			.collect();
+		for (const chat of chats) {
+			await ctx.db.delete(chat._id);
+		}
+
+		return null;
+	},
+});

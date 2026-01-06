@@ -512,7 +512,12 @@ function ChatSession(
 			documentId: contextDocumentId ?? undefined,
 			webSearchEnabled,
 		}),
-		[activeWorkspaceId, contextDocumentId, selectedModel.model, webSearchEnabled],
+		[
+			activeWorkspaceId,
+			contextDocumentId,
+			selectedModel.model,
+			webSearchEnabled,
+		],
 	);
 
 	const activeChatKey =

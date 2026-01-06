@@ -67,14 +67,18 @@ export const createWebSearchTool = () =>
 			}
 
 			const json = (await response.json()) as JinaSearchResponse;
-			const data = Array.isArray(json.data) ? (json.data as JinaSearchResult[]) : [];
+			const data = Array.isArray(json.data)
+				? (json.data as JinaSearchResult[])
+				: [];
 
 			const results = data
 				.map((entry) => {
 					const title = typeof entry.title === "string" ? entry.title : "";
 					const url = typeof entry.url === "string" ? entry.url : "";
 					const snippet =
-						typeof entry.description === "string" ? entry.description : undefined;
+						typeof entry.description === "string"
+							? entry.description
+							: undefined;
 					return { title, url, snippet };
 				})
 				.filter((r) => Boolean(r.title) && Boolean(r.url))
