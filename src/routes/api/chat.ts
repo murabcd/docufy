@@ -2,9 +2,12 @@ import type { ModelMessage, TextPart } from "@tanstack/ai";
 import { chat, toStreamResponse } from "@tanstack/ai";
 import { openai } from "@tanstack/ai-openai";
 import { createFileRoute } from "@tanstack/react-router";
+import { embedText, extractMemoryCandidate } from "@/lib/ai/memory";
 import { systemPrompts } from "@/lib/ai/prompts";
 import { createChatTools } from "@/lib/ai/tool-registry";
 import { createAuthedConvexHttpClient } from "@/lib/convex-http";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 const CONTEXT_PREFIX = "__DOCCTX__";
 const CONTEXT_SUFFIX = "__ENDDOCCTX__";
@@ -120,6 +123,66 @@ const buildContextSystemPrompt = (mentions: MentionPayload[]) => {
 	);
 };
 
+const getLatestUserMessage = (messages: Array<ModelMessage>) => {
+	for (let index = messages.length - 1; index >= 0; index--) {
+		const message = messages[index];
+		if (!message || message.role !== "user") continue;
+
+		let text = "";
+		if (typeof message.content === "string") {
+			text = message.content;
+		} else if (Array.isArray(message.content)) {
+			text = message.content
+				.filter((part) => part.type === "text")
+				.map((part) => part.content)
+				.join("\n");
+		}
+
+		const maybeId = (message as unknown as { id?: unknown }).id;
+		const id = typeof maybeId === "string" ? maybeId : null;
+
+		return { id, text: text.trim() };
+	}
+
+	return null;
+};
+
+const buildMemorySystemPrompt = (facts: Array<string>) => {
+	if (facts.length === 0) return null;
+	const lines = facts
+		.map((fact) => fact.trim())
+		.filter(Boolean)
+		.slice(0, 10)
+		.map((fact) => `- ${fact}`);
+
+	if (lines.length === 0) return null;
+
+	return [
+		"User memory (opt-in):",
+		"Use these facts to personalize responses when relevant.",
+		"If any memory conflicts with the user's latest message, prefer the latest message.",
+		...lines,
+	].join("\n");
+};
+
+const buildMemorySaveInstructionPrompt = (args: {
+	fact: string;
+	sourceMessageId: string | null;
+}) => {
+	const toolArgs = JSON.stringify({
+		fact: args.fact,
+		sourceMessageId: args.sourceMessageId ?? null,
+	});
+
+	return [
+		"Memory is enabled and there is a single candidate fact to save.",
+		"Request approval BEFORE responding to the user.",
+		`Immediately call the tool "save_memory_fact" with EXACT arguments: ${toolArgs}`,
+		"Do not output any assistant text before the tool call.",
+		'After the tool completes, respond with ONE short sentence: if saved say "Saved.", otherwise say "Okay." Do not ask follow-up questions.',
+	].join("\n");
+};
+
 const extractApprovals = (value: unknown) => {
 	if (!value || typeof value !== "object") {
 		return new Map<string, boolean>();
@@ -228,9 +291,75 @@ export const Route = createFileRoute("/api/chat")({
 					const { client: convex } =
 						await createAuthedConvexHttpClient(request);
 
+					const workspaceIdTyped = workspaceId
+						? (workspaceId as Id<"workspaces">)
+						: undefined;
+
+					const memorySettings = workspaceIdTyped
+						? await convex.query(api.aiMemories.getSettings, {
+								workspaceId: workspaceIdTyped,
+							})
+						: { enabled: false, enabledAt: null };
+					const memoryEnabled = Boolean(
+						workspaceIdTyped && memorySettings.enabled,
+					);
+
+					const latestUser = getLatestUserMessage(withApprovals);
+					const latestUserText = latestUser?.text ?? "";
+					const shouldRunUserMemory =
+						memoryEnabled &&
+						latestUserText.length > 0 &&
+						withApprovals[withApprovals.length - 1]?.role === "user";
+
+					let memoryPrompt: string | null = null;
+					if (memoryEnabled && latestUserText) {
+						try {
+							const hasAny = await convex.query(api.aiMemories.hasAny, {
+								workspaceId: workspaceIdTyped as Id<"workspaces">,
+							});
+							if (hasAny) {
+								const queryEmbedding = await embedText(latestUserText);
+								const results = (await convex.action(api.aiMemories.search, {
+									workspaceId: workspaceIdTyped as Id<"workspaces">,
+									embedding: queryEmbedding,
+									limit: 6,
+								})) as Array<string>;
+								memoryPrompt = buildMemorySystemPrompt(results);
+							}
+						} catch (error) {
+							console.warn("Failed to load memory context:", error);
+						}
+					}
+
+					let memorySavePrompt: string | null = null;
+					if (shouldRunUserMemory) {
+						try {
+							const candidate = await extractMemoryCandidate(latestUserText);
+							if (
+								candidate.fact &&
+								candidate.allowed &&
+								candidate.confidence >= 0.85
+							) {
+								const exists = await convex.query(api.aiMemories.exists, {
+									workspaceId: workspaceIdTyped as Id<"workspaces">,
+									content: candidate.fact,
+								});
+								if (!exists) {
+									memorySavePrompt = buildMemorySaveInstructionPrompt({
+										fact: candidate.fact,
+										sourceMessageId: latestUser?.id ?? null,
+									});
+								}
+							}
+						} catch (error) {
+							console.warn("Failed to extract memory candidate:", error);
+						}
+					}
+
 					const tools = createChatTools({
-						workspaceId,
+						workspaceId: workspaceIdTyped,
 						documentId,
+						memoryEnabled,
 						convex,
 					});
 
@@ -240,10 +369,12 @@ export const Route = createFileRoute("/api/chat")({
 						systemPrompts: [
 							...systemPrompts({
 								model: selectedModel,
-								workspaceId,
-								documentId,
+								workspaceId: workspaceIdTyped,
+								documentId: documentId as Id<"documents"> | undefined,
 							}),
+							memoryPrompt,
 							contextPrompt,
+							memorySavePrompt,
 						].filter((prompt): prompt is string => Boolean(prompt)),
 						tools,
 						model: selectedModel,

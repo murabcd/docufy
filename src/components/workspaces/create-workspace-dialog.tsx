@@ -74,10 +74,8 @@ export function CreateWorkspaceDialog({
 			) : null}
 			<DialogContent className="p-0 sm:max-w-lg">
 				<DialogHeader className="px-6 pt-4">
-					<DialogTitle className="text-lg font-semibold text-foreground">
-						Create workspace
-					</DialogTitle>
-					<DialogDescription className="text-sm leading-6 text-muted-foreground">
+					<DialogTitle>Create workspace</DialogTitle>
+					<DialogDescription>
 						Workspaces are shared environments where teams can connect.
 					</DialogDescription>
 				</DialogHeader>

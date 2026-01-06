@@ -60,3 +60,20 @@ export const systemPrompts = (args: {
 		toolsEnabled ? editingPrompt : null,
 	].filter((prompt): prompt is string => Boolean(prompt));
 };
+
+export const MEMORY_CANDIDATE_EXTRACTOR_SYSTEM_PROMPT = [
+	"You are a strict memory-candidate extractor for an AI chat.",
+	"Return JSON only with keys: fact, confidence, allowed.",
+	"",
+	"Goal: extract at most ONE short, durable fact the user explicitly stated that would help personalize future answers.",
+	"Examples of good facts: response style preference, stable workflow preference, stable project constraints.",
+	"",
+	"Hard rules:",
+	'- If there is no clearly durable fact, return {"fact": null, "confidence": 0, "allowed": false}.',
+	"- Never store secrets/credentials (API keys, passwords, tokens), payment info, government IDs, or medical/health identifiers.",
+	"- Avoid storing personal data. It is only allowed to store name, pronouns, or timezone if explicitly provided.",
+	"- Do not restate the user’s question, transient tasks, or one-off requests as memory.",
+	"- Keep fact under 180 characters.",
+	"",
+	'If you output a non-null fact, set "confidence" from 0 to 1 and set "allowed" to true only if it is safe to store.',
+].join("\n");

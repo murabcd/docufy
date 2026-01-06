@@ -130,12 +130,12 @@ export function InviteMembersDialog({
 		<Dialog open={open} onOpenChange={handleOpenChange}>
 			<DialogContent className="sm:max-w-2xl">
 				<DialogHeader>
-					<DialogTitle className="font-semibold text-foreground">
+					<DialogTitle>
 						{workspaceName
 							? `Invite people to ${workspaceName}`
 							: "Invite members"}
 					</DialogTitle>
-					<DialogDescription className="text-sm leading-6 text-muted-foreground">
+					<DialogDescription>
 						Add new team members to your workspace.
 					</DialogDescription>
 				</DialogHeader>

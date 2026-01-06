@@ -41,6 +41,17 @@ const tryParseJson = (value: string): unknown => {
 };
 
 const formatApprovalPrompt = (toolName: string, args: unknown): string => {
+	if (toolName === "save_memory_fact") {
+		const fact =
+			args && typeof args === "object" && "fact" in args
+				? (args as { fact?: unknown }).fact
+				: undefined;
+		if (typeof fact === "string" && fact.trim()) {
+			return `This will save "${fact.trim()}" to memory. Do you approve this action?`;
+		}
+		return "This will save a memory. Do you approve this action?";
+	}
+
 	if (toolName === "rename_page") {
 		const title =
 			args && typeof args === "object" && "title" in args

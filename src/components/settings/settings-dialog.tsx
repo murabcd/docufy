@@ -33,6 +33,7 @@ import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
+	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
 import {
@@ -130,7 +131,10 @@ export function SettingsDialog({
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogContent className="overflow-hidden p-0 md:max-h-[500px] md:max-w-[700px] lg:max-w-[800px]">
-				<DialogTitle className="sr-only">Settings</DialogTitle>
+				<DialogHeader className="sr-only">
+					<DialogTitle>Settings</DialogTitle>
+					<DialogDescription>Customize your settings here.</DialogDescription>
+				</DialogHeader>
 				<DialogDescription className="sr-only">
 					Customize your settings here.
 				</DialogDescription>

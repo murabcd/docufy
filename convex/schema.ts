@@ -18,6 +18,8 @@ export default defineSchema({
 		workspaceId: v.id("workspaces"),
 		userId: v.string(),
 		role: v.union(v.literal("owner"), v.literal("member")),
+		aiMemoryEnabled: v.optional(v.boolean()),
+		aiMemoryEnabledAt: v.optional(v.number()),
 		createdAt: v.number(),
 	})
 		.index("by_user", ["userId"])
@@ -176,10 +178,23 @@ export default defineSchema({
 		updatedAt: v.number(),
 	}).index("by_user", ["userId"]),
 	aiMemories: defineTable({
+		workspaceId: v.id("workspaces"),
+		workspaceUserKey: v.string(),
 		userId: v.string(),
 		content: v.string(),
 		createdAt: v.number(),
+		updatedAt: v.number(),
+		sourceMessageId: v.optional(v.string()),
+		ragEntryId: v.optional(v.string()),
+		embedding: v.optional(v.array(v.float64())),
 	})
 		.index("by_user", ["userId"])
-		.index("by_user_createdAt", ["userId", "createdAt"]),
+		.index("by_user_createdAt", ["userId", "createdAt"])
+		.index("by_workspace_user_createdAt", ["workspaceId", "userId", "createdAt"])
+		.index("by_workspace_user_content", ["workspaceId", "userId", "content"])
+		.vectorIndex("by_embedding", {
+			vectorField: "embedding",
+			dimensions: 1536,
+			filterFields: ["workspaceUserKey"],
+		}),
 });

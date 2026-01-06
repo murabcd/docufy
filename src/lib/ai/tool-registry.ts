@@ -2,6 +2,7 @@ import type { ServerTool } from "@tanstack/ai";
 import type { ConvexHttpClient } from "convex/browser";
 import { createGetPageTool } from "@/lib/ai/tools/get-page";
 import { createRenamePageTool } from "@/lib/ai/tools/rename-page";
+import { createSaveMemoryFactTool } from "@/lib/ai/tools/save-memory-fact";
 import { createSearchPagesTool } from "@/lib/ai/tools/search-pages";
 import { createUpdatePageTool } from "@/lib/ai/tools/update-page";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -9,6 +10,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 export const createChatTools = (args: {
 	workspaceId?: Id<"workspaces">;
 	documentId?: Id<"documents">;
+	memoryEnabled?: boolean;
 	convex: ConvexHttpClient;
 }) => {
 	const tools: Array<ServerTool> = [];
@@ -27,6 +29,15 @@ export const createChatTools = (args: {
 			convex: args.convex,
 		}),
 	);
+
+	if (args.memoryEnabled) {
+		tools.push(
+			createSaveMemoryFactTool({
+				workspaceId: args.workspaceId,
+				convex: args.convex,
+			}),
+		);
+	}
 
 	return tools;
 };
