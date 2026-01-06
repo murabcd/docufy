@@ -7,9 +7,9 @@
   Notion-like Platform Built with TanStack Start, TanStack AI and Convex.
 </p>
 
-- Memory: Persistent AI memory that stores user preferences and facts, with contextual retrieval during conversations
-- Web Search: Real-time web search powered by Jina AI for up-to-date information retrieval
-- Document Management: AI-powered search, retrieval, and editing of workspace documents through natural language
+- Persistent AI memory that stores user preferences and facts, with contextual retrieval during conversations
+- Real-time web search powered by Jina AI for up-to-date information retrieval
+- AI-powered search, retrieval, and editing of workspace documents through natural language
 
 <p align="center">
   <a href="#features"><strong>Features</strong></a> ·
