@@ -1,6 +1,5 @@
 import { ConvexBetterAuthProvider } from "@convex-dev/better-auth/react";
 import type { ConvexQueryClient } from "@convex-dev/react-query";
-import { TanStackDevtools } from "@tanstack/react-devtools";
 import { type QueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import {
 	createRootRouteWithContext,
@@ -10,7 +9,6 @@ import {
 	useRouteContext,
 	useRouter,
 } from "@tanstack/react-router";
-import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
 import { useMutation } from "convex/react";
 import * as React from "react";
@@ -211,17 +209,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 			<body className="min-h-screen bg-background text-foreground">
 				<ThemeProvider>
 					<SidebarProvider>{children}</SidebarProvider>
-					<TanStackDevtools
-						config={{
-							position: "bottom-right",
-						}}
-						plugins={[
-							{
-								name: "Tanstack Router",
-								render: <TanStackRouterDevtoolsPanel />,
-							},
-						]}
-					/>
 					<Toaster position="top-center" />
 					<Scripts />
 				</ThemeProvider>
