@@ -66,10 +66,33 @@ import { chatsQueries } from "@/queries";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
+type PersistedMessagePart =
+	| { type: "text"; content: string }
+	| {
+			type: "tool-call";
+			id: string;
+			name: string;
+			arguments?: string;
+			state?: string;
+			approval?: {
+				id: string;
+				needsApproval?: boolean;
+				approved?: boolean;
+			};
+			output?: string | null;
+	  }
+	| {
+			type: "tool-result";
+			toolCallId: string;
+			content: string;
+			state?: string;
+			error?: string;
+	  };
+
 type PersistedUIMessage = {
 	id: string;
 	role: "user" | "assistant";
-	parts: UIMessage["parts"];
+	parts: PersistedMessagePart[];
 };
 
 type ActiveChat =
@@ -138,6 +161,94 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
 
+const serializeUnknown = (value: unknown) => {
+	try {
+		return JSON.stringify(value);
+	} catch {
+		return String(value);
+	}
+};
+
+const normalizeTextContent = (value: unknown) => {
+	return typeof value === "string" ? value : serializeUnknown(value);
+};
+
+const normalizeToolArguments = (value: unknown) => {
+	if (value === undefined) return undefined;
+	return typeof value === "string" ? value : serializeUnknown(value);
+};
+
+const normalizeToolOutput = (value: unknown) => {
+	if (value === undefined) return undefined;
+	if (value === null) return null;
+	return typeof value === "string" ? value : serializeUnknown(value);
+};
+
+const normalizeApproval = (
+	value: unknown,
+): { id: string; needsApproval?: boolean; approved?: boolean } | undefined => {
+	if (!value || typeof value !== "object") return undefined;
+	const approval = value as Record<string, unknown>;
+	const id = approval.id;
+	if (typeof id !== "string") return undefined;
+	const needsApproval =
+		typeof approval.needsApproval === "boolean"
+			? approval.needsApproval
+			: undefined;
+	const approved =
+		typeof approval.approved === "boolean" ? approval.approved : undefined;
+	return {
+		id,
+		...(needsApproval !== undefined ? { needsApproval } : {}),
+		...(approved !== undefined ? { approved } : {}),
+	};
+};
+
+const normalizeState = (value: unknown) => {
+	return typeof value === "string" ? value : undefined;
+};
+
+const normalizeError = (value: unknown) => {
+	return typeof value === "string" ? value : undefined;
+};
+
+const toPersistedParts = (
+	parts: UIMessage["parts"],
+): PersistedMessagePart[] => {
+	const next: PersistedMessagePart[] = [];
+	for (const part of parts) {
+		if (part.type === "text") {
+			next.push({
+				type: "text",
+				content: normalizeTextContent(part.content),
+			});
+			continue;
+		}
+		if (part.type === "tool-result") {
+			next.push({
+				type: "tool-result",
+				toolCallId: part.toolCallId,
+				content: normalizeTextContent(part.content),
+				state: normalizeState(part.state),
+				error: normalizeError(part.error),
+			});
+			continue;
+		}
+		if (part.type === "tool-call") {
+			next.push({
+				type: "tool-call",
+				id: part.id,
+				name: part.name,
+				arguments: normalizeToolArguments(part.arguments),
+				state: normalizeState(part.state),
+				approval: normalizeApproval(part.approval),
+				output: normalizeToolOutput(part.output),
+			});
+		}
+	}
+	return next;
+};
+
 const generateDraftId = () => {
 	if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
 		return crypto.randomUUID();
@@ -158,7 +269,7 @@ function toPersistedUIMessage(message: UIMessage): PersistedUIMessage {
 	return {
 		id: message.id,
 		role: message.role === "assistant" ? "assistant" : "user",
-		parts: message.parts,
+		parts: toPersistedParts(message.parts),
 	};
 }
 

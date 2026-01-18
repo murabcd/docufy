@@ -1,4 +1,4 @@
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { FileCode, FileText } from "lucide-react";
 import type { ElementType } from "react";
 import { useRef, useState } from "react";
@@ -52,7 +52,9 @@ export function ImportSettings() {
 	const generateImportUploadUrl = useMutation(
 		api.imports.generateImportUploadUrl,
 	);
-	const importTextOrMarkdown = useMutation(api.imports.importTextOrMarkdown);
+	const importTextOrMarkdown = useAction(
+		api.importsActions.importTextOrMarkdown,
+	);
 
 	const handleFileImport = async (option: FileImportOption, _file: File) => {
 		if (!activeWorkspaceId) {

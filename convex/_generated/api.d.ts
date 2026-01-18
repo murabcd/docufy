@@ -16,6 +16,7 @@ import type * as favorites from "../favorites.js";
 import type * as guestCleanup from "../guestCleanup.js";
 import type * as http from "../http.js";
 import type * as imports from "../imports.js";
+import type * as importsActions from "../importsActions.js";
 import type * as init from "../init.js";
 import type * as prosemirrorSync from "../prosemirrorSync.js";
 import type * as teamspaces from "../teamspaces.js";
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   guestCleanup: typeof guestCleanup;
   http: typeof http;
   imports: typeof imports;
+  importsActions: typeof importsActions;
   init: typeof init;
   prosemirrorSync: typeof prosemirrorSync;
   teamspaces: typeof teamspaces;

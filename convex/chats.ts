@@ -29,6 +29,41 @@ const chatFields = {
 	lastMessageAt: v.optional(v.number()),
 };
 
+const messagePayloadValidator = v.object({
+	id: v.string(),
+	role: v.union(v.literal("user"), v.literal("assistant")),
+	parts: v.array(
+		v.union(
+			v.object({
+				type: v.literal("text"),
+				content: v.string(),
+			}),
+			v.object({
+				type: v.literal("tool-call"),
+				id: v.string(),
+				name: v.string(),
+				arguments: v.optional(v.string()),
+				state: v.optional(v.string()),
+				approval: v.optional(
+					v.object({
+						id: v.string(),
+						needsApproval: v.optional(v.boolean()),
+						approved: v.optional(v.boolean()),
+					}),
+				),
+				output: v.optional(v.union(v.string(), v.null())),
+			}),
+			v.object({
+				type: v.literal("tool-result"),
+				toolCallId: v.string(),
+				content: v.string(),
+				state: v.optional(v.string()),
+				error: v.optional(v.string()),
+			}),
+		),
+	),
+});
+
 const messageFields = {
 	_id: v.id("messages"),
 	_creationTime: v.number(),
@@ -36,7 +71,7 @@ const messageFields = {
 	userId: v.string(),
 	messageId: v.string(),
 	role: v.union(v.literal("user"), v.literal("assistant"), v.literal("tool")),
-	message: v.any(),
+	message: messagePayloadValidator,
 	previewText: v.optional(v.string()),
 	createdAt: v.number(),
 };
@@ -157,7 +192,7 @@ export const upsertMessage = mutation({
 		chatId: v.id("chats"),
 		messageId: v.string(),
 		role: v.union(v.literal("user"), v.literal("assistant"), v.literal("tool")),
-		message: v.any(),
+		message: messagePayloadValidator,
 		previewText: v.optional(v.string()),
 		createdAt: v.optional(v.number()),
 	},

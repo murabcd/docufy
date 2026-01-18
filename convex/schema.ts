@@ -1,6 +1,41 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+const messagePayload = v.object({
+	id: v.string(),
+	role: v.union(v.literal("user"), v.literal("assistant")),
+	parts: v.array(
+		v.union(
+			v.object({
+				type: v.literal("text"),
+				content: v.string(),
+			}),
+			v.object({
+				type: v.literal("tool-call"),
+				id: v.string(),
+				name: v.string(),
+				arguments: v.optional(v.string()),
+				state: v.optional(v.string()),
+				approval: v.optional(
+					v.object({
+						id: v.string(),
+						needsApproval: v.optional(v.boolean()),
+						approved: v.optional(v.boolean()),
+					}),
+				),
+				output: v.optional(v.union(v.string(), v.null())),
+			}),
+			v.object({
+				type: v.literal("tool-result"),
+				toolCallId: v.string(),
+				content: v.string(),
+				state: v.optional(v.string()),
+				error: v.optional(v.string()),
+			}),
+		),
+	),
+});
+
 export default defineSchema({
 	workspaces: defineTable({
 		name: v.string(),
@@ -222,7 +257,7 @@ export default defineSchema({
 		userId: v.string(),
 		messageId: v.string(),
 		role: v.union(v.literal("user"), v.literal("assistant"), v.literal("tool")),
-		message: v.any(),
+		message: messagePayload,
 		previewText: v.optional(v.string()),
 		createdAt: v.number(),
 	})

@@ -1,5 +1,5 @@
-import { mutation } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
+import { internalMutation, internalQuery, mutation } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import { prosemirrorSync } from "./prosemirrorSync";
@@ -8,12 +8,12 @@ import { api } from "./_generated/api";
 
 const EMPTY_DOCUMENT = { type: "doc", content: [{ type: "paragraph" }] };
 
-const getUserId = async (ctx: MutationCtx) => {
+const getUserId = async (ctx: MutationCtx | QueryCtx) => {
 	const user = await authComponent.safeGetAuthUser(ctx);
 	return user ? String(user._id) : null;
 };
 
-const requireUserId = async (ctx: MutationCtx) => {
+const requireUserId = async (ctx: MutationCtx | QueryCtx) => {
 	const userId = await getUserId(ctx);
 	if (!userId) throw new ConvexError("Unauthenticated");
 	return userId;
@@ -107,11 +107,22 @@ export const generateImportUploadUrl = mutation({
 	},
 });
 
-export const importTextOrMarkdown = mutation({
+export const getImportStorageUrl = internalQuery({
+	args: {
+		storageId: v.id("_storage"),
+	},
+	returns: v.union(v.string(), v.null()),
+	handler: async (ctx, args) => {
+		await requireUserId(ctx);
+		return await ctx.storage.getUrl(args.storageId);
+	},
+});
+
+export const importTextOrMarkdownInternal = internalMutation({
 	args: {
 		workspaceId: v.id("workspaces"),
 		teamspaceId: v.optional(v.id("teamspaces")),
-		storageId: v.id("_storage"),
+		rawText: v.string(),
 		filename: v.string(),
 		parentId: v.optional(v.id("documents")),
 	},
@@ -139,15 +150,8 @@ export const importTextOrMarkdown = mutation({
 			role: membership.role,
 		});
 
-		const url = await ctx.storage.getUrl(args.storageId);
-		if (!url) throw new ConvexError("File not found");
-
-		const response = await fetch(url);
-		if (!response.ok) throw new ConvexError("File not found");
-
-		const raw = await response.text();
 		const maxChars = 2_000_000;
-		if (raw.length > maxChars) {
+		if (args.rawText.length > maxChars) {
 			throw new ConvexError("File too large");
 		}
 
@@ -170,8 +174,8 @@ export const importTextOrMarkdown = mutation({
 
 		const now = Date.now();
 		const title = titleFromFilename(args.filename);
-		const snapshot = plainTextToSnapshot(raw);
-		const searchableText = ensureTitleInSearchableText(title, raw);
+		const snapshot = plainTextToSnapshot(args.rawText);
+		const searchableText = ensureTitleInSearchableText(title, args.rawText);
 
 		const siblings = await ctx.db
 			.query("documents")
