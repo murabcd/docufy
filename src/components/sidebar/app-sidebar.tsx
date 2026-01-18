@@ -56,24 +56,11 @@ export interface Favorite {
 	icon: LucideIcon | string;
 }
 
-export interface TeamspacePage {
-	name: string;
-	url: string;
-	emoji: string;
-}
-
-export interface Teamspace {
-	name: string;
-	emoji: string;
-	pages: TeamspacePage[];
-}
-
 export interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 	teams?: Team[];
 	navMain?: NavMainItem[];
 	navSecondary?: NavSecondaryItem[];
 	favorites?: Favorite[];
-	teamspaces?: Teamspace[];
 }
 
 const defaultNavMain: NavMainItem[] = [
@@ -106,7 +93,6 @@ export function AppSidebar({
 	navMain = defaultNavMain,
 	navSecondary = defaultNavSecondary,
 	favorites: propFavorites,
-	teamspaces = [],
 	...props
 }: AppSidebarProps) {
 	const navigate = useNavigate();
@@ -141,7 +127,7 @@ export function AppSidebar({
 				logo: Command,
 				icon: workspace.icon,
 				plan: "Free",
-				isPrivate: workspace.isPrivate ?? false,
+				isPrivate: workspace.isGuest ? false : (workspace.isPrivate ?? false),
 			}));
 		}
 		return [
@@ -201,7 +187,8 @@ export function AppSidebar({
 						favorites={propFavorites ?? []}
 						favoritesData={favoritesData ?? []}
 					/>
-					<NavTeamspaces teamspaces={teamspaces} />
+					<NavTeamspaces />
+
 					<NavDocuments />
 					<NavShared />
 					<NavSecondary

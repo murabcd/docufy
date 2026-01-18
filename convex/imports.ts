@@ -4,6 +4,7 @@ import type { Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import { prosemirrorSync } from "./prosemirrorSync";
 import { authComponent } from "./auth";
+import { api } from "./_generated/api";
 
 const EMPTY_DOCUMENT = { type: "doc", content: [{ type: "paragraph" }] };
 
@@ -24,13 +25,38 @@ const requireWorkspaceAccess = async (
 ) => {
 	const userId = await requireUserId(ctx);
 	const membership = await ctx.db
-		.query("members")
+		.query("workspaceMembers")
 		.withIndex("by_workspace_user", (q) =>
 			q.eq("workspaceId", workspaceId).eq("userId", userId),
 		)
 		.unique();
 	if (!membership) throw new ConvexError("Unauthorized");
-	return userId;
+	return { userId, membership };
+};
+
+const requireTeamspaceAccess = async (
+	ctx: MutationCtx,
+	args: {
+		workspaceId: Id<"workspaces">;
+		teamspaceId: Id<"teamspaces">;
+		userId: string;
+		role: "owner" | "member";
+	},
+) => {
+	const teamspace = await ctx.db.get(args.teamspaceId);
+	if (!teamspace || teamspace.workspaceId !== args.workspaceId) {
+		throw new ConvexError("Not found");
+	}
+	if (!teamspace.isRestricted) return teamspace;
+	if (args.role === "owner") return teamspace;
+	const teamspaceMember = await ctx.db
+		.query("teamspaceMembers")
+		.withIndex("by_teamspace_user", (q) =>
+			q.eq("teamspaceId", args.teamspaceId).eq("userId", args.userId),
+		)
+		.unique();
+	if (!teamspaceMember) throw new ConvexError("Unauthorized");
+	return teamspace;
 };
 
 const normalizePlainText = (text: string) => {
@@ -84,13 +110,34 @@ export const generateImportUploadUrl = mutation({
 export const importTextOrMarkdown = mutation({
 	args: {
 		workspaceId: v.id("workspaces"),
+		teamspaceId: v.optional(v.id("teamspaces")),
 		storageId: v.id("_storage"),
 		filename: v.string(),
 		parentId: v.optional(v.id("documents")),
 	},
 	returns: v.id("documents"),
 	handler: async (ctx, args) => {
-		const userId = await requireWorkspaceAccess(ctx, args.workspaceId);
+		const { userId, membership } = await requireWorkspaceAccess(
+			ctx,
+			args.workspaceId,
+		);
+
+		const teamspaceId =
+			args.teamspaceId ??
+			(await ctx.db
+				.query("teamspaces")
+				.withIndex("by_workspace_isDefault", (q) =>
+					q.eq("workspaceId", args.workspaceId).eq("isDefault", true),
+				)
+				.first())?._id;
+		if (!teamspaceId) throw new ConvexError("No teamspace");
+
+		await requireTeamspaceAccess(ctx, {
+			workspaceId: args.workspaceId,
+			teamspaceId,
+			userId,
+			role: membership.role,
+		});
 
 		const url = await ctx.storage.getUrl(args.storageId);
 		if (!url) throw new ConvexError("File not found");
@@ -106,8 +153,18 @@ export const importTextOrMarkdown = mutation({
 
 		if (args.parentId) {
 			const parent = await ctx.db.get(args.parentId);
-			if (!parent || parent.workspaceId !== args.workspaceId || parent.isArchived) {
+			if (
+				!parent ||
+				parent.teamspaceId !== teamspaceId ||
+				parent.isArchived
+			) {
 				throw new ConvexError("Not found");
+			}
+			const access = await ctx.runQuery(api.documents.getMyAccessLevel, {
+				id: args.parentId,
+			});
+			if (access !== "full" && access !== "edit") {
+				throw new ConvexError("Unauthorized");
 			}
 		}
 
@@ -118,9 +175,9 @@ export const importTextOrMarkdown = mutation({
 
 		const siblings = await ctx.db
 			.query("documents")
-			.withIndex("by_workspaceId_and_parentId_and_isArchived", (q) =>
+			.withIndex("by_teamspaceId_and_parentId_and_isArchived", (q) =>
 				q
-					.eq("workspaceId", args.workspaceId)
+					.eq("teamspaceId", teamspaceId)
 					.eq("parentId", args.parentId ?? undefined)
 					.eq("isArchived", false),
 			)
@@ -133,6 +190,7 @@ export const importTextOrMarkdown = mutation({
 		const documentId = await ctx.db.insert("documents", {
 			userId,
 			workspaceId: args.workspaceId,
+			teamspaceId,
 			title,
 			content: JSON.stringify(snapshot),
 			searchableText,

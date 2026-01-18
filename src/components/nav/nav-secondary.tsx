@@ -39,7 +39,7 @@ export function NavSecondary({
 	const pathname = location.pathname;
 	const queryClient = useQueryClient();
 	const [trashOpen, setTrashOpen] = useState(false);
-	const { activeWorkspaceId } = useActiveWorkspace();
+	const { activeWorkspaceId, activeTeamspaceId } = useActiveWorkspace();
 
 	useEffect(() => {
 		if (pathname) setTrashOpen(false);
@@ -47,9 +47,14 @@ export function NavSecondary({
 
 	const prefetchTrash = useCallback(() => {
 		void queryClient
-			.prefetchQuery(documentsQueries.getTrash(activeWorkspaceId ?? undefined))
+			.prefetchQuery(
+				documentsQueries.getTrash({
+					workspaceId: activeWorkspaceId ?? undefined,
+					teamspaceId: activeTeamspaceId ?? undefined,
+				}),
+			)
 			.catch(() => {});
-	}, [activeWorkspaceId, queryClient]);
+	}, [activeTeamspaceId, activeWorkspaceId, queryClient]);
 
 	useEffect(() => {
 		const openTrash = () => {

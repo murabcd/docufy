@@ -14,7 +14,6 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { documentsQueries } from "@/queries";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -27,14 +26,11 @@ export function NavDocuments() {
 		? (pathname.split("/documents/")[1] as Id<"documents">)
 		: null;
 
-	const { activeWorkspaceId } = useActiveWorkspace();
 	const [isCollapsed, setIsCollapsed] = useState(false);
 	const [showAllRoots, setShowAllRoots] = useState(false);
 
 	const { data: documents = [] } = useSuspenseQuery(
-		documentsQueries.listSidebar({
-			workspaceId: activeWorkspaceId ?? undefined,
-		}),
+		documentsQueries.listPersonalSidebar(),
 	);
 
 	const hasMore =
@@ -64,7 +60,7 @@ export function NavDocuments() {
 						<TreeDocuments
 							documents={documents as SidebarDocument[]}
 							currentDocumentId={currentDocumentId}
-							workspaceId={activeWorkspaceId ?? undefined}
+							createMode="personal"
 							maxVisibleRoots={MAX_VISIBLE_ROOTS}
 							showAllRoots={showAllRoots}
 						/>

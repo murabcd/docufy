@@ -7,14 +7,14 @@ export default defineSchema({
 		ownerId: v.string(),
 		icon: v.optional(v.string()),
 		isPrivate: v.optional(v.boolean()),
+		isGuest: v.optional(v.boolean()),
 		publicHomepageDocumentId: v.optional(v.id("documents")),
 		alwaysShowPublishedBanner: v.optional(v.boolean()),
-		defaultWorkspaceIds: v.optional(v.array(v.id("workspaces"))),
-		onlyOwnersCanCreateWorkspaces: v.optional(v.boolean()),
+		onlyOwnersCanCreateTeamspaces: v.optional(v.boolean()),
 		createdAt: v.number(),
 		updatedAt: v.number(),
 	}).index("by_owner", ["ownerId"]),
-	members: defineTable({
+	workspaceMembers: defineTable({
 		workspaceId: v.id("workspaces"),
 		userId: v.string(),
 		role: v.union(v.literal("owner"), v.literal("member")),
@@ -25,10 +25,31 @@ export default defineSchema({
 		.index("by_user", ["userId"])
 		.index("by_workspace", ["workspaceId"])
 		.index("by_workspace_user", ["workspaceId", "userId"]),
+	teamspaces: defineTable({
+		workspaceId: v.id("workspaces"),
+		name: v.string(),
+		icon: v.optional(v.string()),
+		isDefault: v.boolean(),
+		isRestricted: v.boolean(),
+		createdAt: v.number(),
+		updatedAt: v.number(),
+	})
+		.index("by_workspace", ["workspaceId"])
+		.index("by_workspace_isDefault", ["workspaceId", "isDefault"]),
+	teamspaceMembers: defineTable({
+		teamspaceId: v.id("teamspaces"),
+		userId: v.string(),
+		createdAt: v.number(),
+	})
+		.index("by_user", ["userId"])
+		.index("by_teamspace", ["teamspaceId"])
+		.index("by_teamspace_user", ["teamspaceId", "userId"]),
 	documents: defineTable({
 		userId: v.optional(v.string()),
+		teamspaceId: v.optional(v.id("teamspaces")),
 		workspaceId: v.optional(v.id("workspaces")),
 		title: v.string(),
+
 		content: v.optional(v.string()),
 		searchableText: v.string(),
 		parentId: v.optional(v.id("documents")),
@@ -65,6 +86,42 @@ export default defineSchema({
 		.index("by_user", ["userId"])
 		.index("by_user_parent", ["userId", "parentId"])
 		.index("by_user_isArchived_updatedAt", ["userId", "isArchived", "updatedAt"])
+		.index("by_user_workspaceId_teamspaceId_isArchived", [
+			"userId",
+			"workspaceId",
+			"teamspaceId",
+			"isArchived",
+		])
+		.index("by_teamspace", ["teamspaceId"])
+		.index("by_teamspace_parent", ["teamspaceId", "parentId"])
+		.index("by_teamspaceId_and_parentId_and_isArchived", [
+			"teamspaceId",
+			"parentId",
+			"isArchived",
+		])
+		.index("by_teamspace_user_isArchived_updatedAt", [
+			"teamspaceId",
+			"userId",
+			"isArchived",
+			"updatedAt",
+		])
+		.index("by_teamspaceId_and_parentId_and_isArchived_and_isPublished", [
+			"teamspaceId",
+			"parentId",
+			"isArchived",
+			"isPublished",
+		])
+		.index("by_teamspace_isArchived_updatedAt", [
+			"teamspaceId",
+			"isArchived",
+			"updatedAt",
+		])
+		.index("by_teamspace_isArchived_isPublished_updatedAt", [
+			"teamspaceId",
+			"isArchived",
+			"isPublished",
+			"updatedAt",
+		])
 		.index("by_workspace", ["workspaceId"])
 		.index("by_workspace_parent", ["workspaceId", "parentId"])
 		.index("by_workspaceId_and_parentId_and_isArchived", [
@@ -102,11 +159,11 @@ export default defineSchema({
 		.index("by_user_isArchived_archivedAt", ["userId", "isArchived", "archivedAt"])
 		.searchIndex("search_title", {
 			searchField: "title",
-			filterFields: ["workspaceId", "isArchived"],
+			filterFields: ["workspaceId", "teamspaceId", "isArchived"],
 		})
 		.searchIndex("search_body", {
 			searchField: "searchableText",
-			filterFields: ["workspaceId", "isArchived"],
+			filterFields: ["workspaceId", "teamspaceId", "isArchived"],
 		}),
 	documentPermissions: defineTable({
 		documentId: v.id("documents"),

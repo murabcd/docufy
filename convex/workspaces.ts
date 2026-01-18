@@ -19,7 +19,7 @@ const requireUserId = async (ctx: QueryCtx | MutationCtx) => {
 
 const listWorkspaceIdsForUser = async (ctx: QueryCtx, userId: string) => {
 	const memberships = await ctx.db
-		.query("members")
+		.query("workspaceMembers")
 		.withIndex("by_user", (q) => q.eq("userId", userId))
 		.collect();
 	return memberships.map((m) => m.workspaceId);
@@ -31,7 +31,7 @@ const requireWorkspaceAccess = async (
 ) => {
 	const userId = await requireUserId(ctx);
 	const membership = await ctx.db
-		.query("members")
+		.query("workspaceMembers")
 		.withIndex("by_workspace_user", (q) =>
 			q.eq("workspaceId", workspaceId).eq("userId", userId),
 		)
@@ -40,24 +40,24 @@ const requireWorkspaceAccess = async (
 	return { userId, membership };
 };
 
+const workspaceFields = {
+	_id: v.id("workspaces"),
+	_creationTime: v.number(),
+	name: v.string(),
+	ownerId: v.string(),
+	icon: v.optional(v.string()),
+	isPrivate: v.optional(v.boolean()),
+	isGuest: v.optional(v.boolean()),
+	publicHomepageDocumentId: v.optional(v.id("documents")),
+	alwaysShowPublishedBanner: v.optional(v.boolean()),
+	onlyOwnersCanCreateTeamspaces: v.optional(v.boolean()),
+	createdAt: v.number(),
+	updatedAt: v.number(),
+};
+
 export const listMine = query({
 	args: {},
-	returns: v.array(
-		v.object({
-			_id: v.id("workspaces"),
-			_creationTime: v.number(),
-			name: v.string(),
-			ownerId: v.string(),
-			icon: v.optional(v.string()),
-			isPrivate: v.optional(v.boolean()),
-			publicHomepageDocumentId: v.optional(v.id("documents")),
-			alwaysShowPublishedBanner: v.optional(v.boolean()),
-			defaultWorkspaceIds: v.optional(v.array(v.id("workspaces"))),
-			onlyOwnersCanCreateWorkspaces: v.optional(v.boolean()),
-			createdAt: v.number(),
-			updatedAt: v.number(),
-		}),
-	),
+	returns: v.array(v.object(workspaceFields)),
 	handler: async (ctx) => {
 		const userId = await getUserId(ctx);
 		if (!userId) return [];
@@ -92,6 +92,27 @@ export const update = mutation({
 
 		if (args.icon !== undefined) {
 			patch.icon = args.icon === null ? undefined : args.icon;
+		}
+
+		await ctx.db.patch(args.workspaceId, patch);
+		return null;
+	},
+});
+
+export const updateWorkspaceSettings = mutation({
+	args: {
+		workspaceId: v.id("workspaces"),
+		onlyOwnersCanCreateTeamspaces: v.optional(v.boolean()),
+	},
+	returns: v.null(),
+	handler: async (ctx, args) => {
+		const { membership } = await requireWorkspaceAccess(ctx, args.workspaceId);
+		if (membership.role !== "owner") throw new ConvexError("Unauthorized");
+
+		const patch: Record<string, unknown> = { updatedAt: Date.now() };
+
+		if (args.onlyOwnersCanCreateTeamspaces !== undefined) {
+			patch.onlyOwnersCanCreateTeamspaces = args.onlyOwnersCanCreateTeamspaces;
 		}
 
 		await ctx.db.patch(args.workspaceId, patch);
@@ -155,7 +176,7 @@ export const listMembers = query({
 		if (!userId) return [];
 
 		const membership = await ctx.db
-			.query("members")
+			.query("workspaceMembers")
 			.withIndex("by_workspace_user", (q) =>
 				q.eq("workspaceId", args.workspaceId).eq("userId", userId),
 			)
@@ -163,7 +184,7 @@ export const listMembers = query({
 		if (!membership) return [];
 
 		const memberships = await ctx.db
-			.query("members")
+			.query("workspaceMembers")
 			.withIndex("by_workspace", (q) => q.eq("workspaceId", args.workspaceId))
 			.collect();
 
@@ -201,6 +222,10 @@ export const inviteMember = mutation({
 		const { membership } = await requireWorkspaceAccess(ctx, args.workspaceId);
 		if (membership.role !== "owner") throw new ConvexError("Unauthorized");
 
+		const workspace = await ctx.db.get(args.workspaceId);
+		if (!workspace) throw new ConvexError("Not found");
+		if (workspace.isGuest) throw new ConvexError("Guest workspace cannot invite");
+
 		const email = args.email.trim().toLowerCase();
 		if (!email) throw new ConvexError("Email required");
 
@@ -212,14 +237,14 @@ export const inviteMember = mutation({
 		if (!user) throw new ConvexError("User not found");
 
 		const existing = await ctx.db
-			.query("members")
+			.query("workspaceMembers")
 			.withIndex("by_workspace_user", (q) =>
 				q.eq("workspaceId", args.workspaceId).eq("userId", user._id),
 			)
 			.unique();
 		if (existing) return null;
 
-		await ctx.db.insert("members", {
+		await ctx.db.insert("workspaceMembers", {
 			workspaceId: args.workspaceId,
 			userId: user._id,
 			role: "member",
@@ -246,14 +271,25 @@ export const create = mutation({
 			name,
 			ownerId: userId,
 			isPrivate: args.isPrivate ?? false,
+			isGuest: false,
 			createdAt: now,
 			updatedAt: now,
 		});
-		await ctx.db.insert("members", {
+		await ctx.db.insert("workspaceMembers", {
 			workspaceId,
 			userId,
 			role: "owner",
 			createdAt: now,
+		});
+
+		const teamspaceId = await ctx.db.insert("teamspaces", {
+			workspaceId,
+			name: "General",
+			icon: undefined,
+			isDefault: true,
+			isRestricted: false,
+			createdAt: now,
+			updatedAt: now,
 		});
 
 		const legacyDocuments = await ctx.db
@@ -261,8 +297,8 @@ export const create = mutation({
 			.withIndex("by_user", (q) => q.eq("userId", userId))
 			.collect();
 		for (const doc of legacyDocuments) {
-			if (doc.workspaceId) continue;
-			await ctx.db.patch(doc._id, { workspaceId });
+			if (doc.workspaceId || doc.teamspaceId) continue;
+			await ctx.db.patch(doc._id, { workspaceId, teamspaceId });
 		}
 
 		return workspaceId;
@@ -281,7 +317,7 @@ export const ensureDefault = mutation({
 		await ctx.runMutation(internal.init.ensureGuestCleanupCron, {});
 
 		const memberships = await ctx.db
-			.query("members")
+			.query("workspaceMembers")
 			.withIndex("by_user", (q) => q.eq("userId", userId))
 			.collect();
 		if (memberships.length > 0) {
@@ -294,14 +330,24 @@ export const ensureDefault = mutation({
 			name,
 			ownerId: userId,
 			isPrivate: false,
+			isGuest: true,
 			createdAt: now,
 			updatedAt: now,
 		});
-		await ctx.db.insert("members", {
+		await ctx.db.insert("workspaceMembers", {
 			workspaceId,
 			userId,
 			role: "owner",
 			createdAt: now,
+		});
+		const teamspaceId = await ctx.db.insert("teamspaces", {
+			workspaceId,
+			name: "General",
+			icon: undefined,
+			isDefault: true,
+			isRestricted: false,
+			createdAt: now,
+			updatedAt: now,
 		});
 
 		const legacyDocuments = await ctx.db
@@ -309,53 +355,10 @@ export const ensureDefault = mutation({
 			.withIndex("by_user", (q) => q.eq("userId", userId))
 			.collect();
 		for (const doc of legacyDocuments) {
-			if (doc.workspaceId) continue;
-			await ctx.db.patch(doc._id, { workspaceId });
+			if (doc.workspaceId || doc.teamspaceId) continue;
+			await ctx.db.patch(doc._id, { workspaceId, teamspaceId });
 		}
 
 		return { defaultWorkspaceId: workspaceId };
-	},
-});
-
-export const updateTeamspaceSettings = mutation({
-	args: {
-		workspaceId: v.id("workspaces"),
-		defaultWorkspaceIds: v.optional(v.array(v.id("workspaces"))),
-		onlyOwnersCanCreateWorkspaces: v.optional(v.boolean()),
-	},
-	returns: v.null(),
-	handler: async (ctx, args) => {
-		const { membership } = await requireWorkspaceAccess(ctx, args.workspaceId);
-		if (membership.role !== "owner") throw new ConvexError("Unauthorized");
-
-		const patch: Record<string, unknown> = { updatedAt: Date.now() };
-
-		if (args.defaultWorkspaceIds !== undefined) {
-			// Validate that all default workspace IDs are valid and user has access
-			for (const defaultWorkspaceId of args.defaultWorkspaceIds) {
-				const defaultWorkspace = await ctx.db.get(defaultWorkspaceId);
-				if (!defaultWorkspace) {
-					throw new ConvexError("Invalid workspace ID");
-				}
-				// Check if user has access to this workspace
-				const userMembership = await ctx.db
-					.query("members")
-					.withIndex("by_workspace_user", (q) =>
-						q.eq("workspaceId", defaultWorkspaceId).eq("userId", membership.userId),
-					)
-					.unique();
-				if (!userMembership) {
-					throw new ConvexError("No access to workspace");
-				}
-			}
-			patch.defaultWorkspaceIds = args.defaultWorkspaceIds;
-		}
-
-		if (args.onlyOwnersCanCreateWorkspaces !== undefined) {
-			patch.onlyOwnersCanCreateWorkspaces = args.onlyOwnersCanCreateWorkspaces;
-		}
-
-		await ctx.db.patch(args.workspaceId, patch);
-		return null;
 	},
 });

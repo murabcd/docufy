@@ -58,13 +58,52 @@ const resolveInternalAccess = (doc: { generalAccess?: string }) => {
 
 const isWriteLevel = (level: AccessLevel) => level === "full" || level === "edit";
 
-const getMembership = async (ctx: AnyCtx, workspaceId: Id<"workspaces">, userId: string) => {
+const getWorkspaceMembership = async (
+	ctx: AnyCtx,
+	workspaceId: Id<"workspaces">,
+	userId: string,
+) => {
 	return await ctx.db
-		.query("members")
+		.query("workspaceMembers")
 		.withIndex("by_workspace_user", (q) =>
 			q.eq("workspaceId", workspaceId).eq("userId", userId),
 		)
 		.unique();
+};
+
+const getTeamspace = async (ctx: AnyCtx, teamspaceId: Id<"teamspaces">) => {
+	return await ctx.db.get(teamspaceId);
+};
+
+const getDocumentWorkspaceId = async (ctx: AnyCtx, doc: any) => {
+	if (doc.workspaceId) return doc.workspaceId;
+	if (!doc.teamspaceId) return null;
+	const teamspace = await getTeamspace(ctx, doc.teamspaceId);
+	return teamspace?.workspaceId ?? null;
+};
+
+const hasTeamspaceAccess = async (
+	ctx: AnyCtx,
+	teamspaceId: Id<"teamspaces">,
+	userId: string,
+) => {
+	const teamspace = await getTeamspace(ctx, teamspaceId);
+	if (!teamspace) return false;
+	const membership = await getWorkspaceMembership(
+		ctx,
+		teamspace.workspaceId,
+		userId,
+	);
+	if (!membership) return false;
+	if ((membership.role as MembershipRole) === "owner") return true;
+	if (!teamspace.isRestricted) return true;
+	const teamspaceMember = await ctx.db
+		.query("teamspaceMembers")
+		.withIndex("by_teamspace_user", (q) =>
+			q.eq("teamspaceId", teamspaceId).eq("userId", userId),
+		)
+		.unique();
+	return Boolean(teamspaceMember);
 };
 
 const getExplicitPermission = async (
@@ -90,10 +129,17 @@ const canReadDocument = async (
 	if (!userId) return false;
 	if (!doc.workspaceId) return doc.userId === userId;
 
-	const membership = await getMembership(ctx, doc.workspaceId, userId);
+	const workspaceId = await getDocumentWorkspaceId(ctx, doc);
+	if (!workspaceId) return false;
+	const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
 	if (!membership) return false;
 	if ((membership.role as MembershipRole) === "owner") return true;
 	if (doc.userId === userId) return true;
+
+	if (doc.teamspaceId) {
+		const teamspaceAccess = await hasTeamspaceAccess(ctx, doc.teamspaceId, userId);
+		if (!teamspaceAccess) return false;
+	}
 
 	if (resolveInternalAccess(doc) === "workspace") return true;
 
@@ -116,10 +162,17 @@ const canWriteDocument = async (
 	if (!userId) return false;
 	if (!doc.workspaceId) return doc.userId === userId;
 
-	const membership = await getMembership(ctx, doc.workspaceId, userId);
+	const workspaceId = await getDocumentWorkspaceId(ctx, doc);
+	if (!workspaceId) return false;
+	const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
 	if (!membership) return false;
 	if ((membership.role as MembershipRole) === "owner") return true;
 	if (doc.userId === userId) return true;
+
+	if (doc.teamspaceId) {
+		const teamspaceAccess = await hasTeamspaceAccess(ctx, doc.teamspaceId, userId);
+		if (!teamspaceAccess) return false;
+	}
 
 	if (resolveInternalAccess(doc) === "workspace") {
 		const workspaceLevel = (doc.workspaceAccessLevel ?? "full") as AccessLevel;

@@ -168,6 +168,8 @@ export function TreeDocuments({
 	documents,
 	currentDocumentId,
 	workspaceId,
+	teamspaceId,
+	createMode: createModeProp,
 	maxVisibleRoots,
 	showAllRoots,
 	canReorder = true,
@@ -175,6 +177,8 @@ export function TreeDocuments({
 	documents: SidebarDocument[];
 	currentDocumentId: Id<"documents"> | null;
 	workspaceId?: Id<"workspaces">;
+	teamspaceId?: Id<"teamspaces">;
+	createMode?: "personal" | "workspace";
 	maxVisibleRoots: number;
 	showAllRoots: boolean;
 	canReorder?: boolean;
@@ -190,12 +194,15 @@ export function TreeDocuments({
 	const [renameValue, setRenameValue] = useState("");
 	const renameInputRef = useRef<HTMLInputElement>(null);
 	const preventMenuCloseAutoFocusIdRef = useRef<Id<"documents"> | null>(null);
+	const createMode =
+		createModeProp ?? (workspaceId || teamspaceId ? "workspace" : "personal");
 
 	const archiveDocument = useMutation(
 		api.documents.archive,
 	).withOptimisticUpdate(optimisticArchiveDocument);
 	const duplicateDocument = useMutation(api.documents.duplicate);
-	const createDocument = useMutation(api.documents.create);
+	const createPersonalDocument = useMutation(api.documents.createPersonal);
+	const createWorkspaceDocument = useMutation(api.documents.create);
 	const toggleFavorite = useMutation(api.favorites.toggle).withOptimisticUpdate(
 		optimisticToggleFavorite,
 	);
@@ -206,7 +213,7 @@ export function TreeDocuments({
 		api.documents.reorder,
 	).withOptimisticUpdate((localStore, args) => {
 		const { id, newParentId, newOrder } = args;
-		const queryArgs = { workspaceId };
+		const queryArgs = { workspaceId, teamspaceId };
 		const existing = localStore.getQuery(api.documents.listSidebar, queryArgs);
 		if (existing === undefined) return;
 
@@ -405,7 +412,7 @@ export function TreeDocuments({
 				<div key={item.getKey()}>
 					<SidebarMenuItem
 						className={[
-							"group/menu-item relative",
+							"group/tree-item relative",
 							isDraggingOver ? "bg-sidebar-accent rounded-md" : "",
 						]
 							.filter(Boolean)
@@ -422,7 +429,7 @@ export function TreeDocuments({
 							}}
 						>
 							<PopoverAnchor asChild>
-								<div className="flex items-center gap-1">
+								<div className="flex items-center">
 									<div style={{ width: level * INDENT }} />
 									<SidebarMenuButton
 										asChild
@@ -475,7 +482,7 @@ export function TreeDocuments({
 												<span
 													className={[
 														"absolute inset-0 flex items-center justify-center transition-opacity",
-														"opacity-100 group-hover/menu-item:opacity-0",
+														"opacity-100 group-hover/tree-item:opacity-0",
 													].join(" ")}
 												>
 													{data.icon ? (
@@ -491,7 +498,7 @@ export function TreeDocuments({
 														"absolute inset-0 m-auto size-4 transition-[opacity,transform]",
 														item.isExpanded() ? "rotate-90" : "",
 														"text-sidebar-foreground/30",
-														"opacity-0 group-hover/menu-item:opacity-100",
+														"opacity-0 group-hover/tree-item:opacity-100",
 													].join(" ")}
 												/>
 											</button>
@@ -508,7 +515,7 @@ export function TreeDocuments({
 										<DropdownMenuTrigger asChild>
 											<button
 												type="button"
-												className="absolute right-7 top-1/2 -translate-y-1/2 opacity-0 group-hover/menu-item:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
+												className="absolute right-7 top-1/2 -translate-y-1/2 opacity-0 group-hover/tree-item:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
 												onPointerDown={(e) => {
 													e.stopPropagation();
 												}}
@@ -689,7 +696,7 @@ export function TreeDocuments({
 										<TooltipTrigger asChild>
 											<button
 												type="button"
-												className="absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/menu-item:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
+												className="absolute right-0.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/tree-item:opacity-100 transition-opacity size-6 flex items-center justify-center hover:bg-sidebar-accent rounded"
 												onPointerDown={(e) => {
 													e.stopPropagation();
 												}}
@@ -698,10 +705,16 @@ export function TreeDocuments({
 													e.stopPropagation();
 													startTransition(async () => {
 														try {
-															const newId = await createDocument({
-																workspaceId,
-																parentId: id,
-															});
+															const newId =
+																createMode === "personal"
+																	? await createPersonalDocument({
+																			parentId: id,
+																		})
+																	: await createWorkspaceDocument({
+																			workspaceId,
+																			teamspaceId,
+																			parentId: id,
+																		});
 															setExpandedItems((prev) => {
 																const key = String(id);
 																if (prev.includes(key)) return prev;

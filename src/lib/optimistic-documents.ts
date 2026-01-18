@@ -12,6 +12,7 @@ const toFavoriteDocument = (document: DocumentRecord) => ({
 	parentId: document.parentId,
 	order: document.order,
 	icon: document.icon,
+	teamspaceId: document.teamspaceId,
 	createdAt: document.createdAt,
 	updatedAt: document.updatedAt,
 });
@@ -196,15 +197,6 @@ export function optimisticUpdateDocument(
 		);
 	}
 
-	const listShared = localStore.getQuery(api.documents.listShared, listArgs);
-	if (listShared !== undefined) {
-		localStore.setQuery(
-			api.documents.listShared,
-			listArgs,
-			replaceDocInArray(listShared, next),
-		);
-	}
-
 	const recentArgs = { workspaceId, limit: 6 };
 	const recent = localStore.getQuery(
 		api.documents.getRecentlyUpdated,
@@ -242,15 +234,6 @@ export function optimisticArchiveDocument(
 			api.documents.list,
 			listArgs,
 			removeDocFromArray(list, args.id),
-		);
-	}
-
-	const listShared = localStore.getQuery(api.documents.listShared, listArgs);
-	if (listShared !== undefined) {
-		localStore.setQuery(
-			api.documents.listShared,
-			listArgs,
-			removeDocFromArray(listShared, args.id),
 		);
 	}
 

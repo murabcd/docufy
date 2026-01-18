@@ -21,34 +21,38 @@ import type { Id } from "../../../convex/_generated/dataModel";
 export function TeamspaceSettingsDialog({
 	open,
 	onOpenChange,
+	teamspaceId,
 	workspaceId,
-	workspaceName: initialName,
-	workspaceIcon: initialIcon,
+	teamspaceName: initialName,
+	teamspaceIcon: initialIcon,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
+	teamspaceId: Id<"teamspaces">;
 	workspaceId: Id<"workspaces">;
-	workspaceName: string;
-	workspaceIcon?: string | null;
+	teamspaceName: string;
+	teamspaceIcon?: string | null;
 }) {
-	const updateWorkspace = useMutation(
-		api.workspaces.update,
+	const updateTeamspace = useMutation(
+		api.teamspaces.update,
 	).withOptimisticUpdate((localStore, args) => {
-		const existing = localStore.getQuery(api.workspaces.listMine, {});
+		const existing = localStore.getQuery(api.teamspaces.listForWorkspace, {
+			workspaceId,
+		});
 		if (existing === undefined) return;
 
 		const now = Date.now();
 		localStore.setQuery(
-			api.workspaces.listMine,
-			{},
-			existing.map((workspace) => {
-				if (workspace._id !== args.workspaceId) return workspace;
+			api.teamspaces.listForWorkspace,
+			{ workspaceId },
+			existing.map((teamspace) => {
+				if (teamspace._id !== args.teamspaceId) return teamspace;
 				return {
-					...workspace,
-					name: args.name ?? workspace.name,
+					...teamspace,
+					name: args.name ?? teamspace.name,
 					icon:
 						args.icon === undefined
-							? workspace.icon
+							? teamspace.icon
 							: args.icon === null
 								? undefined
 								: args.icon,
@@ -80,8 +84,8 @@ export function TeamspaceSettingsDialog({
 
 		setPending(true);
 		try {
-			await updateWorkspace({
-				workspaceId,
+			await updateTeamspace({
+				teamspaceId,
 				name: trimmed !== initialName ? trimmed : undefined,
 				icon: icon !== (initialIcon ?? null) ? icon : undefined,
 			});

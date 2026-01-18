@@ -23,13 +23,11 @@ export function InviteMembersDialog({
 	open,
 	onOpenChange,
 	workspaceId,
-	workspaceName,
 	canInviteMembers = false,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	workspaceId: Id<"workspaces">;
-	workspaceName?: string;
 	canInviteMembers?: boolean;
 }) {
 	const inviteMember = useMutation(
@@ -130,11 +128,7 @@ export function InviteMembersDialog({
 		<Dialog open={open} onOpenChange={handleOpenChange}>
 			<DialogContent className="sm:max-w-2xl">
 				<DialogHeader>
-					<DialogTitle>
-						{workspaceName
-							? `Invite people to ${workspaceName}`
-							: "Invite members"}
-					</DialogTitle>
+					<DialogTitle>Invite members</DialogTitle>
 					<DialogDescription>
 						Add new team members to your workspace.
 					</DialogDescription>

@@ -250,7 +250,7 @@ export function AISidebar({
 		rightOpenMobile,
 	} = useSidebar();
 	const sidebarOpen = isMobile ? rightOpenMobile : rightOpen;
-	const { activeWorkspaceId } = useActiveWorkspace();
+	const { activeWorkspaceId, activeTeamspaceId } = useActiveWorkspace();
 
 	const { data: chats } = useSuspenseQuery(
 		chatsQueries.list({ documentId: null }),
@@ -299,10 +299,12 @@ export function AISidebar({
 				title,
 				content,
 				workspaceId: activeWorkspaceId ?? undefined,
+				teamspaceId: activeTeamspaceId ?? undefined,
 			});
+
 			navigate({ to: "/documents/$documentId", params: { documentId } });
 		},
-		[activeWorkspaceId, createDocumentFromAi, navigate],
+		[activeTeamspaceId, activeWorkspaceId, createDocumentFromAi, navigate],
 	);
 
 	const [pendingSavedChatById, setPendingSavedChatById] = React.useState<
@@ -469,7 +471,7 @@ function ChatSession(
 		onCreatePageFromAi: (chatTitle: string, content: string) => Promise<void>;
 	}>,
 ) {
-	const { activeWorkspaceId } = useActiveWorkspace();
+	const { activeWorkspaceId, activeTeamspaceId } = useActiveWorkspace();
 
 	const {
 		activeChat,
@@ -509,10 +511,12 @@ function ChatSession(
 		() => ({
 			model: selectedModel.model,
 			workspaceId: activeWorkspaceId ?? undefined,
+			teamspaceId: activeTeamspaceId ?? undefined,
 			documentId: contextDocumentId ?? undefined,
 			webSearchEnabled,
 		}),
 		[
+			activeTeamspaceId,
 			activeWorkspaceId,
 			contextDocumentId,
 			selectedModel.model,

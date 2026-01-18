@@ -18,6 +18,7 @@ import type * as http from "../http.js";
 import type * as imports from "../imports.js";
 import type * as init from "../init.js";
 import type * as prosemirrorSync from "../prosemirrorSync.js";
+import type * as teamspaces from "../teamspaces.js";
 import type * as workspaces from "../workspaces.js";
 
 import type {
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   imports: typeof imports;
   init: typeof init;
   prosemirrorSync: typeof prosemirrorSync;
+  teamspaces: typeof teamspaces;
   workspaces: typeof workspaces;
 }>;
 

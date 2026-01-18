@@ -53,7 +53,7 @@ const LinkButtonMenu = ({ editor }: LinkButtonMenuProps) => {
 	const [menuOpened, setMenuOpened] = useState(false);
 	const [linkValue, setLinkValue] = useState("");
 	const [isActive, setIsActive] = useState(false);
-	const { activeWorkspaceId } = useActiveWorkspace();
+	const { activeWorkspaceId, activeTeamspaceId } = useActiveWorkspace();
 
 	const debouncedSearchTerm = useDebouncedValue(linkValue.trim(), 150);
 	const shouldShowInternalResults = useMemo(() => {
@@ -67,6 +67,7 @@ const LinkButtonMenu = ({ editor }: LinkButtonMenuProps) => {
 		useQuery({
 			...documentsQueries.recentlyUpdated({
 				workspaceId: activeWorkspaceId ?? undefined,
+				teamspaceId: activeTeamspaceId ?? undefined,
 				limit: 6,
 			}),
 			enabled: menuOpened && !!activeWorkspaceId,
@@ -77,6 +78,7 @@ const LinkButtonMenu = ({ editor }: LinkButtonMenuProps) => {
 	const { data: allDocuments = [] } = useQuery({
 		...documentsQueries.listIndex({
 			workspaceId: activeWorkspaceId ?? undefined,
+			teamspaceId: activeTeamspaceId ?? undefined,
 			includeArchived: false,
 			limit: 2_000,
 		}),

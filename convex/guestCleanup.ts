@@ -117,11 +117,26 @@ async function deleteWorkspace(ctx: MutationCtx, workspace: Doc<"workspaces">) {
 	}
 
 	const members = await ctx.db
-		.query("members")
+		.query("workspaceMembers")
 		.withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
 		.collect();
 	for (const member of members) {
 		await ctx.db.delete(member._id);
+	}
+
+	const teamspaces = await ctx.db
+		.query("teamspaces")
+		.withIndex("by_workspace", (q) => q.eq("workspaceId", workspaceId))
+		.collect();
+	for (const teamspace of teamspaces) {
+		const teamspaceMembers = await ctx.db
+			.query("teamspaceMembers")
+			.withIndex("by_teamspace", (q) => q.eq("teamspaceId", teamspace._id))
+			.collect();
+		for (const member of teamspaceMembers) {
+			await ctx.db.delete(member._id);
+		}
+		await ctx.db.delete(teamspace._id);
 	}
 
 	await ctx.db.delete(workspaceId);
@@ -159,7 +174,7 @@ async function purgeAppDataForUser(ctx: MutationCtx, userId: string) {
 	}
 
 	const memberships = await ctx.db
-		.query("members")
+		.query("workspaceMembers")
 		.withIndex("by_user", (q) => q.eq("userId", userId))
 		.collect();
 	for (const membership of memberships) {

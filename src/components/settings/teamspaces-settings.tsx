@@ -2,6 +2,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import {
 	ChevronDown,
+	Home,
 	MoreVertical,
 	Plus,
 	Search,
@@ -33,7 +34,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { CreateTeamspaceDialog } from "@/components/workspaces/create-teamspace-dialog";
-import { InviteMembersDialog } from "@/components/workspaces/invite-members-dialog";
+import { TeamspaceMembersDialog } from "@/components/workspaces/teamspace-members-dialog";
 import { TeamspaceSettingsDialog } from "@/components/workspaces/teamspace-settings-dialog";
 import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { authQueries } from "@/queries";
@@ -41,12 +42,12 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 export function TeamspacesSettings() {
-	const { workspaces, activeWorkspaceId } = useActiveWorkspace();
+	const { workspaces, activeWorkspaceId, teamspaces } = useActiveWorkspace();
 	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
 	const activeWorkspace = workspaces.find((w) => w._id === activeWorkspaceId);
 
-	const updateTeamspaceSettings = useMutation(
-		api.workspaces.updateTeamspaceSettings,
+	const updateWorkspaceSettings = useMutation(
+		api.workspaces.updateWorkspaceSettings,
 	).withOptimisticUpdate((localStore, args) => {
 		const existing = localStore.getQuery(api.workspaces.listMine, {});
 		if (existing === undefined) return;
@@ -59,11 +60,9 @@ export function TeamspacesSettings() {
 				if (workspace._id !== args.workspaceId) return workspace;
 				return {
 					...workspace,
-					defaultWorkspaceIds:
-						args.defaultWorkspaceIds ?? workspace.defaultWorkspaceIds,
-					onlyOwnersCanCreateWorkspaces:
-						args.onlyOwnersCanCreateWorkspaces ??
-						workspace.onlyOwnersCanCreateWorkspaces,
+					onlyOwnersCanCreateTeamspaces:
+						args.onlyOwnersCanCreateTeamspaces ??
+						workspace.onlyOwnersCanCreateTeamspaces,
 					updatedAt: now,
 				};
 			}),
@@ -72,23 +71,20 @@ export function TeamspacesSettings() {
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [createWorkspaceOpen, setCreateWorkspaceOpen] = useState(false);
-	const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-	const [selectedWorkspaceForInvite, setSelectedWorkspaceForInvite] =
-		useState<Id<"workspaces"> | null>(null);
-	const [selectedWorkspaceName, setSelectedWorkspaceName] = useState<
-		string | null
-	>(null);
+	const [membersDialogOpen, setMembersDialogOpen] = useState(false);
+	const [selectedTeamspaceForMembers, setSelectedTeamspaceForMembers] =
+		useState<Id<"teamspaces"> | null>(null);
 	const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
-	const [selectedWorkspaceForSettings, setSelectedWorkspaceForSettings] =
+	const [selectedTeamspaceForSettings, setSelectedTeamspaceForSettings] =
 		useState<{
-			id: Id<"workspaces">;
+			id: Id<"teamspaces">;
+			workspaceId: Id<"workspaces">;
 			name: string;
 			icon?: string | null;
 		} | null>(null);
 
-	const defaultWorkspaceIds = activeWorkspace?.defaultWorkspaceIds ?? [];
 	const onlyOwnersCanCreate =
-		activeWorkspace?.onlyOwnersCanCreateWorkspaces ?? false;
+		activeWorkspace?.onlyOwnersCanCreateTeamspaces ?? false;
 
 	const isOwner = useMemo(() => {
 		if (!activeWorkspaceId || !currentUser?._id) return false;
@@ -96,51 +92,25 @@ export function TeamspacesSettings() {
 		return workspace?.ownerId === String(currentUser._id);
 	}, [activeWorkspaceId, currentUser, workspaces]);
 
-	const filteredWorkspaces = useMemo(() => {
-		if (!searchQuery.trim()) return workspaces;
+	const filteredTeamspaces = useMemo(() => {
+		if (!searchQuery.trim()) return teamspaces;
 		const query = searchQuery.toLowerCase();
-		return workspaces.filter((w) => w.name.toLowerCase().includes(query));
-	}, [searchQuery, workspaces]);
-
-	const handleToggleDefaultWorkspace = (workspaceId: Id<"workspaces">) => {
-		if (!activeWorkspaceId) return;
-
-		const isCurrentlyDefault = defaultWorkspaceIds.includes(workspaceId);
-		const newDefaultIds = isCurrentlyDefault
-			? defaultWorkspaceIds.filter((id) => id !== workspaceId)
-			: [...defaultWorkspaceIds, workspaceId];
-
-		updateTeamspaceSettings({
-			workspaceId: activeWorkspaceId,
-			defaultWorkspaceIds: newDefaultIds,
-		})
-			.then(() => {
-				toast.success(
-					isCurrentlyDefault
-						? "Removed from default teamspaces"
-						: "Added to default teamspaces",
-				);
-			})
-			.catch((error) => {
-				toast.error(
-					error instanceof Error
-						? error.message
-						: "Failed to update default teamspaces",
-				);
-			});
-	};
+		return teamspaces.filter((teamspace) =>
+			teamspace.name.toLowerCase().includes(query),
+		);
+	}, [searchQuery, teamspaces]);
 
 	const handleToggleCreationRestriction = (checked: boolean) => {
 		if (!activeWorkspaceId) return;
 
-		updateTeamspaceSettings({
+		updateWorkspaceSettings({
 			workspaceId: activeWorkspaceId,
-			onlyOwnersCanCreateWorkspaces: checked,
+			onlyOwnersCanCreateTeamspaces: checked,
 		})
 			.then(() => {
 				toast.success("Settings updated");
 			})
-			.catch((error) => {
+			.catch((error: unknown) => {
 				toast.error(
 					error instanceof Error ? error.message : "Failed to update settings",
 				);
@@ -188,33 +158,31 @@ export function TeamspacesSettings() {
 						open={createWorkspaceOpen}
 						onOpenChange={setCreateWorkspaceOpen}
 					/>
-					{selectedWorkspaceForInvite ? (
-						<InviteMembersDialog
-							open={inviteDialogOpen}
+					{selectedTeamspaceForMembers ? (
+						<TeamspaceMembersDialog
+							open={membersDialogOpen}
 							onOpenChange={(open) => {
-								setInviteDialogOpen(open);
+								setMembersDialogOpen(open);
 								if (!open) {
-									setSelectedWorkspaceForInvite(null);
-									setSelectedWorkspaceName(null);
+									setSelectedTeamspaceForMembers(null);
 								}
 							}}
-							workspaceId={selectedWorkspaceForInvite}
-							workspaceName={selectedWorkspaceName ?? undefined}
-							canInviteMembers={true}
+							teamspaceId={selectedTeamspaceForMembers}
 						/>
 					) : null}
-					{selectedWorkspaceForSettings ? (
+					{selectedTeamspaceForSettings ? (
 						<TeamspaceSettingsDialog
 							open={settingsDialogOpen}
 							onOpenChange={(open) => {
 								setSettingsDialogOpen(open);
 								if (!open) {
-									setSelectedWorkspaceForSettings(null);
+									setSelectedTeamspaceForSettings(null);
 								}
 							}}
-							workspaceId={selectedWorkspaceForSettings.id}
-							workspaceName={selectedWorkspaceForSettings.name}
-							workspaceIcon={selectedWorkspaceForSettings.icon}
+							teamspaceId={selectedTeamspaceForSettings.id}
+							workspaceId={selectedTeamspaceForSettings.workspaceId}
+							teamspaceName={selectedTeamspaceForSettings.name}
+							teamspaceIcon={selectedTeamspaceForSettings.icon}
 						/>
 					) : null}
 
@@ -230,21 +198,38 @@ export function TeamspacesSettings() {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{filteredWorkspaces.length > 0 ? (
-									filteredWorkspaces.map((workspace) => {
-										const isDefault = defaultWorkspaceIds.includes(
-											workspace._id,
-										);
+								{filteredTeamspaces.length > 0 ? (
+									filteredTeamspaces.map((teamspace) => {
 										const isWorkspaceOwner =
 											currentUser?._id &&
-											workspace.ownerId === String(currentUser._id);
+											activeWorkspace?.ownerId === String(currentUser._id);
 
 										return (
-											<TableRow key={workspace._id}>
+											<TableRow key={teamspace._id}>
 												<TableCell>
-													<span className="text-sm font-medium">
-														{workspace.name}
-													</span>
+													<div className="flex items-center gap-3">
+														<div className="flex items-center justify-center text-muted-foreground shrink-0">
+															{teamspace.icon ? (
+																teamspace.icon.startsWith("data:") ||
+																teamspace.icon.startsWith("http") ? (
+																	<img
+																		src={teamspace.icon}
+																		alt=""
+																		className="h-5 w-5 object-cover rounded-xs"
+																	/>
+																) : (
+																	<span className="text-base">
+																		{teamspace.icon}
+																	</span>
+																)
+															) : (
+																<Home className="h-4 w-4" />
+															)}
+														</div>
+														<span className="text-sm font-medium">
+															{teamspace.name}
+														</span>
+													</div>
 												</TableCell>
 												<TableCell>
 													<div className="flex items-center gap-2">
@@ -261,7 +246,7 @@ export function TeamspacesSettings() {
 																type="button"
 																className="flex items-center gap-2 text-muted-foreground rounded px-2 py-1 hover:bg-accent/50"
 															>
-																{isDefault ? (
+																{teamspace.isDefault ? (
 																	<>
 																		<Badge
 																			variant="outline"
@@ -280,21 +265,17 @@ export function TeamspacesSettings() {
 															</button>
 														</DropdownMenuTrigger>
 														<DropdownMenuContent align="start">
-															<DropdownMenuItem
-																onClick={() =>
-																	handleToggleDefaultWorkspace(workspace._id)
-																}
-															>
-																{isDefault
-																	? "Remove from default"
-																	: "Set as default"}
+															<DropdownMenuItem disabled>
+																{teamspace.isDefault
+																	? "Default teamspace"
+																	: "Member"}
 															</DropdownMenuItem>
 														</DropdownMenuContent>
 													</DropdownMenu>
 												</TableCell>
 												<TableCell>
 													<span className="text-sm text-muted-foreground">
-														{new Date(workspace.updatedAt).toLocaleDateString()}
+														{new Date(teamspace.updatedAt).toLocaleDateString()}
 													</span>
 												</TableCell>
 												<TableCell>
@@ -312,11 +293,10 @@ export function TeamspacesSettings() {
 																<>
 																	<DropdownMenuItem
 																		onClick={() => {
-																			setSelectedWorkspaceForInvite(
-																				workspace._id,
+																			setSelectedTeamspaceForMembers(
+																				teamspace._id,
 																			);
-																			setSelectedWorkspaceName(workspace.name);
-																			setInviteDialogOpen(true);
+																			setMembersDialogOpen(true);
 																		}}
 																	>
 																		<UserPlus className="mr-2 h-4 w-4" />
@@ -324,11 +304,13 @@ export function TeamspacesSettings() {
 																	</DropdownMenuItem>
 																	<DropdownMenuItem
 																		onClick={() => {
-																			setSelectedWorkspaceForSettings({
-																				id: workspace._id,
-																				name: workspace.name,
-																				icon: workspace.icon,
+																			setSelectedTeamspaceForSettings({
+																				id: teamspace._id,
+																				workspaceId: teamspace.workspaceId,
+																				name: teamspace.name,
+																				icon: teamspace.icon,
 																			});
+
 																			setSettingsDialogOpen(true);
 																		}}
 																	>

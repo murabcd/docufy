@@ -27,13 +27,14 @@ export function NavShared() {
 		? (pathname.split("/documents/")[1] as Id<"documents">)
 		: null;
 
-	const { activeWorkspaceId } = useActiveWorkspace();
+	const { activeWorkspaceId, activeTeamspaceId } = useActiveWorkspace();
 	const [isCollapsed, setIsCollapsed] = useState(false);
 	const [showAllRoots, setShowAllRoots] = useState(false);
 
 	const { data: documents = [] } = useSuspenseQuery(
 		documentsQueries.listSharedSidebar({
 			workspaceId: activeWorkspaceId ?? undefined,
+			teamspaceId: activeTeamspaceId ?? undefined,
 		}),
 	);
 
@@ -65,6 +66,7 @@ export function NavShared() {
 							documents={documents as SidebarDocument[]}
 							currentDocumentId={currentDocumentId}
 							workspaceId={activeWorkspaceId ?? undefined}
+							teamspaceId={activeTeamspaceId ?? undefined}
 							maxVisibleRoots={MAX_VISIBLE_ROOTS}
 							showAllRoots={showAllRoots}
 							canReorder={false}

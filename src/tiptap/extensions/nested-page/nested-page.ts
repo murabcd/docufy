@@ -1,5 +1,8 @@
 import { mergeAttributes, Node } from "@tiptap/core";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import type { EditorState } from "@tiptap/pm/state";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import type { DecorationSource } from "@tiptap/pm/view";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 type NestedPagePluginState = {
@@ -107,14 +110,14 @@ export const NestedPage = Node.create({
 					},
 				},
 				props: {
-					decorations(state) {
+					decorations(state: EditorState): DecorationSource | null {
 						const pluginState = nestedPagePluginKey.getState(state);
 						if (!pluginState) {
 							return null;
 						}
 
 						const decorations: Decoration[] = [];
-						state.doc.descendants((node, pos) => {
+						state.doc.descendants((node: ProseMirrorNode, pos: number) => {
 							if (node.type.name !== "nestedPage") {
 								return true;
 							}

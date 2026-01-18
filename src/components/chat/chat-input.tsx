@@ -235,10 +235,12 @@ export function ChatInput({
 	}, [suggestionAction]);
 
 	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
-	const { activeWorkspaceId, workspaces } = useActiveWorkspace();
+	const { activeWorkspaceId, workspaces, activeTeamspaceId } =
+		useActiveWorkspace();
 	const { data: documents } = useSuspenseQuery(
 		documentsQueries.listIndex({
 			workspaceId: activeWorkspaceId ?? undefined,
+			teamspaceId: activeTeamspaceId ?? undefined,
 			includeArchived: false,
 			limit: 2_000,
 		}),
@@ -304,22 +306,15 @@ export function ChatInput({
 			term: normalizedSearchTerm,
 			limit: 25,
 			workspaceId: activeWorkspaceId ?? undefined,
+			teamspaceId: activeTeamspaceId ?? undefined,
 		}),
 		enabled: shouldSearchDocuments,
 	});
 
 	const searchResults = documentSearchQuery.data ?? [];
 
-	const sourceSearchQuery = useQuery({
-		...documentsQueries.searchInWorkspaces({
-			term: normalizedSourceSearchTerm,
-			limit: 25,
-			workspaceIds: workspaceScopes.length > 0 ? workspaceScopes : undefined,
-		}),
-		enabled: shouldSearchSources,
-	});
+	const sourceSearchResults: typeof documents = [];
 
-	const sourceSearchResults = sourceSearchQuery.data ?? [];
 	const localTitleSearchResults = useMemo(() => {
 		if (!shouldSearchSources) return [];
 		const term = normalizedSourceSearchTerm.toLowerCase();
@@ -338,7 +333,7 @@ export function ChatInput({
 			byId.set(String(doc._id), {
 				_id: doc._id,
 				title: doc.title,
-				workspaceId: doc.workspaceId,
+				workspaceId: activeWorkspaceId ?? undefined,
 			});
 		}
 		for (const doc of localTitleSearchResults) {
@@ -350,12 +345,7 @@ export function ChatInput({
 			});
 		}
 		return Array.from(byId.values()).slice(0, 25);
-	}, [
-		activeWorkspaceId,
-		localTitleSearchResults,
-		shouldSearchSources,
-		sourceSearchResults,
-	]);
+	}, [activeWorkspaceId, localTitleSearchResults, shouldSearchSources]);
 
 	useEffect(() => {
 		if (!mentionPopoverOpen) {

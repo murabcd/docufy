@@ -1,7 +1,9 @@
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import { authComponent } from "./auth";
+import { getEffectiveAccessLevelForDoc } from "./documents";
 
 const getUserId = async (ctx: QueryCtx | MutationCtx) => {
 	const user = await authComponent.safeGetAuthUser(ctx);
@@ -21,6 +23,10 @@ export const toggle = mutation({
 	returns: v.boolean(),
 	handler: async (ctx, args) => {
 		const userId = await requireUserId(ctx);
+		const document = await ctx.db.get(args.documentId);
+		if (!document) throw new ConvexError("Not found");
+		const access = await getEffectiveAccessLevelForDoc(ctx, document, userId);
+		if (!access) throw new ConvexError("Not found");
 		const existing = await ctx.db
 			.query("favorites")
 			.withIndex("by_user_document", (q) =>
@@ -72,17 +78,18 @@ export const listWithDocuments = query({
 			documentId: v.id("documents"),
 			createdAt: v.number(),
 			document: v.union(
-				v.object({
-					_id: v.id("documents"),
-					_creationTime: v.number(),
-					title: v.string(),
-					content: v.optional(v.string()),
-					parentId: v.optional(v.id("documents")),
-					order: v.optional(v.number()),
-					icon: v.optional(v.string()),
-					createdAt: v.number(),
-					updatedAt: v.number(),
-				}),
+					v.object({
+						_id: v.id("documents"),
+						_creationTime: v.number(),
+						title: v.string(),
+						content: v.optional(v.string()),
+						parentId: v.optional(v.id("documents")),
+						order: v.optional(v.number()),
+						icon: v.optional(v.string()),
+						teamspaceId: v.optional(v.id("teamspaces")),
+						createdAt: v.number(),
+						updatedAt: v.number(),
+					}),
 				v.null(),
 			),
 		}),
@@ -93,28 +100,18 @@ export const listWithDocuments = query({
 		const workspaceId = args.workspaceId
 			? args.workspaceId
 			: (await ctx.db
-						.query("members")
+						.query("workspaceMembers")
 						.withIndex("by_user", (q) => q.eq("userId", userId))
 						.first())?.workspaceId ?? null;
 		if (!workspaceId) return [];
 		const membership = await ctx.db
-			.query("members")
+			.query("workspaceMembers")
 			.withIndex("by_workspace_user", (q) =>
 				q.eq("workspaceId", workspaceId).eq("userId", userId),
 			)
 			.unique();
 		if (!membership) return [];
-		const toFavoriteDocument = (document: {
-			_id: any;
-			_creationTime: number;
-			title: string;
-			content?: string;
-			parentId?: any;
-			order?: number;
-			icon?: string;
-			createdAt: number;
-			updatedAt: number;
-		}) => ({
+		const toFavoriteDocument = (document: Doc<"documents">) => ({
 			_id: document._id,
 			_creationTime: document._creationTime,
 			title: document.title,
@@ -122,6 +119,7 @@ export const listWithDocuments = query({
 			parentId: document.parentId,
 			order: document.order,
 			icon: document.icon,
+			teamspaceId: document.teamspaceId,
 			createdAt: document.createdAt,
 			updatedAt: document.updatedAt,
 		});
@@ -141,14 +139,22 @@ export const listWithDocuments = query({
 					documentId: favorite.documentId,
 					createdAt: favorite.createdAt,
 				};
+				if (
+					!document ||
+					document.isArchived ||
+					document.workspaceId !== workspaceId
+				) {
+					return { ...safeFavorite, document: null };
+				}
+				const access = await getEffectiveAccessLevelForDoc(
+					ctx,
+					document,
+					userId,
+				);
+				const isAccessible = Boolean(access);
 				return {
 					...safeFavorite,
-					document:
-						document &&
-						!document.isArchived &&
-						document.workspaceId === workspaceId
-							? toFavoriteDocument(document)
-							: null,
+					document: isAccessible ? toFavoriteDocument(document) : null,
 				};
 			}),
 		);

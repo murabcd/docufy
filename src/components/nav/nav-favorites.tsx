@@ -41,6 +41,7 @@ type FavoritesDataItem = {
 		parentId?: Id<"documents">;
 		order?: number;
 		icon?: string;
+		teamspaceId?: Id<"teamspaces">;
 		createdAt: number;
 		updatedAt: number;
 	} | null;
@@ -64,7 +65,7 @@ export function NavFavorites({
 		: null;
 
 	const { isMobile } = useSidebar();
-	const { activeWorkspaceId } = useActiveWorkspace();
+	const { activeWorkspaceId, activeTeamspaceId } = useActiveWorkspace();
 	const removeFavorite = useMutation(api.favorites.remove).withOptimisticUpdate(
 		optimisticRemoveFavorite,
 	);
@@ -74,6 +75,10 @@ export function NavFavorites({
 	const favoriteDocuments = (favoritesData ?? [])
 		.map((f) => f.document)
 		.filter((d): d is NonNullable<FavoritesDataItem["document"]> => d !== null)
+		.filter((d) =>
+			activeTeamspaceId ? d.teamspaceId === activeTeamspaceId : true,
+		)
+
 		.map((d) => ({
 			_id: d._id,
 			_creationTime: d._creationTime,
@@ -81,6 +86,7 @@ export function NavFavorites({
 			parentId: d.parentId,
 			order: d.order,
 			icon: d.icon,
+			teamspaceId: d.teamspaceId,
 			isPublished: false,
 			createdAt: d.createdAt,
 			updatedAt: d.updatedAt,
@@ -127,6 +133,7 @@ export function NavFavorites({
 								documents={favoriteDocuments as SidebarDocument[]}
 								currentDocumentId={currentDocumentId}
 								workspaceId={activeWorkspaceId ?? undefined}
+								teamspaceId={activeTeamspaceId ?? undefined}
 								maxVisibleRoots={MAX_VISIBLE_ROOTS}
 								showAllRoots={showAllRoots}
 								canReorder={false}

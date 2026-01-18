@@ -78,10 +78,17 @@ function DocumentEditor() {
 	const [shareDialogInitialTab, setShareDialogInitialTab] = useState<
 		"share" | "publish"
 	>("share");
-	const { activeWorkspaceId, setActiveWorkspaceId } = useActiveWorkspace();
+	const {
+		activeWorkspaceId,
+		activeTeamspaceId,
+		setActiveWorkspaceId,
+		setActiveTeamspaceId,
+	} = useActiveWorkspace();
 	const { data: document } = useSuspenseQuery(
 		documentsQueries.get(documentId as Id<"documents">),
 	);
+	const resolvedTeamspaceId =
+		document?.teamspaceId ?? activeTeamspaceId ?? undefined;
 	const { data: accessLevel } = useSuspenseQuery(
 		documentsQueries.getMyAccessLevel(documentId as Id<"documents">),
 	);
@@ -93,20 +100,36 @@ function DocumentEditor() {
 
 	useEffect(() => {
 		if (!document?.workspaceId) return;
-		if (String(document.workspaceId) === String(activeWorkspaceId)) return;
-		setActiveWorkspaceId(document.workspaceId);
-	}, [activeWorkspaceId, document?.workspaceId, setActiveWorkspaceId]);
+		if (String(document.workspaceId) !== String(activeWorkspaceId)) {
+			setActiveWorkspaceId(document.workspaceId);
+		}
+		if (
+			document.teamspaceId &&
+			String(document.teamspaceId) !== String(activeTeamspaceId)
+		) {
+			setActiveTeamspaceId(document.teamspaceId);
+		}
+	}, [
+		activeTeamspaceId,
+		activeWorkspaceId,
+		document?.teamspaceId,
+		document?.workspaceId,
+		setActiveTeamspaceId,
+		setActiveWorkspaceId,
+	]);
 
 	const { data: rootDocuments = [] } = useQuery({
 		...documentsQueries.list({
 			parentId: null,
 			workspaceId: activeWorkspaceId ?? undefined,
+			teamspaceId: resolvedTeamspaceId,
 		}),
 		placeholderData: [],
 	});
 	const { data: allDocuments = [] } = useQuery({
 		...documentsQueries.listIndex({
 			workspaceId: activeWorkspaceId ?? undefined,
+			teamspaceId: resolvedTeamspaceId,
 			includeArchived: true,
 			limit: 10_000,
 		}),
@@ -291,6 +314,7 @@ function DocumentEditor() {
 				const newId = await createDocument({
 					parentId: documentId as Id<"documents">,
 					workspaceId: activeWorkspaceId ?? undefined,
+					teamspaceId: resolvedTeamspaceId,
 				});
 
 				// Replace placeholder attrs with the real document id.

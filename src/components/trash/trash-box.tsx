@@ -276,9 +276,12 @@ export function TrashBoxPopover({
 	open: boolean;
 	onRequestClose?: () => void;
 }) {
-	const { activeWorkspaceId } = useActiveWorkspace();
+	const { activeWorkspaceId, activeTeamspaceId } = useActiveWorkspace();
 	const { data: documents, isLoading } = useQuery({
-		...documentsQueries.getTrash(activeWorkspaceId ?? undefined),
+		...documentsQueries.getTrash({
+			workspaceId: activeWorkspaceId ?? undefined,
+			teamspaceId: activeTeamspaceId ?? undefined,
+		}),
 		enabled: open,
 		gcTime: 2 * 60_000,
 		placeholderData: (previousData) => previousData,

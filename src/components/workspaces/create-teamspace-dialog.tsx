@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -22,9 +23,10 @@ export function CreateTeamspaceDialog({
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onCreated?: (workspaceId: Id<"workspaces">) => void;
+	onCreated?: (teamspaceId: Id<"teamspaces">) => void;
 }) {
-	const createWorkspace = useMutation(api.workspaces.create);
+	const { activeWorkspaceId } = useActiveWorkspace();
+	const createTeamspace = useMutation(api.teamspaces.create);
 	const [name, setName] = useState("");
 	const [pending, setPending] = useState(false);
 
@@ -36,13 +38,20 @@ export function CreateTeamspaceDialog({
 			toast.error("Teamspace name is required");
 			return;
 		}
+		if (!activeWorkspaceId) {
+			toast.error("No workspace selected");
+			return;
+		}
 		setPending(true);
 		try {
-			const workspaceId = await createWorkspace({
+			const teamspaceId = await createTeamspace({
+				workspaceId: activeWorkspaceId,
 				name: trimmed,
-				isPrivate: false,
+				icon: null,
+				isDefault: false,
+				isRestricted: false,
 			});
-			onCreated?.(workspaceId);
+			onCreated?.(teamspaceId);
 			onOpenChange(false);
 			setName("");
 		} catch (error) {

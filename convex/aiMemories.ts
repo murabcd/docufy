@@ -28,7 +28,7 @@ const requireWorkspaceMember = async (
 	args: { workspaceId: Id<"workspaces">; userId: string },
 ) => {
 	const member = await ctx.db
-		.query("members")
+		.query("workspaceMembers")
 		.withIndex("by_workspace_user", (q) =>
 			q.eq("workspaceId", args.workspaceId).eq("userId", args.userId),
 		)

@@ -53,7 +53,7 @@ export function PublicPagesSettings() {
 	const { workspaces, activeWorkspaceId } = useActiveWorkspace();
 	const activeWorkspace = workspaces.find((w) => w._id === activeWorkspaceId);
 	const { data: allDocuments } = useSuspenseQuery(
-		documentsQueries.getAll(activeWorkspaceId ?? undefined),
+		documentsQueries.getAll({ workspaceId: activeWorkspaceId ?? undefined }),
 	);
 
 	const updatePublicPagesSettings = useMutation(

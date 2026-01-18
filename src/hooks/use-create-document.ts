@@ -2,7 +2,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { useCallback, useSyncExternalStore } from "react";
-import { useActiveWorkspace } from "@/hooks/use-active-workspace";
 import { documentsQueries } from "@/queries";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -32,8 +31,7 @@ function setIsCreatingGlobal(next: boolean) {
 export function useCreateDocument() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const createDocument = useMutation(api.documents.create);
-	const { activeWorkspaceId } = useActiveWorkspace();
+	const createDocument = useMutation(api.documents.createPersonal);
 	const isCreating = useSyncExternalStore(
 		subscribeIsCreating,
 		getIsCreatingSnapshot,
@@ -44,9 +42,7 @@ export function useCreateDocument() {
 		if (isCreating) return;
 		setIsCreatingGlobal(true);
 		try {
-			const documentId = await createDocument({
-				workspaceId: activeWorkspaceId ?? undefined,
-			});
+			const documentId = await createDocument({});
 
 			await Promise.allSettled([
 				queryClient.ensureQueryData(
@@ -64,7 +60,7 @@ export function useCreateDocument() {
 		} finally {
 			setIsCreatingGlobal(false);
 		}
-	}, [activeWorkspaceId, createDocument, isCreating, navigate, queryClient]);
+	}, [createDocument, isCreating, navigate, queryClient]);
 
 	return { createAndNavigate, isCreating };
 }
