@@ -1,5 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-import { useConvexAuth } from "convex/react";
 import { Loader2 } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
@@ -13,7 +11,6 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { authClient } from "@/lib/auth-client";
-import { authQueries } from "@/queries";
 
 interface LoginDialogProps {
 	open?: boolean;
@@ -24,11 +21,6 @@ export function LoginDialog({
 	open: controlledOpen,
 	onOpenChange,
 }: LoginDialogProps) {
-	const { isAuthenticated, isLoading } = useConvexAuth();
-	const { data: currentUser } = useQuery({
-		...authQueries.currentUser(),
-		enabled: !isLoading && isAuthenticated,
-	});
 	const [internalOpen, setInternalOpen] = React.useState(false);
 	const [loadingGitHub, setLoadingGitHub] = React.useState(false);
 
@@ -38,15 +30,6 @@ export function LoginDialog({
 	const handleGitHubSignIn = async () => {
 		setLoadingGitHub(true);
 		try {
-			if (
-				currentUser &&
-				(currentUser as { isAnonymous?: boolean }).isAnonymous
-			) {
-				localStorage.setItem(
-					"docufy:migrateFromUserId",
-					String((currentUser as { _id?: unknown })._id),
-				);
-			}
 			await authClient.signIn.social({
 				provider: "github",
 				callbackURL: window.location.href,

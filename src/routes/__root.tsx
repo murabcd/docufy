@@ -91,7 +91,6 @@ function RootComponent() {
 		>
 			<EnsureGuestSession hasInitialToken={Boolean(context.token)} />
 			<EnsureGuestWorkspace />
-			<MigrateAnonymousData />
 			{context.isAuthenticated ? (
 				<ActiveWorkspaceProvider>
 					<Outlet />
@@ -141,43 +140,6 @@ function EnsureGuestSession({ hasInitialToken }: { hasInitialToken: boolean }) {
 				sessionStorage.removeItem(key);
 			});
 	}, [error, hasInitialToken, isPending, isRefetching, router, session]);
-
-	return null;
-}
-
-function MigrateAnonymousData() {
-	const { data: currentUser } = useSuspenseQuery(authQueries.currentUser());
-	const context = useRouteContext({ from: Route.id });
-	const migrateAnonymousData = useMutation(api.auth.migrateAnonymousData);
-	const startedRef = React.useRef(false);
-
-	React.useEffect(() => {
-		if (typeof window === "undefined") return;
-		if (!currentUser) return;
-		if (startedRef.current) return;
-
-		const key = "docufy:migrateFromUserId";
-		const fromUserId = localStorage.getItem(key);
-		if (!fromUserId) return;
-		startedRef.current = true;
-
-		const toUserId = String((currentUser as { _id?: unknown })._id);
-		if (!toUserId || fromUserId === toUserId) {
-			localStorage.removeItem(key);
-			return;
-		}
-
-		migrateAnonymousData({ fromUserId })
-			.then(() => {
-				localStorage.removeItem(key);
-				// Keep UI stable (no full reload), but make sure any user-scoped
-				// Convex subscriptions are refreshed under the new identity.
-				context.queryClient.invalidateQueries();
-			})
-			.catch((error) => {
-				console.error(error);
-			});
-	}, [context.queryClient, currentUser, migrateAnonymousData]);
 
 	return null;
 }
