@@ -1,4 +1,8 @@
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import {
+	type UseQueryOptions,
+	useQuery,
+	useSuspenseQuery,
+} from "@tanstack/react-query";
 import * as React from "react";
 import { teamspacesQueries, workspacesQueries } from "@/queries";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -56,10 +60,15 @@ export function ActiveWorkspaceProvider({
 	const [activeTeamspaceId, setActiveTeamspaceIdState] =
 		React.useState<Id<"teamspaces"> | null>(null);
 
-	const teamspacesQuery = teamspacesQueries.listForWorkspace(
-		activeWorkspaceId ?? ("skip" as Id<"workspaces">),
-	);
-	const { data: teamspaces = [] } = useQuery({
+	const teamspacesQuery = (
+		activeWorkspaceId
+			? teamspacesQueries.listForWorkspace(activeWorkspaceId)
+			: {
+					queryKey: ["teamspaces", "listForWorkspace", "empty"] as const,
+					queryFn: async () => [] as TeamspaceSummary[],
+				}
+	) as UseQueryOptions<TeamspaceSummary[]>;
+	const { data: teamspaces = [] } = useQuery<TeamspaceSummary[]>({
 		...teamspacesQuery,
 		enabled: Boolean(activeWorkspaceId),
 		placeholderData: [],
@@ -68,7 +77,7 @@ export function ActiveWorkspaceProvider({
 	React.useEffect(() => {
 		if (typeof window === "undefined") return;
 		const storedWorkspace = localStorage.getItem(WORKSPACE_STORAGE_KEY);
-		if (storedWorkspace) {
+		if (storedWorkspace && storedWorkspace !== "skip") {
 			setActiveWorkspaceIdState(storedWorkspace as Id<"workspaces">);
 		}
 		const storedTeamspace = localStorage.getItem(TEAMSPACE_STORAGE_KEY);
