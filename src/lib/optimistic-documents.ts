@@ -225,9 +225,10 @@ export function optimisticArchiveDocument(
 	localStore.setQuery(api.documents.get, getArgs, next);
 
 	const workspaceId = next.workspaceId ?? undefined;
+	const teamspaceId = next.teamspaceId ?? undefined;
 	const parentId = next.parentId ?? null;
 
-	const listArgs = { workspaceId, parentId };
+	const listArgs = { workspaceId, teamspaceId, parentId };
 	const list = localStore.getQuery(api.documents.list, listArgs);
 	if (list !== undefined) {
 		localStore.setQuery(
@@ -237,7 +238,7 @@ export function optimisticArchiveDocument(
 		);
 	}
 
-	const recentArgs = { workspaceId, limit: 6 };
+	const recentArgs = { workspaceId, teamspaceId, limit: 6 };
 	const recent = localStore.getQuery(
 		api.documents.getRecentlyUpdated,
 		recentArgs,
@@ -250,7 +251,7 @@ export function optimisticArchiveDocument(
 		);
 	}
 
-	const trashArgs = { workspaceId };
+	const trashArgs = { workspaceId, teamspaceId };
 	const trash = localStore.getQuery(api.documents.getTrash, trashArgs);
 	if (trash !== undefined) {
 		localStore.setQuery(
@@ -275,7 +276,8 @@ export function optimisticRestoreDocument(
 	localStore.setQuery(api.documents.get, getArgs, next);
 
 	const workspaceId = next.workspaceId ?? undefined;
-	const trashArgs = { workspaceId };
+	const teamspaceId = next.teamspaceId ?? undefined;
+	const trashArgs = { workspaceId, teamspaceId };
 	const trash = localStore.getQuery(api.documents.getTrash, trashArgs);
 	if (trash !== undefined) {
 		localStore.setQuery(
@@ -296,12 +298,16 @@ export function optimisticRemoveDocument(
 		existing && existing !== null
 			? (existing as DocumentRecord).workspaceId
 			: undefined;
+	const teamspaceId =
+		existing && existing !== null
+			? (existing as DocumentRecord).teamspaceId
+			: undefined;
 
 	if (existing !== undefined) {
 		localStore.setQuery(api.documents.get, getArgs, null);
 	}
 
-	const trashArgs = { workspaceId };
+	const trashArgs = { workspaceId, teamspaceId };
 	const trash = localStore.getQuery(api.documents.getTrash, trashArgs);
 	if (trash !== undefined) {
 		localStore.setQuery(

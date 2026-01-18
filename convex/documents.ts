@@ -1228,8 +1228,38 @@ export const archive = mutation({
 		if (!document) {
 			throw new ConvexError("Not found");
 		}
-		if (!document.workspaceId && !document.teamspaceId) throw new ConvexError("Not found");
 		await requireDocumentWriteAccess(ctx, document, userId);
+		const isPersonal = !document.workspaceId && !document.teamspaceId;
+		if (isPersonal) {
+			const recursiveArchive = async (documentId: Id<"documents">) => {
+				const children = await ctx.db
+					.query("documents")
+					.withIndex("by_user_parent", (q) =>
+						q.eq("userId", userId).eq("parentId", documentId),
+					)
+					.collect();
+
+				for (const child of children) {
+					if (child.workspaceId || child.teamspaceId) continue;
+					await ctx.db.patch(child._id, {
+						isArchived: true,
+						archivedAt: now,
+						updatedAt: now,
+					});
+					await recursiveArchive(child._id);
+				}
+			};
+
+			await ctx.db.patch(args.id, {
+				isArchived: true,
+				archivedAt: now,
+				updatedAt: now,
+			});
+
+			await recursiveArchive(args.id);
+			await ctx.runMutation(internal.init.ensureTrashCleanupCron, {});
+			return null;
+		}
 		const workspaceId = await getDocumentWorkspaceId(ctx, document);
 		if (!workspaceId) throw new ConvexError("Not found");
 		const teamspaceId = document.teamspaceId ?? (await resolveTeamspaceId(ctx, workspaceId));
@@ -1275,51 +1305,55 @@ export const getTrash = query({
 	handler: async (ctx, args) => {
 		const userId = await getUserId(ctx);
 		if (!userId) return [];
-		const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
-		if (!workspaceId) return [];
-		const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
-		if (!membership) return [];
-		const teamspaceId = await resolveTeamspaceId(
-			ctx,
-			workspaceId,
-			args.teamspaceId,
-		);
-		if (!teamspaceId) return [];
 
-		if (membership.role === "owner") {
-			const documents = await ctx.db
+		const [personalDocs, workspaceDocs] = await Promise.all([
+			ctx.db
 				.query("documents")
-				.withIndex("by_teamspace_isArchived_updatedAt", (q) =>
-					q.eq("teamspaceId", teamspaceId).eq("isArchived", true),
+				.withIndex("by_user_isArchived_updatedAt", (q) =>
+					q.eq("userId", userId).eq("isArchived", true),
 				)
-				.collect();
+				.collect(),
+			(async () => {
+				const workspaceId = await resolveWorkspaceId(ctx, args.workspaceId);
+				if (!workspaceId) return [] as Doc<"documents">[];
+				const membership = await getWorkspaceMembership(ctx, workspaceId, userId);
+				if (!membership) return [] as Doc<"documents">[];
+				const teamspaceId = await resolveTeamspaceId(
+					ctx,
+					workspaceId,
+					args.teamspaceId,
+				);
+				if (!teamspaceId) return [] as Doc<"documents">[];
 
-			return documents.sort((a, b) => {
-				const aArchivedAt = a.archivedAt ?? a.updatedAt;
-				const bArchivedAt = b.archivedAt ?? b.updatedAt;
-				return bArchivedAt - aArchivedAt;
-			});
-		}
-		const explicitPermissions = await listExplicitPermissionsForWorkspaceUser(
-			ctx,
-			workspaceId,
-			userId,
+				const documents = await ctx.db
+					.query("documents")
+					.withIndex("by_teamspace_isArchived_updatedAt", (q) =>
+						q.eq("teamspaceId", teamspaceId).eq("isArchived", true),
+					)
+					.collect();
+
+				if (membership.role === "owner") {
+					return documents;
+				}
+
+				const explicitPermissions = await listExplicitPermissionsForWorkspaceUser(
+					ctx,
+					workspaceId,
+					userId,
+				);
+				return documents.filter((doc) => {
+					if (doc.userId && doc.userId === userId) return true;
+					const generalAccess = resolveGeneralAccess(doc);
+					if (generalAccess === "workspace") return true;
+					return explicitPermissions.has(String(doc._id));
+				});
+			})(),
+		]);
+
+		const personalOnly = personalDocs.filter(
+			(doc) => !doc.workspaceId && !doc.teamspaceId,
 		);
-		const documents = await ctx.db
-			.query("documents")
-			.withIndex("by_teamspace_isArchived_updatedAt", (q) =>
-				q.eq("teamspaceId", teamspaceId).eq("isArchived", true),
-			)
-			.collect();
-
-		const accessible = documents.filter((doc) => {
-			if (doc.userId && doc.userId === userId) return true;
-			const generalAccess = resolveGeneralAccess(doc);
-			if (generalAccess === "workspace") return true;
-			return explicitPermissions.has(String(doc._id));
-		});
-
-		return accessible.sort((a, b) => {
+		return [...workspaceDocs, ...personalOnly].sort((a, b) => {
 			const aArchivedAt = a.archivedAt ?? a.updatedAt;
 			const bArchivedAt = b.archivedAt ?? b.updatedAt;
 			return bArchivedAt - aArchivedAt;
@@ -1339,8 +1373,75 @@ export const restore = mutation({
 		if (!document) {
 			throw new ConvexError("Not found");
 		}
-		if (!document.workspaceId && !document.teamspaceId) throw new ConvexError("Not found");
 		await requireDocumentWriteAccess(ctx, document, userId);
+		const isPersonal = !document.workspaceId && !document.teamspaceId;
+		if (isPersonal) {
+			const recursiveRestore = async (documentId: Id<"documents">) => {
+				const children = await ctx.db
+					.query("documents")
+					.withIndex("by_user_parent", (q) =>
+						q.eq("userId", userId).eq("parentId", documentId),
+					)
+					.collect();
+
+				for (const child of children) {
+					if (child.workspaceId || child.teamspaceId) continue;
+					await ctx.db.patch(child._id, {
+						isArchived: false,
+						archivedAt: undefined,
+						updatedAt: now,
+					});
+					await recursiveRestore(child._id);
+				}
+			};
+
+			const patch: {
+				isArchived: boolean;
+				parentId?: Id<"documents"> | undefined;
+				order?: number | undefined;
+				archivedAt?: number | undefined;
+				updatedAt: number;
+			} = {
+				isArchived: false,
+				archivedAt: undefined,
+				updatedAt: now,
+			};
+
+			let targetParentId: Id<"documents"> | undefined = document.parentId;
+			if (targetParentId) {
+				const parent = await ctx.db.get(targetParentId);
+				if (
+					!parent ||
+					parent.isArchived ||
+					parent.workspaceId ||
+					parent.teamspaceId ||
+					parent.userId !== userId
+				) {
+					targetParentId = undefined;
+				}
+			}
+
+			patch.parentId = targetParentId;
+
+			const siblings = await ctx.db
+				.query("documents")
+				.withIndex("by_user_parent", (q) =>
+					q.eq("userId", userId).eq("parentId", targetParentId),
+				)
+				.collect();
+			const personalSiblings = siblings.filter(
+				(doc) => !doc.workspaceId && !doc.teamspaceId && !doc.isArchived,
+			);
+			const maxOrder = personalSiblings.reduce(
+				(max, doc) => Math.max(max, doc.order ?? 0),
+				-1,
+			);
+			patch.order = maxOrder + 1;
+
+			await ctx.db.patch(args.id, patch);
+			await recursiveRestore(args.id);
+			return null;
+		}
 		const workspaceId = await getDocumentWorkspaceId(ctx, document);
 		if (!workspaceId) throw new ConvexError("Not found");
 		const teamspaceId = document.teamspaceId ?? (await resolveTeamspaceId(ctx, workspaceId));
@@ -1474,6 +1575,64 @@ async function cascadeDelete(
 	}
 }
 
+async function cascadeDeletePersonal(
+	ctx: MutationCtx,
+	rootId: Id<"documents">,
+	userId: string,
+) {
+	const idsToDelete: Id<"documents">[] = [];
+	const stack: Id<"documents">[] = [rootId];
+
+	while (stack.length > 0) {
+		const currentId = stack.pop() as Id<"documents">;
+		idsToDelete.push(currentId);
+
+		const children = await ctx.db
+			.query("documents")
+			.withIndex("by_user_parent", (q) =>
+				q.eq("userId", userId).eq("parentId", currentId),
+			)
+			.collect();
+
+		for (const child of children) {
+			if (child.workspaceId || child.teamspaceId) continue;
+			stack.push(child._id);
+		}
+	}
+
+	for (const documentId of idsToDelete.reverse()) {
+		const relatedPermissions = await ctx.db
+			.query("documentPermissions")
+			.withIndex("by_document", (q) => q.eq("documentId", documentId))
+			.collect();
+		for (const permission of relatedPermissions) {
+			await ctx.db.delete(permission._id);
+		}
+
+		const relatedChunks = await ctx.db
+			.query("chunks")
+			.withIndex("by_documentId", (q) => q.eq("documentId", documentId))
+			.collect();
+		for (const chunk of relatedChunks) {
+			await ctx.db.delete(chunk._id);
+		}
+
+		const relatedFavorites = await ctx.db
+			.query("favorites")
+			.withIndex("by_documentId", (q) => q.eq("documentId", documentId))
+			.collect();
+		for (const favorite of relatedFavorites) {
+			await ctx.db.delete(favorite._id);
+		}
+
+		await ctx.runMutation(components.prosemirrorSync.lib.deleteDocument, {
+			id: String(documentId),
+		});
+
+		await ctx.db.delete(documentId);
+	}
+}
+
 export const remove = mutation({
 	args: {
 		id: v.id("documents"),
@@ -1485,11 +1644,14 @@ export const remove = mutation({
 		if (!document) {
 			throw new ConvexError("Not found");
 		}
-		if (!document.workspaceId && !document.teamspaceId) throw new ConvexError("Not found");
 		await requireDocumentWriteAccess(ctx, document, userId);
 
 		if (!document.isArchived) {
 			throw new Error("Page must be moved to trash before permanent deletion");
+		}
+		if (!document.workspaceId && !document.teamspaceId) {
+			await cascadeDeletePersonal(ctx, args.id, userId);
+			return null;
 		}
 		const teamspaceId = document.teamspaceId;
 		if (!teamspaceId) throw new ConvexError("Not found");
@@ -1518,8 +1680,11 @@ export const removeAllForUser = mutation({
 		for (const doc of roots) {
 			const current = await ctx.db.get(doc._id);
 			if (!current) continue;
-			if (!current.teamspaceId) continue;
 			await requireDocumentWriteAccess(ctx, current, userId);
+			if (!current.teamspaceId) {
+				await cascadeDeletePersonal(ctx, current._id, userId);
+				continue;
+			}
 			await cascadeDelete(ctx, current._id, current.teamspaceId);
 		}
 
